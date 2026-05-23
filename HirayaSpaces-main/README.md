@@ -1,2 +1,0 @@
-# HirayaSpaces
-Cleaning Business Hosting
