@@ -644,6 +644,7 @@
   }
 }
 </script>
+<link rel="stylesheet" href="/css/auth.css">
 </head>
 <body>
 
@@ -666,10 +667,12 @@
     <li><a href="#contact">Contact</a></li>
   </ul>
   <div style="display:flex;gap:10px;align-items:center">
-    <button class="nav-login" id="nav-login-btn" onclick="showModal('login')">Log in</button>
-    <button class="nav-user-btn" id="nav-user-btn" onclick="openDashboard()">
-      <span id="nav-user-name"></span> · My account
-    </button>
+    <button class="nav-login" id="nav-login-btn" onclick="HirayaAuth.openAuthModal('login')">Log in</button>
+    <button class="nav-login" id="nav-signup-btn" onclick="HirayaAuth.openAuthModal('signup')" style="display:none">Sign up</button>
+    <div class="nav-user-wrap" id="nav-user-wrap">
+      <span class="nav-user-greet" id="nav-user-greet">Welcome</span>
+      <button class="nav-logout" onclick="HirayaAuth.doLogout()">Log out</button>
+    </div>
     <button class="nav-cta" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book now</button>
     <a href="tel:+12267514566" class="nav-phone" style="font-size:13px;color:var(--muted);text-decoration:none;font-weight:500">(226) 751-4566</a>
   </div>
@@ -1149,33 +1152,72 @@ renderTimes();
 updateSummary();
 </script>
 
-<!-- LOGIN / SIGNUP MODAL -->
-<div class="modal-overlay" id="auth-modal">
+<!-- LOGIN / SIGNUP / FORGOT-PASSWORD MODAL -->
+<div class="modal-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeModal()">✕</button>
+    <button class="modal-close" onclick="HirayaAuth.closeAuthModal()" aria-label="Close">✕</button>
     <div class="modal-logo" style="font-family:'Cinzel',serif;letter-spacing:2px;font-size:16px;color:var(--sage);text-transform:uppercase">HIRAYA SPACES</div>
 
     <!-- Login form -->
     <div id="form-login">
-      <h2 class="modal-title">Welcome back</h2>
+      <h2 class="modal-title" id="auth-modal-title">Welcome back</h2>
       <p class="modal-sub">Log in to view your bookings, past cleans, and invoices.</p>
-      <div class="modal-field"><label>Email</label><input type="email" id="login-email" placeholder="you@email.com"></div>
-      <div class="modal-field"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
-      <div class="modal-err" id="login-err">Incorrect email or password. Try: sarah@example.com / password123</div>
-      <button class="modal-btn" onclick="doLogin()">Log in</button>
-      <div class="modal-switch">Don't have an account? <a onclick="switchForm('signup')">Sign up</a></div>
+      <div class="modal-field">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" autocomplete="email" placeholder="you@email.com">
+      </div>
+      <div class="modal-field">
+        <label for="login-pass">Password</label>
+        <input type="password" id="login-pass" autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <div class="modal-field-row">
+        <button type="button" class="modal-forgot-link" onclick="HirayaAuth.switchAuthView('forgot')">Forgot password?</button>
+      </div>
+      <div class="modal-err" id="login-err" role="alert"></div>
+      <button class="modal-btn" id="login-submit" onclick="HirayaAuth.doLogin()">Log in</button>
+      <div class="modal-switch">Don't have an account? <a onclick="HirayaAuth.switchAuthView('signup')">Sign up</a></div>
     </div>
 
     <!-- Signup form -->
     <div id="form-signup" style="display:none">
       <h2 class="modal-title">Create account</h2>
       <p class="modal-sub">Sign up to book cleans and track your cleaning history.</p>
-      <div class="modal-field"><label>Full name</label><input type="text" id="su-name" placeholder="Jane Smith"></div>
-      <div class="modal-field"><label>Email</label><input type="email" id="su-email" placeholder="you@email.com"></div>
-      <div class="modal-field"><label>Password</label><input type="password" id="su-pass" placeholder="Create a password"></div>
-      <div class="modal-err" id="su-err">Please fill in all fields.</div>
-      <button class="modal-btn" onclick="doSignup()">Create account</button>
-      <div class="modal-switch">Already have an account? <a onclick="switchForm('login')">Log in</a></div>
+      <div class="modal-field">
+        <label for="su-name">Full name</label>
+        <input type="text" id="su-name" autocomplete="name" placeholder="Jane Smith">
+      </div>
+      <div class="modal-field">
+        <label for="su-email">Email</label>
+        <input type="email" id="su-email" autocomplete="email" placeholder="you@email.com">
+      </div>
+      <div class="modal-field">
+        <label for="su-phone">Phone <span class="modal-field-optional">(optional)</span></label>
+        <input type="tel" id="su-phone" autocomplete="tel" placeholder="(519) 555-0100">
+      </div>
+      <div class="modal-field">
+        <label for="su-pass">Password</label>
+        <input type="password" id="su-pass" autocomplete="new-password" placeholder="At least 8 characters">
+      </div>
+      <div class="modal-field">
+        <label for="su-pass2">Confirm password</label>
+        <input type="password" id="su-pass2" autocomplete="new-password" placeholder="Re-enter password">
+      </div>
+      <div class="modal-err" id="su-err" role="alert"></div>
+      <button class="modal-btn" id="su-submit" onclick="HirayaAuth.doSignup()">Create account</button>
+      <div class="modal-switch">Already have an account? <a onclick="HirayaAuth.switchAuthView('login')">Log in</a></div>
+    </div>
+
+    <!-- Forgot password form -->
+    <div id="form-forgot" style="display:none">
+      <h2 class="modal-title">Reset your password</h2>
+      <p class="modal-sub">Enter your email and we'll send you a link to set a new password.</p>
+      <div class="modal-field">
+        <label for="fp-email">Email</label>
+        <input type="email" id="fp-email" autocomplete="email" placeholder="you@email.com">
+      </div>
+      <div class="modal-err" id="fp-err" role="alert"></div>
+      <button class="modal-btn" id="fp-submit" onclick="HirayaAuth.doForgotPassword()">Send reset link</button>
+      <div class="modal-switch">Remembered it? <a onclick="HirayaAuth.switchAuthView('login')">Back to log in</a></div>
     </div>
   </div>
 </div>
@@ -1412,13 +1454,16 @@ function showInvoice(id) {
 function closeInvoice() {
   document.getElementById('invoice-panel').classList.remove('open');
 }
-document.getElementById('auth-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
 document.getElementById('invoice-panel').addEventListener('click', function(e) {
   if (e.target === this) closeInvoice();
 });
 </script>
+
+<!-- Supabase + auth -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script src="/js/supabase-client.js"></script>
+<script src="/js/auth.js"></script>
 
 </main>
 
