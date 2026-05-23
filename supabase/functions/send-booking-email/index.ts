@@ -19,7 +19,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, content-type, apikey",
+  // supabase-js sends x-client-info on every request — without it in the
+  // allow-list the browser preflight fails and invoke() can't reach the function.
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
 };
 
 function escapeHtml(value: unknown): string {
