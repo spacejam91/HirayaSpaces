@@ -824,7 +824,7 @@
         <div class="form-group full"><label>Address <span style="color:var(--rose)">*</span></label><input type="text" id="f-addr" placeholder="123 King St, Waterloo ON"></div>
 
       </div>
-      <button class="submit-btn" onclick="submitBooking()">Confirm booking →</button>
+      <button class="submit-btn" onclick="HirayaBooking.openReview()">Confirm booking →</button>
       <div class="confirm-msg" id="conf-msg">
         <div class="c-icon">🌿</div>
         <h4>You're all booked!</h4>
@@ -1207,6 +1207,25 @@ updateSummary();
       <div class="modal-switch">Already have an account? <a onclick="HirayaAuth.switchAuthView('login')">Log in</a></div>
     </div>
 
+    <!-- Check email confirmation view -->
+    <div id="form-check-email" style="display:none">
+      <div style="text-align:center;font-size:56px;line-height:1;margin-bottom:1rem">✉️</div>
+      <h2 class="modal-title" id="check-email-title" style="text-align:center">Check your email</h2>
+      <p class="modal-sub" id="check-email-sub" style="text-align:center">
+        We sent a confirmation link to <strong id="check-email-addr"></strong>. Click the link to continue.
+      </p>
+      <div class="check-email-tips">
+        <p style="margin-bottom:0.5rem"><strong>Didn't get it?</strong></p>
+        <ul style="padding-left:1.25rem;margin:0">
+          <li>Check your spam or promotions folder</li>
+          <li>Make sure the email address above is correct</li>
+          <li>Wait 60 seconds — you can request another after that</li>
+        </ul>
+      </div>
+      <button class="modal-btn" onclick="HirayaAuth.closeAuthModal()">Got it</button>
+    </div>
+
+    <!-- (Booking modals are appended after this modal — see below) -->
     <!-- Forgot password form -->
     <div id="form-forgot" style="display:none">
       <h2 class="modal-title">Reset your password</h2>
@@ -1219,6 +1238,83 @@ updateSummary();
       <button class="modal-btn" id="fp-submit" onclick="HirayaAuth.doForgotPassword()">Send reset link</button>
       <div class="modal-switch">Remembered it? <a onclick="HirayaAuth.switchAuthView('login')">Back to log in</a></div>
     </div>
+  </div>
+</div>
+
+<!-- BOOKING REVIEW MODAL -->
+<div class="modal-overlay" id="booking-review-modal" role="dialog" aria-modal="true" aria-labelledby="br-title">
+  <div class="modal-box booking-modal-box">
+    <button class="modal-close" onclick="HirayaBooking.closeReview()" aria-label="Close">✕</button>
+    <h2 class="modal-title" id="br-title">Review your booking</h2>
+    <p class="modal-sub">Take a quick look. You can edit details below if anything's off.</p>
+
+    <div class="br-section">
+      <div class="br-section-label">Service</div>
+      <div class="br-service-row">
+        <span class="br-icon" id="br-service-icon">🧹</span>
+        <div>
+          <div class="br-service-name" id="br-service-name"></div>
+          <div class="br-date" id="br-date"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="br-section">
+      <div class="br-section-label">Customer</div>
+      <div class="br-customer">
+        <div><strong id="br-name"></strong></div>
+        <div id="br-email"></div>
+        <div id="br-phone"></div>
+        <div id="br-addr"></div>
+      </div>
+    </div>
+
+    <div class="br-section">
+      <div class="br-section-label">Add-ons</div>
+      <div id="br-addons"></div>
+    </div>
+
+    <div class="br-total-box">
+      <div class="br-line"><span>Service</span><span id="br-base"></span></div>
+      <div class="br-line"><span>Add-ons</span><span id="br-addon-total"></span></div>
+      <div class="br-line br-total"><span>Estimated total</span><span id="br-total"></span></div>
+      <div class="br-note">Final price confirmed after walkthrough. Cancel free up to 24h before.</div>
+    </div>
+
+    <div class="br-actions">
+      <button class="modal-btn-ghost" onclick="HirayaBooking.closeReview()">Edit details</button>
+      <button class="modal-btn" id="br-submit" onclick="HirayaBooking.confirmAndSubmit()">Confirm booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOOKING CONFIRMATION MODAL -->
+<div class="modal-overlay" id="booking-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="bc-title">
+  <div class="modal-box booking-modal-box">
+    <button class="modal-close" onclick="HirayaBooking.closeConfirmation()" aria-label="Close">✕</button>
+    <div style="text-align:center;font-size:56px;line-height:1;margin-bottom:0.75rem">🌿</div>
+    <h2 class="modal-title" id="bc-title" style="text-align:center">You're booked!</h2>
+    <p class="modal-sub" style="text-align:center">
+      Your booking reference is <strong id="bc-id"></strong>. We've recorded the request and will be in touch to confirm timing.
+    </p>
+
+    <div class="br-total-box" style="margin-top:1.5rem">
+      <div class="br-line"><span>Service</span><span id="bc-service"></span></div>
+      <div class="br-line"><span>Date</span><span id="bc-date"></span></div>
+      <div class="br-line br-total"><span>Estimated total</span><span id="bc-total"></span></div>
+    </div>
+
+    <div class="bc-email-note">
+      A confirmation will be sent to <strong id="bc-email"></strong>.
+    </div>
+
+    <div id="bc-signup-block" style="display:none" class="check-email-tips" role="note">
+      <p style="margin-bottom:0.5rem"><strong>Want to track this booking?</strong></p>
+      <p style="margin:0 0 0.75rem">Create an account to see upcoming cleans, invoices, and rebook in one click.</p>
+      <button class="modal-btn" style="margin-top:0;padding:10px" onclick="HirayaBooking.promptSignup()">Create my account</button>
+    </div>
+
+    <button class="modal-btn-ghost" style="margin-top:1rem;width:100%" onclick="HirayaBooking.closeConfirmation()">Close</button>
   </div>
 </div>
 
@@ -1464,6 +1560,7 @@ document.getElementById('invoice-panel').addEventListener('click', function(e) {
 <script src="/js/config.js"></script>
 <script src="/js/supabase-client.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/booking.js"></script>
 
 </main>
 

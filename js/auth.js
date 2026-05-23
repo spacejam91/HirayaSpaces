@@ -10,7 +10,20 @@
   function friendly(err) {
     if (!err) return 'Something went wrong. Please try again.';
     const msg = (err.message || String(err)).trim();
-    return ERR_MAP[msg] || msg;
+    if (ERR_MAP[msg]) return ERR_MAP[msg];
+    if (/Password should contain/i.test(msg)) {
+      return 'Your password needs lowercase, uppercase, a number, and a special character (e.g. !@#$). Try something like "MyPass2024!".';
+    }
+    if (/Password should be at least/i.test(msg)) {
+      return 'Password is too short — please use at least 8 characters.';
+    }
+    if (/For security purposes/i.test(msg)) {
+      return 'Too many attempts — please wait a minute and try again.';
+    }
+    if (/rate limit/i.test(msg)) {
+      return 'Too many requests right now. Please wait a moment.';
+    }
+    return msg;
   }
 
   function $(id) { return document.getElementById(id); }
@@ -87,16 +100,30 @@
     const views = {
       login: 'form-login',
       signup: 'form-signup',
-      forgot: 'form-forgot'
+      forgot: 'form-forgot',
+      'check-email': 'form-check-email'
     };
     Object.keys(views).forEach(k => {
       const el = $(views[k]);
       if (el) el.style.display = (k === view) ? 'block' : 'none';
     });
     setTimeout(() => {
-      const firstInput = $(views[view])?.querySelector('input');
-      if (firstInput) firstInput.focus();
+      const target = $(views[view]);
+      const firstInput = target?.querySelector('input');
+      const firstBtn = target?.querySelector('button');
+      (firstInput || firstBtn)?.focus();
     }, 30);
+  }
+
+  function showCheckEmailView(opts) {
+    const titleEl = $('check-email-title');
+    const subEl = $('check-email-sub');
+    if (titleEl) titleEl.textContent = opts.title || 'Check your email';
+    if (subEl) subEl.innerHTML = opts.sub || '';
+    // Re-fetch addrEl AFTER innerHTML rewrite — the old reference is now detached.
+    const addrEl = $('check-email-addr');
+    if (addrEl) addrEl.textContent = opts.email || '';
+    switchAuthView('check-email');
   }
 
   function installFocusTrap(modal) {
@@ -146,6 +173,7 @@
     const btn = $('su-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Creating account…'; }
 
+    console.log('[Hiraya] doSignup → calling supabase.auth.signUp for', email);
     const { data, error } = await sb().auth.signUp({
       email,
       password: pass,
@@ -154,17 +182,40 @@
         emailRedirectTo: window.location.origin + '/'
       }
     });
+    console.log('[Hiraya] doSignup ← response:', { data, error });
 
     if (btn) { btn.disabled = false; btn.textContent = 'Create account'; }
 
-    if (error) { showErr('su-err', friendly(error)); return; }
+    if (error) {
+      console.log('[Hiraya] doSignup: showing error', error.message);
+      showErr('su-err', friendly(error));
+      return;
+    }
 
     if (data?.user && !data.session) {
-      closeAuthModal();
-      showToast('Check your email to confirm your account.', 'success');
+      console.log('[Hiraya] doSignup: showing check-email view');
+      showCheckEmailView({
+        title: 'Check your email',
+        sub: 'We sent a confirmation link to <strong id="check-email-addr"></strong>. Click the link in that email to activate your account, then come back here to log in.',
+        email: email
+      });
     } else if (data?.session) {
+      console.log('[Hiraya] doSignup: instant session — closing modal');
       closeAuthModal();
       showToast('Welcome to Hiraya Spaces!', 'success');
+    } else {
+      // Supabase v2 returns {user: null, session: null, error: null} as an
+      // obfuscated response when email confirmation is enabled. It looks the
+      // same whether the email is new (signup succeeded, email sent) or already
+      // registered (no email sent) — security to prevent email enumeration.
+      // We show the check-email view either way; if they don't get an email
+      // they can fall back to logging in.
+      console.log('[Hiraya] doSignup: obfuscated response → showing check-email view');
+      showCheckEmailView({
+        title: 'Check your email',
+        sub: 'If this email is new, a confirmation link has been sent to <strong id="check-email-addr"></strong>. Click the link to activate your account. If you already have an account, just <a onclick="HirayaAuth.switchAuthView(\'login\')" style="color:var(--sage);cursor:pointer;font-weight:600">log in</a> instead.',
+        email: email
+      });
     }
   }
 
@@ -215,8 +266,11 @@
     if (btn) { btn.disabled = false; btn.textContent = 'Send reset link'; }
 
     if (error) { showErr('fp-err', friendly(error)); return; }
-    closeAuthModal();
-    showToast('Password reset email sent. Check your inbox.', 'success');
+    showCheckEmailView({
+      title: 'Check your email',
+      sub: 'We sent a password reset link to <strong id="check-email-addr"></strong>. Click the link to set a new password.',
+      email: email
+    });
   }
 
   // ── RESET PASSWORD (on /reset-password page) ──────────────────────────

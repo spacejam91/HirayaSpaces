@@ -79,6 +79,20 @@
   background: #b04a3a;
 }
 
+/* Check-email confirmation view */
+.check-email-tips {
+  background: var(--sage-light);
+  border: 1px solid var(--sage-mid);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  font-size: 12px;
+  color: var(--text);
+  margin: 1.5rem 0;
+  line-height: 1.6;
+}
+.check-email-tips ul { list-style: disc; padding-left: 1.25rem; }
+.check-email-tips li { margin-bottom: 2px; }
+
 /* Optional-field hint */
 .modal-field label .modal-field-optional {
   text-transform: none;
@@ -87,6 +101,132 @@
   letter-spacing: 0;
   font-size: 10px;
   margin-left: 6px;
+}
+
+/* ── Booking review + confirmation modals ─────────────────────────────── */
+.booking-modal-box {
+  max-width: 520px;
+}
+.br-section {
+  margin: 1.25rem 0;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.br-section:last-of-type { border-bottom: none; padding-bottom: 0; }
+.br-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--sage);
+  margin-bottom: 0.75rem;
+}
+.br-service-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+.br-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--sage-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.br-service-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--text);
+}
+.br-date {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.br-customer {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.br-customer strong { color: var(--text); font-weight: 600; }
+
+.br-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  padding: 4px 0;
+  color: var(--text);
+}
+.br-line.br-muted { color: var(--muted); font-style: italic; }
+.br-line.br-total {
+  font-size: 17px;
+  font-weight: 700;
+  padding-top: 12px;
+  margin-top: 8px;
+  border-top: 1px solid var(--sage-mid);
+}
+.br-line.br-total span:last-child { color: var(--sage); }
+
+.br-total-box {
+  background: var(--sage-light);
+  border: 1.5px solid var(--sage-mid);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+}
+.br-note {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.br-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+.br-actions .modal-btn,
+.br-actions .modal-btn-ghost {
+  flex: 1;
+  margin-top: 0;
+}
+
+.modal-btn-ghost {
+  background: white;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Jost', sans-serif;
+  transition: border-color .2s, color .2s;
+}
+.modal-btn-ghost:hover { border-color: var(--sage); color: var(--sage); }
+
+.bc-email-note {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1rem;
+  line-height: 1.6;
+}
+.bc-email-note strong { color: var(--text); }
+
+@media (max-width: 540px) {
+  .booking-modal-box { padding: 1.75rem 1.5rem; }
+  .br-actions { flex-direction: column-reverse; }
+  .br-service-name { font-size: 19px; }
 }
 
 /* ── Reset-password page layout ──────────────────────────────────────── */
