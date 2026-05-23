@@ -670,9 +670,20 @@
     <button class="nav-login" id="nav-login-btn" onclick="HirayaAuth.openAuthModal('login')">Log in</button>
     <button class="nav-login" id="nav-signup-btn" onclick="HirayaAuth.openAuthModal('signup')" style="display:none">Sign up</button>
     <div class="nav-user-wrap" id="nav-user-wrap">
-      <span class="nav-user-greet" id="nav-user-greet">Welcome</span>
-      <button class="nav-logout" onclick="HirayaAuth.doLogout()">Log out</button>
+      <button type="button" class="nav-user-trigger" id="nav-user-trigger"
+              onclick="HirayaAuth.toggleUserMenu()" aria-haspopup="true" aria-expanded="false">
+        <span class="nav-user-greet" id="nav-user-greet">Welcome</span>
+        <span class="nav-user-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="nav-user-menu" id="nav-user-menu" role="menu" aria-labelledby="nav-user-trigger">
+        <button type="button" role="menuitem" class="nav-user-menu-item"
+                onclick="HirayaAccount.openAddresses(); HirayaAuth.closeUserMenu()">My addresses</button>
+        <button type="button" role="menuitem" class="nav-user-menu-item"
+                onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
+      </div>
     </div>
+    <button class="nav-account-link" id="nav-account-link"
+            onclick="HirayaAccount.openAddresses()" style="display:none">Account</button>
     <button class="nav-cta" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book now</button>
     <a href="tel:+12267514566" class="nav-phone" style="font-size:13px;color:var(--muted);text-decoration:none;font-weight:500">(226) 751-4566</a>
   </div>
@@ -818,11 +829,28 @@
       <div class="time-label">Select a time</div>
       <div class="time-grid" id="time-grid"></div>
       <div class="form-grid">
-        <div class="form-group"><label>Full name <span style="color:var(--rose)">*</span></label><input type="text" id="f-name" placeholder="Jane Smith"></div>
-        <div class="form-group"><label>Phone <span style="color:var(--rose)">*</span></label><input type="tel" id="f-phone" placeholder="(519) 555-0100"></div>
-        <div class="form-group full"><label>Email <span style="color:var(--rose)">*</span></label><input type="email" id="f-email" placeholder="you@email.com"></div>
-        <div class="form-group full"><label>Address <span style="color:var(--rose)">*</span></label><input type="text" id="f-addr" placeholder="123 King St, Waterloo ON"></div>
+        <div class="form-group"><label>Full name <span style="color:var(--rose)">*</span></label><input type="text" id="f-name" autocomplete="name" placeholder="Jane Smith"></div>
+        <div class="form-group"><label>Phone <span style="color:var(--rose)">*</span></label><input type="tel" id="f-phone" autocomplete="tel" placeholder="(519) 555-0100"></div>
+        <div class="form-group full"><label>Email <span style="color:var(--rose)">*</span></label><input type="email" id="f-email" autocomplete="email" placeholder="you@email.com"></div>
 
+        <!-- Saved address picker (shown only when logged-in user has saved addresses) -->
+        <div class="form-group full" id="f-saved-addr-group" style="display:none">
+          <label>Use a saved address</label>
+          <select id="f-saved-addr"></select>
+        </div>
+
+        <div class="form-group full"><label>Street address <span style="color:var(--rose)">*</span></label><input type="text" id="f-street" autocomplete="street-address" placeholder="123 King St"></div>
+        <div class="form-group"><label>Unit <span class="form-optional">(optional)</span></label><input type="text" id="f-unit" autocomplete="address-line2" placeholder="Apt 2B"></div>
+        <div class="form-group"><label>Postal code <span style="color:var(--rose)">*</span></label><input type="text" id="f-postal" autocomplete="postal-code" placeholder="N2L 3G1" maxlength="7"></div>
+        <div class="form-group full"><label>City <span style="color:var(--rose)">*</span></label><input type="text" id="f-city" autocomplete="address-level2" placeholder="Waterloo" value="Waterloo"></div>
+
+        <!-- Save-to-account checkbox (shown only when logged in and entering a new address) -->
+        <div class="form-group full form-check-row" id="f-save-addr-group" style="display:none">
+          <label class="form-check-label">
+            <input type="checkbox" id="f-save-addr" checked>
+            <span>Save this address to my account for next time</span>
+          </label>
+        </div>
       </div>
       <button class="submit-btn" onclick="HirayaBooking.openReview()">Confirm booking →</button>
       <div class="confirm-msg" id="conf-msg">
@@ -1318,6 +1346,83 @@ updateSummary();
   </div>
 </div>
 
+<!-- MY ADDRESSES MODAL -->
+<div class="modal-overlay" id="addresses-modal" role="dialog" aria-modal="true" aria-labelledby="addr-modal-title">
+  <div class="modal-box addresses-modal-box">
+    <button class="modal-close" onclick="HirayaAccount.closeAddresses()" aria-label="Close">✕</button>
+    <div class="modal-logo" style="font-family:'Cinzel',serif;letter-spacing:2px;font-size:16px;color:var(--sage);text-transform:uppercase">HIRAYA SPACES</div>
+
+    <!-- List view -->
+    <div id="addr-list-view">
+      <h2 class="modal-title" id="addr-modal-title">My addresses</h2>
+      <p class="modal-sub">Save the places you'd like cleaned so you don't have to type them in every time.</p>
+
+      <div id="addr-list" class="addr-list" aria-live="polite">
+        <!-- populated by JS -->
+      </div>
+
+      <div id="addr-empty" class="addr-empty" style="display:none">
+        <div class="addr-empty-icon" aria-hidden="true">🏠</div>
+        <p>You haven't saved any addresses yet.</p>
+      </div>
+
+      <button class="modal-btn" id="addr-add-btn" onclick="HirayaAccount.openAddressForm()" style="margin-top:1rem">+ Add an address</button>
+    </div>
+
+    <!-- Add/Edit form view -->
+    <div id="addr-form-view" style="display:none">
+      <h2 class="modal-title" id="addr-form-title">Add an address</h2>
+      <p class="modal-sub" id="addr-form-sub">Where would you like us to clean?</p>
+
+      <div class="modal-field">
+        <label for="addr-label">Label <span class="modal-field-optional">(optional)</span></label>
+        <input type="text" id="addr-label" placeholder="Home, Cottage, Mom's place…">
+      </div>
+      <div class="modal-field">
+        <label for="addr-street">Street address</label>
+        <input type="text" id="addr-street" autocomplete="street-address" placeholder="123 King St">
+      </div>
+      <div class="modal-field-grid">
+        <div class="modal-field">
+          <label for="addr-unit">Unit <span class="modal-field-optional">(optional)</span></label>
+          <input type="text" id="addr-unit" autocomplete="address-line2" placeholder="Apt 2B">
+        </div>
+        <div class="modal-field">
+          <label for="addr-postal">Postal code</label>
+          <input type="text" id="addr-postal" autocomplete="postal-code" placeholder="N2L 3G1" maxlength="7">
+        </div>
+      </div>
+      <div class="modal-field">
+        <label for="addr-city">City</label>
+        <input type="text" id="addr-city" autocomplete="address-level2" placeholder="Waterloo" value="Waterloo">
+      </div>
+
+      <label class="form-check-label" style="margin:0.75rem 0 1.25rem">
+        <input type="checkbox" id="addr-is-default">
+        <span>Set as my default address</span>
+      </label>
+
+      <div class="modal-err" id="addr-form-err" role="alert"></div>
+
+      <div class="br-actions">
+        <button class="modal-btn-ghost" onclick="HirayaAccount.cancelAddressForm()">Cancel</button>
+        <button class="modal-btn" id="addr-save-btn" onclick="HirayaAccount.saveAddressForm()">Save address</button>
+      </div>
+    </div>
+
+    <!-- Confirm-delete view -->
+    <div id="addr-confirm-delete" style="display:none">
+      <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">🗑️</div>
+      <h2 class="modal-title" style="text-align:center">Delete this address?</h2>
+      <p class="modal-sub" style="text-align:center" id="addr-confirm-text"></p>
+      <div class="br-actions">
+        <button class="modal-btn-ghost" onclick="HirayaAccount.cancelDelete()">Keep it</button>
+        <button class="modal-btn" id="addr-confirm-delete-btn" style="background:var(--rose)" onclick="HirayaAccount.confirmDelete()">Yes, delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CUSTOMER DASHBOARD -->
 <div class="dashboard-overlay" id="dashboard">
   <div class="dash-nav">
@@ -1560,6 +1665,7 @@ document.getElementById('invoice-panel').addEventListener('click', function(e) {
 <script src="/js/config.js"></script>
 <script src="/js/supabase-client.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/account.js"></script>
 <script src="/js/booking.js"></script>
 
 </main>
