@@ -1,0 +1,132 @@
+/* Auth additions — reuses brand tokens defined in index.html (:root vars). */
+
+/* Logged-in nav wrap: greeting + Log Out button */
+.nav-user-wrap {
+  display: none;
+  align-items: center;
+  gap: 12px;
+}
+.nav-user-greet {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.nav-logout {
+  background: none;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'Jost', sans-serif;
+  transition: border-color .2s, color .2s;
+}
+.nav-logout:hover {
+  border-color: var(--rose);
+  color: var(--rose);
+}
+
+/* Forgot-password link inside login form */
+.modal-forgot-link {
+  display: block;
+  text-align: right;
+  margin: -0.25rem 0 0.75rem;
+  font-size: 12px;
+  color: var(--sage);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: auto;
+  font-family: 'Jost', sans-serif;
+}
+.modal-forgot-link:hover { text-decoration: underline; }
+
+.modal-field-row { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+
+/* Toast banner */
+.hiraya-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--sage);
+  color: white;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-family: 'Jost', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.2);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+.hiraya-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.hiraya-toast[data-kind="error"] {
+  background: #b04a3a;
+}
+
+/* Optional-field hint */
+.modal-field label .modal-field-optional {
+  text-transform: none;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0;
+  font-size: 10px;
+  margin-left: 6px;
+}
+
+/* ── Reset-password page layout ──────────────────────────────────────── */
+.reset-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 1rem 3rem;
+  background: var(--cream);
+}
+.reset-card {
+  background: white;
+  border-radius: 24px;
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+  border: 1px solid var(--border);
+}
+.reset-card .modal-logo {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 2px;
+  font-size: 16px;
+  color: var(--sage);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.reset-back {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.reset-back:hover { color: var(--sage); }
+
+/* Mobile spacing */
+@media (max-width: 720px) {
+  .nav-user-greet { font-size: 12px; }
+  .nav-logout { padding: 8px 14px; font-size: 12px; }
+  .hiraya-toast { bottom: 16px; font-size: 13px; padding: 12px 18px; }
+}
