@@ -454,9 +454,18 @@
     padding: 9px 4px; border: 1.5px solid var(--border); border-radius: 10px;
     text-align: center; font-size: 12px; cursor: pointer; font-family: 'Jost', sans-serif;
     font-weight: 500; background: white; transition: all .15s;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
   }
   .time-btn:hover { border-color: var(--sage); color: var(--sage); }
   .time-btn.selected { background: var(--sage); color: white; border-color: var(--sage); }
+  .time-btn-start { font-size: 12px; font-weight: 600; }
+  .time-btn-end { font-size: 10px; opacity: 0.7; font-weight: 400; }
+  .time-btn.selected .time-btn-end { opacity: 0.85; }
+  .time-btn.disabled {
+    background: #f5f5f5; color: #b0b0b0; border-color: #e0e0e0;
+    cursor: not-allowed; text-decoration: line-through;
+  }
+  .time-btn.disabled:hover { border-color: #e0e0e0; color: #b0b0b0; }
 
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
   .form-group { display: flex; flex-direction: column; gap: 6px; }
@@ -934,12 +943,12 @@
 
 <script>
 const SERVICES = [
-  {id:'standard',icon:'🧹',name:'Regular Residential',price:'From $120',basePrice:120,desc:'Perfect for weekly, bi-weekly, or monthly maintenance. Dusting, vacuuming, mopping, kitchen & bathroom cleaning.'},
-  {id:'deep',icon:'✨',name:'Deep Clean',price:'From $220',basePrice:220,desc:'Recommended for first-time cleans. Everything in regular plus baseboards, doors, detailed scrubbing & more.'},
-  {id:'moveinout',icon:'📦',name:'Move In / Out',price:'From $250',basePrice:250,desc:'Full preparation for homes before or after moving. Inside cabinets, fridge, oven, full bathroom sanitization & more.'},
-  {id:'carpet',icon:'🏠',name:'Carpet Cleaning',price:'From $45/room',basePrice:45,desc:'Professional carpet cleaning. Single rooms, full homes, staircases & specialty treatments available.'},
-  {id:'upholstery',icon:'🛋️',name:'Upholstery Cleaning',price:'From $85',basePrice:85,desc:'Professional cleaning for sofas, loveseats, sectionals, dining chairs & more.'},
-  {id:'commercial',icon:'🏢',name:'Commercial / Office',price:'Custom quote',basePrice:null,desc:'Customized pricing based on square footage, frequency, number of washrooms & type of business.'},
+  {id:'standard',icon:'🧹',name:'Regular Residential',price:'From $120',basePrice:120,durationMin:180,desc:'Perfect for weekly, bi-weekly, or monthly maintenance. Dusting, vacuuming, mopping, kitchen & bathroom cleaning.'},
+  {id:'deep',icon:'✨',name:'Deep Clean',price:'From $220',basePrice:220,durationMin:300,desc:'Recommended for first-time cleans. Everything in regular plus baseboards, doors, detailed scrubbing & more.'},
+  {id:'moveinout',icon:'📦',name:'Move In / Out',price:'From $250',basePrice:250,durationMin:300,desc:'Full preparation for homes before or after moving. Inside cabinets, fridge, oven, full bathroom sanitization & more.'},
+  {id:'carpet',icon:'🏠',name:'Carpet Cleaning',price:'From $45/room',basePrice:45,durationMin:60,desc:'Professional carpet cleaning. Single rooms, full homes, staircases & specialty treatments available.'},
+  {id:'upholstery',icon:'🛋️',name:'Upholstery Cleaning',price:'From $85',basePrice:85,durationMin:60,desc:'Professional cleaning for sofas, loveseats, sectionals, dining chairs & more.'},
+  {id:'commercial',icon:'🏢',name:'Commercial / Office',price:'Custom quote',basePrice:null,durationMin:null,desc:'Customized pricing based on square footage, frequency, number of washrooms & type of business.'},
 ];
 const ADDONS = [
   {id:'oven',icon:'🍳',name:'Inside Oven',price:'+$35',addonPrice:35,desc:'Deep clean inside your oven'},
@@ -974,7 +983,33 @@ document.getElementById('svc-grid').innerHTML = SERVICES.map(s=>`
 function selectSvc(id){
   selSvc=id;
   SERVICES.forEach(s=>{ document.getElementById('svc-'+s.id).classList.toggle('selected',s.id===id); });
+  renderTimes();
   updateSummary();
+}
+
+// Time-math helpers shared by slot rendering and booking submission.
+function parseSlotToMinutes(slot){
+  const m = slot.match(/^(\d+):(\d+)\s*(am|pm)$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ampm = m[3].toLowerCase();
+  if (ampm === 'pm' && h < 12) h += 12;
+  if (ampm === 'am' && h === 12) h = 0;
+  return h * 60 + min;
+}
+function formatMinutesToTime(totalMin){
+  const m = ((totalMin % 1440) + 1440) % 1440;
+  let h = Math.floor(m / 60);
+  const min = m % 60;
+  const ampm = h >= 12 ? 'pm' : 'am';
+  let displayH = h % 12; if (displayH === 0) displayH = 12;
+  return displayH + ':' + min.toString().padStart(2, '0') + ' ' + ampm;
+}
+function slotEndTime(slot, durMin){
+  const startMin = parseSlotToMinutes(slot);
+  if (startMin == null || !durMin) return '';
+  return formatMinutesToTime(startMin + durMin);
 }
 
 // Addons
@@ -1054,7 +1089,42 @@ function renderCalendar(){
   }
   document.getElementById('cal-grid').innerHTML=html;
 }
-function pickDay(d){ selDay=d; renderCalendar(); }
+async function pickDay(d){
+  selDay = d;
+  // Clear time selection if the new date has different booked windows.
+  selTime = null;
+  renderCalendar();
+  await refreshBookedSlots();
+  renderTimes();
+}
+
+// Booked slots for the currently-selected date — used to grey out conflicting buttons.
+let bookedSlots = []; // [{startMin, endMin}]
+
+async function refreshBookedSlots(){
+  bookedSlots = [];
+  if (selDay == null || !window.hirayaSupabase) return;
+  const iso = new Date(calY, calM, selDay).toISOString().slice(0, 10);
+  try {
+    const { data, error } = await window.hirayaSupabase.rpc('get_booked_slots', { target_date: iso });
+    if (error) { console.warn('get_booked_slots:', error.message); return; }
+    bookedSlots = (data || []).map(b => {
+      const startMin = parseSlotToMinutes(b.preferred_time_slot);
+      if (startMin == null) return null;
+      const durMin = b.duration_minutes || 180;
+      return { startMin, endMin: startMin + durMin };
+    }).filter(Boolean);
+  } catch (e) {
+    console.warn('refreshBookedSlots failed:', e);
+  }
+}
+
+function slotConflicts(slot, durMin){
+  const startMin = parseSlotToMinutes(slot);
+  if (startMin == null) return false;
+  const endMin = startMin + (durMin || 60);
+  return bookedSlots.some(b => startMin < b.endMin && endMin > b.startMin);
+}
 function changeMonth(dir){
   calM+=dir;
   if(calM>11){calM=0;calY++;} if(calM<0){calM=11;calY--;}
@@ -1063,10 +1133,29 @@ function changeMonth(dir){
 
 // Times
 function renderTimes(){
-  document.getElementById('time-grid').innerHTML=TIMES.map(t=>`
-    <div class="time-btn${selTime===t?' selected':''}" onclick="pickTime('${t}')">${t}</div>`).join('');
+  const svc = SERVICES.find(s => s.id === selSvc);
+  const dur = svc ? svc.durationMin : null;
+  document.getElementById('time-grid').innerHTML = TIMES.map(t => {
+    const conflict = dur ? slotConflicts(t, dur) : false;
+    const classes = ['time-btn'];
+    if (selTime === t) classes.push('selected');
+    if (conflict) classes.push('disabled');
+    const end = dur ? slotEndTime(t, dur) : '';
+    const endLine = end ? `<div class="time-btn-end">${conflict ? 'booked' : 'to ' + end}</div>` : '';
+    const handler = conflict ? '' : `onclick="pickTime('${t}')"`;
+    const title = conflict ? ' title="Already booked"' : '';
+    return `<div class="${classes.join(' ')}"${title} ${handler}>
+      <div class="time-btn-start">${t}</div>${endLine}
+    </div>`;
+  }).join('');
 }
-function pickTime(t){ selTime=t; renderTimes(); }
+
+function pickTime(t){
+  const svc = SERVICES.find(s => s.id === selSvc);
+  if (svc && svc.durationMin && slotConflicts(t, svc.durationMin)) return;
+  selTime = t;
+  renderTimes();
+}
 
 // Reviews
 document.getElementById('reviews-grid').innerHTML = REVIEWS.map(r=>`

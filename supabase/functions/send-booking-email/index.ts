@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
     }
     const customerEmail = userResult.user.email;
     const customerName = booking.profiles?.full_name || userResult.user.user_metadata?.full_name || "there";
+    const customerPhone = booking.profiles?.phone || userResult.user.user_metadata?.phone || "";
 
     const idShort = String(booking.id).slice(0, 8).toUpperCase();
     const serviceName = booking.services?.name || "Cleaning service";
@@ -210,6 +211,121 @@ Deno.serve(async (req) => {
       html,
       content: `Hi ${customerName}, your Hiraya Spaces ${isQuote ? "quote request" : "booking"} (${idShort}) for ${serviceName} on ${dateDisplay}${timeDisplay ? " at " + timeDisplay : ""} has been received. ${isQuote ? "We'll send a tailored quote soon." : "Estimated total: " + totalDisplay + "."} Reply to this email with any questions.`,
     });
+
+    // ── OWNER NOTIFICATION (best-effort — don't fail the request if this errors)
+    const ownerEmail = Deno.env.get("OWNER_EMAIL") || Deno.env.get("SMTP_USER")!;
+    try {
+      const phoneDisplay = customerPhone || "Not provided";
+      const phoneHref = customerPhone ? customerPhone.replace(/[^\d+]/g, "") : "";
+      const mapsHref = booking.addresses
+        ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addressLine)
+        : "";
+      const statusLabel = isQuote ? "AWAITING QUOTE" : "PENDING REVIEW";
+      const statusColor = isQuote ? "#b08c4a" : "#1e4d2b";
+
+      const ownerAddonsHtml = bookingAddons.length
+        ? `<ul style="margin:6px 0 0;padding-left:18px;color:#1a2e1e;font-size:13px">${bookingAddons.map((ba: any) => {
+            const name = ba.addons?.name || ba.addon_id;
+            const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
+            const price = ba.price_cents ? ` — ${dollars(ba.price_cents * (ba.quantity || 1))}` : "";
+            return `<li style="margin-bottom:3px">${escapeHtml(name)}${qty}${price}</li>`;
+          }).join("")}</ul>`
+        : `<div style="color:#6a7d6e;font-style:italic;font-size:13px;margin-top:4px">None</div>`;
+
+      const ownerHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:32px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:14px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#1e4d2b;padding:20px 26px;color:white;display:flex;justify-content:space-between">
+          <div>
+            <div style="font-family:Georgia,serif;font-size:14px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
+            <div style="font-size:20px;font-weight:600;margin-top:4px">🌿 New booking</div>
+          </div>
+        </td></tr>
+        <tr><td style="padding:22px 26px 8px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td><span style="background:${statusColor};color:white;font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:6px">${statusLabel}</span></td>
+              <td style="text-align:right;font-size:12px;color:#6a7d6e">Ref <strong style="color:#1a2e1e">${idShort}</strong></td>
+            </tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:14px 26px 6px">
+          <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:500;margin:0 0 4px;color:#1a2e1e">${escapeHtml(serviceName)}</h2>
+          <div style="font-size:14px;color:#6a7d6e">${escapeHtml(dateDisplay)}${timeDisplay ? " · " + escapeHtml(timeDisplay) : ""}</div>
+        </td></tr>
+
+        <tr><td style="padding:14px 26px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:10px">
+            <tr><td style="padding:14px 18px">
+              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Customer</div>
+              <div style="font-size:15px;font-weight:600;color:#1a2e1e">${escapeHtml(customerName)}</div>
+              <div style="font-size:13px;color:#1a2e1e;margin-top:4px"><a href="mailto:${escapeHtml(customerEmail)}" style="color:#1e4d2b;text-decoration:none">${escapeHtml(customerEmail)}</a></div>
+              <div style="font-size:13px;color:#1a2e1e;margin-top:2px">${phoneHref ? `<a href="tel:${escapeHtml(phoneHref)}" style="color:#1e4d2b;text-decoration:none">${escapeHtml(phoneDisplay)}</a>` : escapeHtml(phoneDisplay)}</div>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:0 26px 14px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f9f6;border:1px solid #d4e2d8;border-radius:10px">
+            <tr><td style="padding:14px 18px">
+              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Address</div>
+              <div style="font-size:13px;color:#1a2e1e;line-height:1.5">${escapeHtml(addressLine)}</div>
+              ${mapsHref ? `<div style="margin-top:8px"><a href="${mapsHref}" style="font-size:12px;color:#1e4d2b;text-decoration:none;font-weight:600">🗺 Open in Google Maps →</a></div>` : ""}
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:0 26px 14px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f9f6;border:1px solid #d4e2d8;border-radius:10px">
+            <tr><td style="padding:14px 18px">
+              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Add-ons</div>
+              ${ownerAddonsHtml}
+            </td></tr>
+          </table>
+        </td></tr>
+
+        ${booking.customer_notes ? `
+        <tr><td style="padding:0 26px 14px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fff8e8;border:1px solid #e0c890;border-radius:10px">
+            <tr><td style="padding:14px 18px">
+              <div style="font-size:10px;font-weight:700;color:#8a6a18;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Customer notes</div>
+              <div style="font-size:13px;color:#1a2e1e;line-height:1.5;white-space:pre-wrap">${escapeHtml(booking.customer_notes)}</div>
+            </td></tr>
+          </table>
+        </td></tr>
+        ` : ""}
+
+        <tr><td style="padding:0 26px 22px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#1e4d2b;border-radius:10px">
+            <tr><td style="padding:16px 20px">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="color:white;font-size:14px;font-weight:600">${isQuote ? "Estimate (TBD)" : "Estimated total"}</td>
+                  <td style="text-align:right;color:white;font-size:22px;font-weight:700">${escapeHtml(totalDisplay)}</td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      await client.send({
+        from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+        to: ownerEmail,
+        replyTo: customerEmail,
+        subject: `🌿 New booking: ${customerName} — ${dateDisplay}${timeDisplay ? " " + timeDisplay : ""} — ${idShort}`,
+        html: ownerHtml,
+        content: `New booking ${idShort}\nCustomer: ${customerName} (${customerEmail}${customerPhone ? ", " + customerPhone : ""})\nService: ${serviceName}\nWhen: ${dateDisplay}${timeDisplay ? " at " + timeDisplay : ""}\nAddress: ${addressLine}\nTotal: ${totalDisplay}${booking.customer_notes ? "\n\nNotes: " + booking.customer_notes : ""}`,
+      });
+    } catch (ownerErr) {
+      console.warn("owner notification failed:", ownerErr);
+    }
 
     await client.close();
 
