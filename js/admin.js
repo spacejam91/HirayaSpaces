@@ -207,6 +207,8 @@
     } else if (name === 'all') {
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
+      const completeView = $('complete-view');
+      if (completeView) completeView.style.display = 'none';
       refreshAll();
     } else if (name === 'calendar') {
       // Re-render off whatever data we already have, then refresh in the
@@ -300,7 +302,20 @@
     return { start: fmt(start), end: fmt(end), label: now.toLocaleDateString(undefined, { month: 'long' }) };
   }
 
+  function currentYearRange() {
+    const now = new Date();
+    return {
+      start: `${now.getFullYear()}-01-01`,
+      end: `${now.getFullYear()}-12-31`,
+      label: String(now.getFullYear()),
+    };
+  }
+
   const ACTIVE_STATUSES = ['pending_review', 'awaiting_quote', 'confirmed', 'in_progress', 'completed'];
+  // For revenue calculations, "earned" = job is done. Confirmed isn't earned yet.
+  const EARNED_STATUSES = ['completed'];
+  const PIPELINE_STATUSES = ['confirmed', 'in_progress'];
+  const bookingPrice = b => (b.final_price_cents ?? b.estimated_price_cents ?? 0);
 
   function renderStats() {
     const statConfirmed = $('stat-confirmed');
@@ -331,15 +346,46 @@
 
     if (statRevenue) {
       const { start, end, label } = currentMonthRange();
-      const monthBookings = allBookings.filter(b =>
+      // MTD revenue counts only completed jobs. Pipeline (still confirmed)
+      // is broken out separately so Aaron sees earned vs expected at a glance.
+      const earnedThisMonth = allBookings.filter(b =>
         b.preferred_date && b.preferred_date >= start && b.preferred_date <= end &&
-        ACTIVE_STATUSES.includes(b.status)
+        EARNED_STATUSES.includes(b.status)
       );
-      // Prefer final_price_cents when set (post-job actuals), fall back to estimate.
-      const cents = monthBookings.reduce((sum, b) => sum + (b.final_price_cents ?? b.estimated_price_cents ?? 0), 0);
+      const cents = earnedThisMonth.reduce((sum, b) => sum + bookingPrice(b), 0);
       statRevenue.textContent = '$' + Math.round(cents / 100).toLocaleString();
       if (statRevenueSub) {
-        statRevenueSub.textContent = `${label} · ${monthBookings.length} ${monthBookings.length === 1 ? 'booking' : 'bookings'}`;
+        statRevenueSub.textContent = `${label} · ${earnedThisMonth.length} completed`;
+      }
+    }
+
+    const statRevenueYtd = $('stat-revenue-ytd');
+    const statRevenueYtdSub = $('stat-revenue-ytd-sub');
+    if (statRevenueYtd) {
+      const { start, end, label } = currentYearRange();
+      const earnedYtd = allBookings.filter(b =>
+        b.preferred_date && b.preferred_date >= start && b.preferred_date <= end &&
+        EARNED_STATUSES.includes(b.status)
+      );
+      const cents = earnedYtd.reduce((sum, b) => sum + bookingPrice(b), 0);
+      statRevenueYtd.textContent = '$' + Math.round(cents / 100).toLocaleString();
+      if (statRevenueYtdSub) {
+        statRevenueYtdSub.textContent = `${label} · ${earnedYtd.length} completed`;
+      }
+    }
+
+    const statPipeline = $('stat-pipeline');
+    const statPipelineSub = $('stat-pipeline-sub');
+    if (statPipeline) {
+      // Pipeline = booked-but-not-yet-done. Uses estimate since these haven't
+      // been completed yet (final_price_cents won't be set).
+      const pipeline = allBookings.filter(b => PIPELINE_STATUSES.includes(b.status));
+      const cents = pipeline.reduce((sum, b) => sum + (b.estimated_price_cents ?? 0), 0);
+      statPipeline.textContent = '$' + Math.round(cents / 100).toLocaleString();
+      if (statPipelineSub) {
+        statPipelineSub.textContent = pipeline.length === 0
+          ? 'Nothing booked yet'
+          : `${pipeline.length} booking${pipeline.length === 1 ? '' : 's'} to deliver`;
       }
     }
   }
@@ -367,9 +413,18 @@
 
     list.innerHTML = rows.map(b => {
       const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
-      const actions = ownerCancellable
-        ? `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button></div>`
-        : '';
+      const completable = ['confirmed', 'in_progress'].includes(b.status);
+      let actions = '';
+      if (completable || ownerCancellable) {
+        const parts = [];
+        if (completable) {
+          parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askComplete('${b.id}')">Mark complete</button>`);
+        }
+        if (ownerCancellable) {
+          parts.push(`<button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
+        }
+        actions = `<div class="booking-card-actions">${parts.join('')}</div>`;
+      }
       return bookingCardHtml(b, { actions, showInternal: true });
     }).join('');
   }
@@ -397,6 +452,10 @@
           first_booking: null,
           last_booking: null,
           status_counts: {},
+          // Set in the second pass below — needs the full bookings list.
+          avg_ticket_cents: 0,
+          earned_count: 0,
+          avg_gap_days: null,
         };
         map.set(b.user_id, c);
       }
@@ -424,6 +483,30 @@
             postal_code: b.postal_code,
           });
         }
+      }
+    }
+
+    // Second pass: profitability metrics that need the full per-customer set.
+    for (const c of map.values()) {
+      // Average ticket: divide by earned bookings only, not pending/cancelled.
+      const earned = c.bookings.filter(b => EARNED_STATUSES.includes(b.status));
+      c.earned_count = earned.length;
+      c.avg_ticket_cents = earned.length ? Math.round(c.ltv_cents / earned.length) : 0;
+
+      // Rebook cadence: average days between consecutive completed bookings.
+      // Needs at least 2 completed bookings to be meaningful.
+      const completedDates = earned
+        .filter(b => b.preferred_date)
+        .map(b => b.preferred_date)
+        .sort();
+      if (completedDates.length > 1) {
+        const gaps = [];
+        for (let i = 1; i < completedDates.length; i++) {
+          const prev = new Date(completedDates[i - 1] + 'T12:00:00');
+          const curr = new Date(completedDates[i] + 'T12:00:00');
+          gaps.push(Math.round((curr - prev) / 86400000));
+        }
+        c.avg_gap_days = Math.round(gaps.reduce((s, x) => s + x, 0) / gaps.length);
       }
     }
     return Array.from(map.values());
@@ -536,6 +619,31 @@
     $('customer-stat-ltv').textContent = formatLtv(c.ltv_cents);
     $('customer-stat-since').textContent = c.first_booking ? formatBookingDate(c.first_booking) : '—';
 
+    const avgTicketEl = $('customer-stat-avg-ticket');
+    if (avgTicketEl) {
+      avgTicketEl.textContent = c.earned_count > 0 ? formatLtv(c.avg_ticket_cents) : '—';
+    }
+    const cadenceEl = $('customer-stat-cadence');
+    if (cadenceEl) {
+      if (c.avg_gap_days != null) {
+        // Express in the most human-friendly unit.
+        let txt;
+        if (c.avg_gap_days < 14) txt = `${c.avg_gap_days}d`;
+        else if (c.avg_gap_days < 60) txt = `${Math.round(c.avg_gap_days / 7)} wks`;
+        else txt = `${Math.round(c.avg_gap_days / 30)} mo`;
+        cadenceEl.textContent = txt;
+        // Keep the serif style consistent with the other stat values.
+        cadenceEl.style.fontSize = '';
+        cadenceEl.style.fontWeight = '';
+        cadenceEl.style.fontFamily = '';
+      } else {
+        cadenceEl.textContent = c.earned_count > 1 ? '—' : 'First-time';
+        cadenceEl.style.fontSize = '14px';
+        cadenceEl.style.fontWeight = '500';
+        cadenceEl.style.fontFamily = "'Jost', sans-serif";
+      }
+    }
+
     const mix = Object.entries(c.status_counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
@@ -594,6 +702,70 @@
   function closeCustomerDetail() {
     $('customer-detail-view').style.display = 'none';
     $('customers-list-view').style.display = 'block';
+  }
+
+  // ── MARK COMPLETE (confirmed/in_progress → completed + final price) ────
+  let completingId = null;
+
+  function askComplete(id) {
+    const b = allBookings.find(x => x.id === id);
+    if (!b) return;
+    completingId = id;
+    $('complete-text').textContent =
+      `${b.service_name || 'this booking'} on ${formatBookingDate(b.preferred_date)} (${b.customer_name || 'Customer'})`;
+    // Pre-fill with the estimate so a one-click "yes that's right" works.
+    const estDollars = b.estimated_price_cents != null ? Math.round(b.estimated_price_cents / 100) : '';
+    $('complete-amount').value = estDollars;
+    $('complete-est-hint').textContent = b.estimated_price_cents != null
+      ? `Estimate was $${estDollars}`
+      : 'No estimate on file.';
+    hideErr('complete-err');
+    $('all-list-view').style.display = 'none';
+    $('owner-cancel-view').style.display = 'none';
+    $('complete-view').style.display = 'block';
+  }
+
+  function cancelComplete() {
+    completingId = null;
+    $('complete-view').style.display = 'none';
+    $('all-list-view').style.display = 'block';
+  }
+
+  async function submitComplete() {
+    if (!completingId || !sb()) return;
+    const id = completingId;
+    const raw = $('complete-amount').value.trim();
+    // Treat blank as "keep the existing final_price_cents" (the RPC uses
+    // coalesce). Validate non-blank values as a non-negative integer-ish.
+    let finalCents = null;
+    if (raw !== '') {
+      const num = Number(raw);
+      if (!Number.isFinite(num) || num < 0) {
+        showErr('complete-err', 'Enter a valid amount or leave blank.');
+        return;
+      }
+      finalCents = Math.round(num * 100);
+    }
+    const btn = $('complete-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { data, error } = await sb().rpc('complete_booking', { booking_id: id, final_cents: finalCents });
+      if (error) throw error;
+      if (data === false) {
+        showErr('complete-err', 'Booking is no longer eligible — refresh and try again.');
+      } else {
+        showToast('Booking marked complete.', 'success');
+        completingId = null;
+        await refreshAll();
+        refreshPending();
+        cancelComplete();
+      }
+    } catch (err) {
+      console.error('complete_booking failed:', err);
+      showErr('complete-err', err.message || 'Could not save.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Mark complete';
+    }
   }
 
   // ── CALENDAR ───────────────────────────────────────────────────────────
@@ -966,6 +1138,9 @@
     askOwnerCancel,
     cancelOwnerCancel,
     submitOwnerCancel,
+    askComplete,
+    cancelComplete,
+    submitComplete,
     // Calendar
     calPrev,
     calNext,

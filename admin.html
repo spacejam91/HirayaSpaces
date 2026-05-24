@@ -96,18 +96,21 @@
     margin-top: 6px; font-size: 14px; color: var(--muted);
   }
 
-  /* ── STATS ROW (stub for phase 2) ── */
+  /* ── STATS ROW ── */
   .stats-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.75rem;
     margin-bottom: 2rem;
+  }
+  @media (max-width: 1100px) {
+    .stats-row { grid-template-columns: repeat(3, 1fr); }
   }
   .stat-card {
     background: white;
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 1.1rem 1.2rem;
+    padding: 1rem 1.1rem;
   }
   .stat-card-label {
     font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
@@ -115,8 +118,9 @@
   }
   .stat-card-value {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 32px; font-weight: 500; margin-top: 6px;
+    font-size: 28px; font-weight: 500; margin-top: 6px;
     color: var(--text);
+    line-height: 1.1;
   }
   .stat-card-sub {
     font-size: 12px; color: var(--muted); margin-top: 2px;
@@ -473,9 +477,12 @@
 
   .customer-stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.75rem;
     margin-bottom: 1.5rem;
+  }
+  @media (max-width: 1100px) {
+    .customer-stats { grid-template-columns: repeat(3, 1fr); }
   }
   .customer-stat {
     background: white;
@@ -538,7 +545,7 @@
   @media (max-width: 720px) {
     .admin-shell { padding: 1.25rem 4vw 3rem; }
     .admin-hero h1 { font-size: 30px; }
-    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .stats-row { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
     .booking-grid { grid-template-columns: 1fr; }
     .admin-tab { padding: 10px 12px; font-size: 12px; }
     .admin-nav { padding: 0 4vw; height: 60px; }
@@ -623,9 +630,19 @@
         <div class="stat-card-sub" id="stat-week-sub">Cleans scheduled</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-label">Revenue (est.)</div>
+        <div class="stat-card-label">Revenue MTD</div>
         <div class="stat-card-value" id="stat-revenue">—</div>
         <div class="stat-card-sub" id="stat-revenue-sub">This month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Revenue YTD</div>
+        <div class="stat-card-value" id="stat-revenue-ytd">—</div>
+        <div class="stat-card-sub" id="stat-revenue-ytd-sub">Year to date</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Pipeline</div>
+        <div class="stat-card-value" id="stat-pipeline">—</div>
+        <div class="stat-card-sub" id="stat-pipeline-sub">Confirmed, not yet done</div>
       </div>
     </div>
 
@@ -722,6 +739,23 @@
         </div>
       </div>
 
+      <!-- Mark-complete overlay -->
+      <div id="complete-view" class="overlay-card" style="display:none">
+        <h3>Mark this booking complete?</h3>
+        <p id="complete-text"></p>
+        <p style="font-size:13px">Enter the final amount charged. Leave blank to keep the estimate.</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <span style="font-size:20px;color:var(--muted)">$</span>
+          <input type="number" id="complete-amount" min="0" step="1" placeholder="0" style="flex:1;font-family:'Jost',sans-serif;font-size:16px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none">
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px" id="complete-est-hint"></p>
+        <div id="complete-err" class="form-err"></div>
+        <div class="overlay-actions">
+          <button class="btn-ghost" onclick="HirayaAdmin.cancelComplete()">Back</button>
+          <button class="btn-primary" id="complete-btn" onclick="HirayaAdmin.submitComplete()">Mark complete</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- ── CALENDAR PANEL ── -->
@@ -805,6 +839,14 @@
           <div class="customer-stat">
             <div class="customer-stat-label">Lifetime value (est.)</div>
             <div class="customer-stat-value" id="customer-stat-ltv">$0</div>
+          </div>
+          <div class="customer-stat">
+            <div class="customer-stat-label">Avg ticket</div>
+            <div class="customer-stat-value" id="customer-stat-avg-ticket">—</div>
+          </div>
+          <div class="customer-stat">
+            <div class="customer-stat-label">Rebook cadence</div>
+            <div class="customer-stat-value" id="customer-stat-cadence">—</div>
           </div>
           <div class="customer-stat">
             <div class="customer-stat-label">Member since</div>

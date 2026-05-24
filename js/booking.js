@@ -107,7 +107,12 @@
       ? savedAddrSel.options[savedAddrSel.selectedIndex].dataset.full || savedAddrSel.options[savedAddrSel.selectedIndex].textContent
       : [street, unit, city, normalizedPostal].filter(Boolean).join(', ');
 
-    const svc = SERVICES.find(s => s.id === selSvc);
+    // 'hourly' isn't in SERVICES — it's a synthesized path. Stand-in metadata
+    // so the review modal / emails get the right icon and a sensible label.
+    const isHourly = selSvc === 'hourly';
+    const svc = isHourly
+      ? { id: 'hourly', name: 'Flexible Cleaning', icon: '⏱' }
+      : SERVICES.find(s => s.id === selSvc);
     const addons = selAddons
       .map(id => ADDONS.find(a => a.id === id))
       .filter(Boolean);

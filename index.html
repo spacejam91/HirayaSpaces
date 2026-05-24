@@ -393,6 +393,104 @@
   .svc-price { color: var(--sage); font-size: 14px; font-weight: 600; margin-bottom: 0.75rem; }
   .svc-desc { font-size: 13px; color: var(--muted); line-height: 1.65; font-weight: 300; }
   .svc-check { display: none; position: absolute; top: 16px; right: 16px; background: var(--sage); color: white; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center; font-size: 12px; z-index: 2; }
+
+  /* ── FLEXIBLE HOURLY ── */
+  #flexible { background: white; padding-top: 0; padding-bottom: 4rem; }
+  .flex-divider {
+    display: flex; align-items: center; gap: 1rem;
+    margin: 0 auto 2.5rem; max-width: 540px;
+    color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .flex-divider::before, .flex-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+  .flex-card {
+    max-width: 920px; margin: 0 auto;
+    border: 1.5px solid var(--border); border-radius: 24px;
+    padding: 2.5rem; background: var(--warm);
+    position: relative; transition: border-color .25s, box-shadow .25s, transform .15s;
+  }
+  .flex-card.selected {
+    border-color: var(--sage);
+    background: var(--sage-light);
+    box-shadow: 0 10px 30px rgba(30,77,43,0.08);
+  }
+  .flex-head {
+    display: flex; gap: 1.25rem; align-items: flex-start;
+    margin-bottom: 1.75rem;
+  }
+  .flex-icon {
+    font-size: 40px; line-height: 1; flex-shrink: 0;
+  }
+  .flex-head h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; font-weight: 500; line-height: 1.1;
+    margin-bottom: 6px;
+  }
+  .flex-head p { font-size: 14px; color: var(--muted); line-height: 1.6; font-weight: 300; }
+  .flex-head p strong { color: var(--sage); font-weight: 600; }
+  .flex-body {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 2rem; align-items: center;
+  }
+  .flex-stepper {
+    display: flex; align-items: center; justify-content: center;
+    gap: 1rem;
+    background: white; border: 1px solid var(--border);
+    border-radius: 20px; padding: 1rem;
+  }
+  .flex-step-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--cream); border: 1.5px solid var(--border);
+    color: var(--text); font-size: 22px; font-weight: 400;
+    cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Jost', sans-serif;
+  }
+  .flex-step-btn:hover { background: var(--sage); color: white; border-color: var(--sage); }
+  .flex-step-btn:disabled { opacity: 0.35; cursor: not-allowed; background: var(--cream); color: var(--muted); }
+  .flex-step-btn:disabled:hover { background: var(--cream); color: var(--muted); border-color: var(--border); }
+  .flex-step-display { text-align: center; min-width: 90px; }
+  .flex-step-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px; font-weight: 500; line-height: 1; color: var(--text);
+  }
+  .flex-step-label {
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .flex-summary {
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .flex-math {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 1rem 1.25rem; background: white;
+    border: 1px solid var(--border); border-radius: 14px;
+    font-size: 14px;
+  }
+  .flex-math strong {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px; font-weight: 500; color: var(--sage);
+  }
+  .flex-pick-btn {
+    background: var(--sage); color: white; border: none;
+    padding: 14px 24px; border-radius: 14px;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.4px;
+    cursor: pointer; font-family: 'Jost', sans-serif;
+    transition: background .2s, transform .15s;
+  }
+  .flex-pick-btn:hover { background: #0f2e18; transform: translateY(-1px); }
+  .flex-card.selected .flex-pick-btn { background: var(--rose); }
+  .flex-card.selected .flex-pick-btn:hover { background: #1a3a26; }
+
+  @media (max-width: 640px) {
+    .flex-card { padding: 1.5rem; }
+    .flex-head { gap: 1rem; }
+    .flex-head h3 { font-size: 24px; }
+    .flex-icon { font-size: 32px; }
+    .flex-body { grid-template-columns: 1fr; gap: 1.25rem; }
+  }
   .svc-card.selected .svc-check { display: flex; }
 
   /* ── TIER PICKER ──
@@ -837,6 +935,37 @@
   <div id="tier-picker" style="display:none"></div>
 </section>
 
+<!-- FLEXIBLE HOURLY CLEANING -->
+<section id="flexible">
+  <div class="flex-divider"><span>or, pay by the hour</span></div>
+  <div class="flex-card" id="flex-card">
+    <div class="flex-head">
+      <span class="flex-icon">⏱</span>
+      <div>
+        <h3>Flexible Cleaning</h3>
+        <p>Need help with something in between? Book a single cleaner by the hour — focus on whatever matters most to you. <strong>$40/hour, 3-hour minimum.</strong></p>
+      </div>
+    </div>
+    <div class="flex-body">
+      <div class="flex-stepper" role="group" aria-label="Choose hours">
+        <button type="button" class="flex-step-btn" onclick="adjustHours(-1)" aria-label="Fewer hours">−</button>
+        <div class="flex-step-display">
+          <div class="flex-step-value" id="flex-hours">3</div>
+          <div class="flex-step-label">hours</div>
+        </div>
+        <button type="button" class="flex-step-btn" onclick="adjustHours(1)" aria-label="More hours">+</button>
+      </div>
+      <div class="flex-summary">
+        <div class="flex-math">
+          <span id="flex-math-line">3 × $40/hr</span>
+          <strong id="flex-total">$120</strong>
+        </div>
+        <button type="button" class="flex-pick-btn" id="flex-pick-btn" onclick="selectHourly()">Choose Flexible</button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ADD-ONS -->
 <section id="addons">
   <div class="addons-layout">
@@ -1065,6 +1194,102 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 let selSvc=null, selTier=null, selAddons=[], selDay=null, selTime=null, calM=4, calY=2026;
 
+// Flexible hourly state. selHours is what the stepper shows; selHourly flips
+// to true once the customer commits via the "Choose Flexible" button (so
+// fiddling with the stepper doesn't silently override a tier they already
+// picked). When selHourly is true, selSvc='hourly' and selTier is synthesized
+// from the hour count so the existing review/submit pipeline keeps working.
+const HOURLY_RATE = 40;
+const HOURLY_MIN = 3;
+const HOURLY_MAX = 8;
+let selHours = HOURLY_MIN;
+let selHourly = false;
+
+function synthesizeHourlyTier(hours) {
+  return {
+    slug: 'hourly-flexible',
+    // Just the duration — booking.js composes the full service_name as
+    // "Flexible Cleaning — N hours" via the parent svc.name + tier.name.
+    name: `${hours} hours`,
+    basePrice: hours * HOURLY_RATE,
+    durationMin: hours * 60,
+  };
+}
+
+function adjustHours(delta) {
+  const next = Math.max(HOURLY_MIN, Math.min(HOURLY_MAX, selHours + delta));
+  if (next === selHours) return;
+  selHours = next;
+  // If the customer already committed to hourly, keep selTier in sync with
+  // the new hour count so the calendar/quote updates immediately.
+  if (selHourly) {
+    selTier = synthesizeHourlyTier(selHours);
+    renderTimes();
+    updateSummary();
+  }
+  renderHourlyState();
+}
+
+function selectHourly() {
+  if (selHourly) {
+    // Toggle off — go back to a "nothing chosen" state so the customer can
+    // pick a tiered service instead.
+    deselectHourly();
+    updateSummary();
+    return;
+  }
+  selHourly = true;
+  selSvc = 'hourly';
+  selTier = synthesizeHourlyTier(selHours);
+  // Wipe any tier selection from the services grid + clear add-ons (hourly
+  // doesn't combine with them — keeps the math honest).
+  SERVICES.forEach(s => {
+    const el = document.getElementById('svc-' + s.id);
+    if (el) el.classList.remove('selected');
+  });
+  // Addons are rendered statically once with .selected classes flipped by
+  // toggleAddon — clear them by hand since there's no renderAddons() helper.
+  selAddons = [];
+  ADDONS.forEach(a => {
+    const el = document.getElementById('addon-' + a.id);
+    if (el) el.classList.remove('selected');
+  });
+  renderTierPicker();
+  renderHourlyState();
+  renderTimes();
+  updateSummary();
+}
+
+function deselectHourly() {
+  selHourly = false;
+  if (selSvc === 'hourly') { selSvc = null; selTier = null; }
+  renderHourlyState();
+}
+
+function renderHourlyState() {
+  const card = document.getElementById('flex-card');
+  const hoursEl = document.getElementById('flex-hours');
+  const totalEl = document.getElementById('flex-total');
+  const mathEl = document.getElementById('flex-math-line');
+  const btn = document.getElementById('flex-pick-btn');
+  if (!card) return;
+  if (hoursEl) hoursEl.textContent = selHours;
+  if (totalEl) totalEl.textContent = '$' + (selHours * HOURLY_RATE);
+  if (mathEl) mathEl.textContent = `${selHours} × $${HOURLY_RATE}/hr`;
+  card.classList.toggle('selected', selHourly);
+  if (btn) btn.textContent = selHourly ? '✓ Selected — tap to change' : 'Choose Flexible';
+  // Disable +/- at the bounds so the customer doesn't smash a no-op button.
+  const stepBtns = card.querySelectorAll('.flex-step-btn');
+  if (stepBtns.length === 2) {
+    stepBtns[0].disabled = selHours <= HOURLY_MIN;
+    stepBtns[1].disabled = selHours >= HOURLY_MAX;
+  }
+  // Hide the add-ons section when hourly is the chosen path — keeps the
+  // page honest (the user said "hourly is hourly, no extras").
+  const addonsSection = document.getElementById('addons');
+  if (addonsSection) addonsSection.style.display = selHourly ? 'none' : '';
+}
+
 // Services
 document.getElementById('svc-grid').innerHTML = SERVICES.map(s=>`
   <div class="svc-card" id="svc-${s.id}" onclick="selectSvc('${s.id}')">
@@ -1076,6 +1301,9 @@ document.getElementById('svc-grid').innerHTML = SERVICES.map(s=>`
   </div>`).join('');
 
 function selectSvc(id){
+  // Picking a tiered service must clear the hourly choice — they're mutually
+  // exclusive (the customer is on one path or the other, not both).
+  if (selHourly) deselectHourly();
   selSvc=id;
   selTier=null; // reset tier whenever the parent service changes
   SERVICES.forEach(s=>{ document.getElementById('svc-'+s.id).classList.toggle('selected',s.id===id); });
@@ -1206,7 +1434,10 @@ function toggleAddon(id){
 }
 
 function updateSummary(){
-  const svc = SERVICES.find(s=>s.id===selSvc);
+  // 'hourly' is synthetic — not in SERVICES — so build a stand-in for it.
+  const svc = selSvc === 'hourly'
+    ? { id: 'hourly', name: 'Flexible Cleaning', icon: '⏱' }
+    : SERVICES.find(s=>s.id===selSvc);
   let label = 'No service selected yet';
   if (svc && selTier) {
     const priceTxt = selTier.basePrice == null ? 'Custom quote' : '$' + selTier.basePrice;
@@ -1456,6 +1687,7 @@ document.querySelectorAll('.fade-up').forEach(el=>obs.observe(el));
 renderCalendar();
 renderTimes();
 updateSummary();
+renderHourlyState();
 </script>
 
 <!-- LOGIN / SIGNUP / FORGOT-PASSWORD MODAL -->
