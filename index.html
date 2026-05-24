@@ -1724,12 +1724,41 @@ updateSummary();
 
     <!-- ── ADMIN TAB (owner-only) ────────────────────────────────────────── -->
     <div id="account-tab-admin" style="display:none">
+      <!-- Sub-tab toggle: Pending vs All bookings -->
+      <div class="account-tabs" id="admin-subtabs" style="margin-bottom:1rem">
+        <button type="button" class="account-tab active" data-admin-subtab="pending" onclick="HirayaAccount.switchAdminSubtab('pending')">Pending</button>
+        <button type="button" class="account-tab" data-admin-subtab="all" onclick="HirayaAccount.switchAdminSubtab('all')">All bookings</button>
+      </div>
+
       <div id="admin-list-view">
         <p class="modal-sub">Pending bookings waiting for your review. Confirm to lock them in, decline to free up the slot.</p>
         <div id="admin-pending-list" class="bookings-list" aria-live="polite"></div>
         <div id="admin-pending-empty" class="addr-empty" style="display:none">
           <div class="addr-empty-icon" aria-hidden="true">✨</div>
           <p>Nothing pending right now. You're all caught up.</p>
+        </div>
+      </div>
+
+      <!-- All-bookings sub-view -->
+      <div id="admin-all-view" style="display:none">
+        <p class="modal-sub">Every booking across every status, newest first. Use the filter to narrow it down.</p>
+        <div class="modal-field" style="margin-bottom:1rem">
+          <label for="admin-all-status-filter">Filter by status</label>
+          <select id="admin-all-status-filter" onchange="HirayaAccount.refreshAllBookings()">
+            <option value="">All statuses</option>
+            <option value="pending_review">Pending review</option>
+            <option value="awaiting_quote">Awaiting quote</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="no_show">No show</option>
+          </select>
+        </div>
+        <div id="admin-all-list" class="bookings-list" aria-live="polite"></div>
+        <div id="admin-all-empty" class="addr-empty" style="display:none">
+          <div class="addr-empty-icon" aria-hidden="true">📭</div>
+          <p>No bookings match this filter.</p>
         </div>
       </div>
 

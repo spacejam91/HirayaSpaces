@@ -147,26 +147,52 @@
       showBookingsListView();
       refreshBookings();
     } else if (tab === 'admin') {
+      // Always land on the Pending sub-tab when entering Admin.
+      adminSubtab = 'pending';
+      document.querySelectorAll('[data-admin-subtab]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.adminSubtab === 'pending');
+      });
       showAdminListView();
       refreshPending();
     }
   }
 
-  // Admin sub-view toggles
+  // Admin sub-tab state: 'pending' (default) vs 'all' (the full history view).
+  // The confirm/decline overlays hide both list views regardless of which
+  // sub-tab is active, then we restore the active one when the overlay closes.
+  let adminSubtab = 'pending';
+
   function showAdminListView() {
-    $('admin-list-view').style.display = 'block';
+    const pendingActive = adminSubtab === 'pending';
+    $('admin-list-view').style.display = pendingActive ? 'block' : 'none';
+    const av = $('admin-all-view'); if (av) av.style.display = pendingActive ? 'none' : 'block';
     $('admin-decline-view').style.display = 'none';
     const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
+    const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'flex';
   }
   function showAdminDeclineView() {
     $('admin-list-view').style.display = 'none';
+    const av = $('admin-all-view'); if (av) av.style.display = 'none';
     $('admin-decline-view').style.display = 'block';
     const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
+    const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'none';
   }
   function showAdminConfirmView() {
     $('admin-list-view').style.display = 'none';
+    const av = $('admin-all-view'); if (av) av.style.display = 'none';
     $('admin-decline-view').style.display = 'none';
     $('admin-confirm-view').style.display = 'block';
+    const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'none';
+  }
+
+  function switchAdminSubtab(which) {
+    adminSubtab = which === 'all' ? 'all' : 'pending';
+    document.querySelectorAll('[data-admin-subtab]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.adminSubtab === adminSubtab);
+    });
+    showAdminListView();
+    if (adminSubtab === 'pending') refreshPending();
+    else refreshAllBookings();
   }
 
   function showListView() {
@@ -675,6 +701,82 @@
     }).join('');
   }
 
+  // ── ADMIN — all bookings (every status, newest first) ─────────────────
+  let allBookings = [];
+
+  async function fetchAllBookings() {
+    if (!sb() || !isOwner) { allBookings = []; return []; }
+    const { data, error } = await sb().rpc('get_all_bookings');
+    if (error) {
+      console.warn('get_all_bookings failed:', error.message);
+      allBookings = [];
+    } else {
+      allBookings = data || [];
+    }
+    return allBookings;
+  }
+
+  async function refreshAllBookings() {
+    await fetchAllBookings();
+    renderAllBookings();
+  }
+
+  function renderAllBookings() {
+    const list = $('admin-all-list');
+    const empty = $('admin-all-empty');
+    if (!list) return;
+
+    const filter = ($('admin-all-status-filter')?.value || '').trim();
+    const rows = filter ? allBookings.filter(b => b.status === filter) : allBookings;
+
+    if (!rows.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    list.innerHTML = rows.map(b => {
+      const svc = b.service_name || 'Cleaning service';
+      const dateStr = formatBookingDate(b.preferred_date);
+      const timeStr = b.preferred_time_slot ? ` at ${escapeHtml(b.preferred_time_slot)}` : '';
+      const addr = [
+        [b.street_address, b.unit].filter(Boolean).join(', '),
+        [b.city, b.postal_code].filter(Boolean).join(' '),
+      ].filter(Boolean).join(' · ');
+      const total = b.estimated_price_cents != null
+        ? '$' + Math.round(b.estimated_price_cents / 100)
+        : 'Quote on request';
+      const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}" style="color:var(--sage)">${escapeHtml(b.customer_phone)}</a>` : '';
+      const emailLink = b.customer_email ? `<a href="mailto:${escapeHtml(b.customer_email)}" style="color:var(--sage)">${escapeHtml(b.customer_email)}</a>` : '';
+      const mapsLink = addr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="color:var(--sage);font-size:12px">🗺 Maps →</a>` : '';
+      const notes = b.customer_notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic">📝 ${escapeHtml(b.customer_notes)}</div>` : '';
+      const internal = b.internal_notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted)">🔒 ${escapeHtml(b.internal_notes)}</div>` : '';
+      const classes = ['booking-card'];
+      if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
+      if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
+      return `
+        <div class="${classes.join(' ')}" data-id="${b.id}">
+          <div class="booking-card-head">
+            <div>
+              <div class="booking-card-svc">${escapeHtml(svc)}</div>
+              <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
+            </div>
+            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
+          </div>
+          <div class="booking-card-body">
+            <div>👤 <strong>${escapeHtml(b.customer_name || 'Customer')}</strong></div>
+            ${emailLink ? `<div>✉️ ${emailLink}</div>` : ''}
+            ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
+            ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
+            <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
+            ${notes}
+            ${internal}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
   let confirmingBookingId = null;
   let confirmingBookingLabel = '';
 
@@ -792,6 +894,7 @@
           cachedAddresses = [];
           cachedBookings = [];
           pendingBookings = [];
+          allBookings = [];
           isOwner = false;
           notifyListeners();
         }
@@ -821,6 +924,7 @@
     refreshBookings,
     // Admin tab (owner-only)
     openAdmin,
+    switchAdminSubtab,
     adminConfirm,
     cancelAdminConfirm,
     confirmAdminConfirm,
@@ -828,6 +932,7 @@
     cancelDecline,
     confirmDecline,
     refreshPending,
+    refreshAllBookings,
     // For booking.js to read the saved list and react to changes
     fetchAddresses,
     getCachedAddresses,
