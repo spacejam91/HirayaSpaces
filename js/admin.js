@@ -187,10 +187,11 @@
       startBookingsRealtime();
     }
 
-    // Load initial panel (pending)
+    // Load initial panel (pending) + services list for the new-booking form
     await refreshPending();
     // Load all bookings in the background so the count is ready
     refreshAll();
+    loadServicesCache();
   }
 
   // ── PANEL SWITCHING ────────────────────────────────────────────────────
@@ -868,6 +869,223 @@ Hiraya Spaces`
       sb().removeChannel(realtimeChannel);
     }
     realtimeChannel = null;
+  }
+
+  // ── NEW BOOKING (admin-initiated, on behalf of an existing customer) ───
+  // Services list is loaded once on dashboard boot. Limited to existing
+  // customers (must have a profile in our DB) because creating an auth user
+  // requires the service role key, which can't safely live in the browser.
+  let servicesCache = [];
+  let nbSelectedCustomer = null;
+  let nbSelectedAddresses = [];
+
+  async function loadServicesCache() {
+    if (servicesCache.length || !sb()) return;
+    const { data, error } = await sb()
+      .from('services')
+      .select('slug, name, starting_price_cents, sort_order, is_active, requires_quote, category_id')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (error) {
+      console.warn('services fetch failed:', error.message);
+      return;
+    }
+    servicesCache = data || [];
+    populateServiceSelect();
+  }
+
+  function populateServiceSelect() {
+    const sel = $('nb-service');
+    if (!sel) return;
+    // Skip requires_quote services — those need a human pricing conversation.
+    const items = servicesCache.filter(s => !s.requires_quote);
+    sel.innerHTML = '<option value="">Pick a service…</option>'
+      + items.map(s => {
+          const price = s.slug === 'hourly-flexible'
+            ? '$40/hr'
+            : (s.starting_price_cents != null ? '$' + Math.round(s.starting_price_cents / 100) : '');
+          return `<option value="${escapeHtml(s.slug)}" data-price="${s.starting_price_cents ?? ''}">${escapeHtml(s.name)}${price ? ' — ' + price : ''}</option>`;
+        }).join('');
+  }
+
+  function openNewBooking() {
+    if (!isOwner) return;
+    // Reset everything so reopening doesn't carry stale state.
+    nbSelectedCustomer = null;
+    nbSelectedAddresses = [];
+    $('nb-customer-search').value = '';
+    $('nb-customer-results').classList.remove('open');
+    $('nb-customer-results').innerHTML = '';
+    $('nb-customer-search-wrap').style.display = '';
+    $('nb-customer-selected').style.display = 'none';
+    $('nb-service').value = '';
+    $('nb-hourly-wrap').style.display = 'none';
+    $('nb-hours').value = 3;
+    $('nb-price-hint').textContent = '';
+    $('nb-date').value = '';
+    $('nb-time').value = '';
+    $('nb-address').innerHTML = '<option value="">Select a customer first…</option>';
+    $('nb-customer-notes').value = '';
+    $('nb-internal-notes').value = '';
+    hideErr('nb-err');
+    $('nb-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    loadServicesCache();
+  }
+
+  function closeNewBooking() {
+    $('nb-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function closeNewBookingIfBackdrop(e) {
+    if (e.target.id === 'nb-overlay') closeNewBooking();
+  }
+
+  function searchCustomers() {
+    const q = $('nb-customer-search').value.trim().toLowerCase();
+    const results = $('nb-customer-results');
+    if (!q) {
+      results.classList.remove('open');
+      return;
+    }
+    const customers = aggregateCustomers();
+    const matches = customers.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.email.toLowerCase().includes(q) ||
+      (c.phone && c.phone.toLowerCase().includes(q))
+    ).slice(0, 8);
+    if (!matches.length) {
+      results.innerHTML = `<div class="nb-customer-result" style="cursor:default;color:var(--muted)">No matches. They may need to sign up on the public site first.</div>`;
+      results.classList.add('open');
+      return;
+    }
+    results.innerHTML = matches.map(c => `
+      <div class="nb-customer-result" onclick="HirayaAdmin.pickCustomer('${c.user_id}')">
+        <div class="nb-customer-result-name">${escapeHtml(c.name)}</div>
+        <div class="nb-customer-result-email">${escapeHtml(c.email || 'no email')}${c.phone ? ' · ' + escapeHtml(c.phone) : ''}</div>
+      </div>
+    `).join('');
+    results.classList.add('open');
+  }
+
+  async function pickCustomer(userId) {
+    const c = aggregateCustomers().find(x => x.user_id === userId);
+    if (!c) return;
+    nbSelectedCustomer = c;
+    $('nb-customer-search-wrap').style.display = 'none';
+    $('nb-selected-name').textContent = c.name;
+    $('nb-selected-email').textContent = c.email + (c.phone ? ' · ' + c.phone : '');
+    $('nb-customer-selected').style.display = 'flex';
+
+    // Pull this customer's saved addresses via the admin RPC.
+    const addrSel = $('nb-address');
+    addrSel.innerHTML = '<option value="">Loading addresses…</option>';
+    try {
+      const { data, error } = await sb().rpc('admin_list_addresses', { p_user_id: userId });
+      if (error) throw error;
+      nbSelectedAddresses = data || [];
+      if (!nbSelectedAddresses.length) {
+        addrSel.innerHTML = '<option value="">No saved addresses — ask customer to add one on the site</option>';
+      } else {
+        addrSel.innerHTML = '<option value="">Pick an address…</option>'
+          + nbSelectedAddresses.map(a => {
+              const parts = [
+                [a.street_address, a.unit].filter(Boolean).join(', '),
+                [a.city, a.postal_code].filter(Boolean).join(' '),
+              ].filter(Boolean).join(' · ');
+              const label = a.label ? `${a.label}: ${parts}` : parts;
+              return `<option value="${a.id}">${escapeHtml(label)}</option>`;
+            }).join('');
+        // Auto-select the default address if there's exactly one.
+        const def = nbSelectedAddresses.find(a => a.is_default) || nbSelectedAddresses[0];
+        if (def) addrSel.value = def.id;
+      }
+    } catch (err) {
+      console.warn('admin_list_addresses failed:', err);
+      addrSel.innerHTML = `<option value="">Couldn't load addresses</option>`;
+    }
+  }
+
+  function clearCustomer() {
+    nbSelectedCustomer = null;
+    nbSelectedAddresses = [];
+    $('nb-customer-search-wrap').style.display = '';
+    $('nb-customer-selected').style.display = 'none';
+    $('nb-customer-search').value = '';
+    $('nb-customer-search').focus();
+    $('nb-address').innerHTML = '<option value="">Select a customer first…</option>';
+  }
+
+  function onServicePicked() {
+    const slug = $('nb-service').value;
+    const isHourly = slug === 'hourly-flexible';
+    $('nb-hourly-wrap').style.display = isHourly ? 'block' : 'none';
+    updatePriceHint();
+  }
+
+  function updatePriceHint() {
+    const slug = $('nb-service').value;
+    const hint = $('nb-price-hint');
+    if (!slug) { hint.textContent = ''; return; }
+    if (slug === 'hourly-flexible') {
+      const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
+      hint.textContent = `Estimated price: ${hrs} × $40 = $${hrs * 40}`;
+      return;
+    }
+    const svc = servicesCache.find(s => s.slug === slug);
+    if (svc && svc.starting_price_cents != null) {
+      hint.textContent = `Estimated price: $${Math.round(svc.starting_price_cents / 100)}`;
+    } else {
+      hint.textContent = '';
+    }
+  }
+
+  async function submitNewBooking() {
+    hideErr('nb-err');
+    if (!nbSelectedCustomer) { showErr('nb-err', 'Pick a customer first.'); return; }
+    const slug = $('nb-service').value;
+    if (!slug) { showErr('nb-err', 'Pick a service.'); return; }
+    const date = $('nb-date').value;
+    if (!date) { showErr('nb-err', 'Pick a date.'); return; }
+    const time = $('nb-time').value;
+    if (!time) { showErr('nb-err', 'Pick a time slot.'); return; }
+    const addressId = $('nb-address').value;
+    if (!addressId) { showErr('nb-err', 'Pick an address.'); return; }
+
+    let priceCents = null;
+    if (slug === 'hourly-flexible') {
+      const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
+      priceCents = hrs * 4000;
+    } else {
+      const svc = servicesCache.find(s => s.slug === slug);
+      priceCents = svc?.starting_price_cents ?? null;
+    }
+
+    const btn = $('nb-submit');
+    btn.disabled = true; btn.textContent = 'Creating…';
+    try {
+      const { data, error } = await sb().rpc('admin_create_booking', {
+        p_user_id: nbSelectedCustomer.user_id,
+        p_service_slug: slug,
+        p_address_id: addressId,
+        p_preferred_date: date,
+        p_preferred_time_slot: time,
+        p_estimated_price_cents: priceCents,
+        p_customer_notes: $('nb-customer-notes').value.trim() || null,
+        p_internal_notes: $('nb-internal-notes').value.trim() || null,
+        p_status: 'confirmed',
+      });
+      if (error) throw error;
+      showToast('Booking created and confirmed.', 'success');
+      closeNewBooking();
+      await refreshAll();
+      refreshPending();
+    } catch (err) {
+      console.error('admin_create_booking failed:', err);
+      showErr('nb-err', err.message || 'Could not create the booking.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Create confirmed booking';
+    }
   }
 
   // ── RESCHEDULE (edit date/time without losing the booking) ─────────────
@@ -1595,6 +1813,16 @@ Hiraya Spaces`
     renderCustomers,
     openCustomerDetail,
     closeCustomerDetail,
+    // New booking
+    openNewBooking,
+    closeNewBooking,
+    closeNewBookingIfBackdrop,
+    searchCustomers,
+    pickCustomer,
+    clearCustomer,
+    onServicePicked,
+    updatePriceHint,
+    submitNewBooking,
   };
 
   if (document.readyState === 'loading') {

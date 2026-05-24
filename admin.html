@@ -79,6 +79,98 @@
   .admin-nav-btn:hover { border-color: var(--sage); color: var(--sage); }
   .admin-bell.is-on { background: var(--sage-light); border-color: var(--sage-mid); color: var(--sage); }
   .admin-bell.is-on:hover { background: var(--sage); color: white; border-color: var(--sage); }
+  .admin-new {
+    background: var(--sage) !important;
+    color: white !important;
+    border-color: var(--sage) !important;
+    font-weight: 600;
+  }
+  .admin-new:hover {
+    background: #0f2e18 !important;
+    color: white !important;
+    border-color: #0f2e18 !important;
+  }
+
+  /* ── NEW-BOOKING MODAL ── */
+  .nb-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(30,26,23,0.5);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    align-items: flex-start; justify-content: center;
+    padding: 2rem 1rem; overflow-y: auto;
+  }
+  .nb-overlay.open { display: flex; }
+  .nb-modal {
+    background: white; border-radius: 18px;
+    width: 100%; max-width: 640px;
+    padding: 2rem; position: relative;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.2);
+  }
+  .nb-modal h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; font-weight: 400; margin-bottom: 4px;
+  }
+  .nb-modal p.nb-sub {
+    color: var(--muted); font-size: 13px; margin-bottom: 1.5rem;
+  }
+  .nb-close {
+    position: absolute; top: 1rem; right: 1rem;
+    background: var(--warm); border: none; border-radius: 50%;
+    width: 32px; height: 32px; cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nb-section {
+    margin-bottom: 1.5rem;
+  }
+  .nb-section-label {
+    font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;
+    color: var(--muted); font-weight: 500; margin-bottom: 8px;
+  }
+  .nb-input, .nb-select {
+    width: 100%; font-family: 'Jost', sans-serif; font-size: 14px;
+    padding: 10px 14px; border: 1.5px solid var(--border);
+    border-radius: 12px; outline: none; background: white; color: var(--text);
+  }
+  .nb-input:focus, .nb-select:focus { border-color: var(--sage); }
+  .nb-textarea {
+    width: 100%; font-family: 'Jost', sans-serif; font-size: 14px;
+    padding: 10px 14px; border: 1.5px solid var(--border);
+    border-radius: 12px; outline: none; min-height: 70px; resize: vertical;
+  }
+  .nb-customer-results {
+    border: 1px solid var(--border); border-radius: 12px;
+    max-height: 220px; overflow-y: auto; margin-top: 6px;
+    display: none;
+  }
+  .nb-customer-results.open { display: block; }
+  .nb-customer-result {
+    padding: 10px 14px; cursor: pointer; font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  .nb-customer-result:last-child { border-bottom: none; }
+  .nb-customer-result:hover { background: var(--sage-light); }
+  .nb-customer-result-name { font-weight: 600; }
+  .nb-customer-result-email { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .nb-customer-selected {
+    background: var(--sage-light); border: 1px solid var(--sage-mid);
+    border-radius: 12px; padding: 12px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 14px;
+  }
+  .nb-customer-selected button {
+    background: none; border: none; color: var(--sage); cursor: pointer;
+    font-size: 12px; font-family: 'Jost', sans-serif;
+  }
+  .nb-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .nb-actions {
+    display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.5rem;
+  }
+  @media (max-width: 640px) {
+    .nb-modal { padding: 1.5rem; }
+    .nb-row { grid-template-columns: 1fr; }
+  }
 
   /* ── PAGE LAYOUT ── */
   .admin-shell {
@@ -655,6 +747,7 @@
     </a>
     <div class="admin-nav-right">
       <span class="admin-greet" id="admin-greet"></span>
+      <button class="admin-nav-btn admin-new" onclick="HirayaAdmin.openNewBooking()">+ New booking</button>
       <button class="admin-nav-btn admin-bell" id="admin-bell-btn" onclick="HirayaAdmin.toggleNotifications()" aria-label="Toggle new-booking alerts">
         <span id="admin-bell-icon">🔕</span>
         <span id="admin-bell-label">Alerts off</span>
@@ -967,6 +1060,85 @@
 
     </div>
 
+  </div>
+</div>
+
+<!-- ── NEW BOOKING MODAL ────────────────────────────────────────────────── -->
+<div class="nb-overlay" id="nb-overlay" onclick="HirayaAdmin.closeNewBookingIfBackdrop(event)">
+  <div class="nb-modal" role="dialog" aria-labelledby="nb-title">
+    <button class="nb-close" onclick="HirayaAdmin.closeNewBooking()" aria-label="Close">✕</button>
+    <h2 id="nb-title">New booking</h2>
+    <p class="nb-sub">Create a booking on behalf of an existing customer. New customers should sign up via the public site first.</p>
+
+    <!-- WHO -->
+    <div class="nb-section">
+      <div class="nb-section-label">Customer</div>
+      <div id="nb-customer-search-wrap">
+        <input type="search" id="nb-customer-search" class="nb-input" placeholder="Search by name or email…" autocomplete="off" oninput="HirayaAdmin.searchCustomers()" onfocus="HirayaAdmin.searchCustomers()">
+        <div id="nb-customer-results" class="nb-customer-results"></div>
+      </div>
+      <div id="nb-customer-selected" class="nb-customer-selected" style="display:none">
+        <div>
+          <div style="font-weight:600" id="nb-selected-name"></div>
+          <div style="font-size:12px;color:var(--muted)" id="nb-selected-email"></div>
+        </div>
+        <button type="button" onclick="HirayaAdmin.clearCustomer()">Change</button>
+      </div>
+    </div>
+
+    <!-- WHAT -->
+    <div class="nb-section">
+      <div class="nb-section-label">Service</div>
+      <select id="nb-service" class="nb-select" onchange="HirayaAdmin.onServicePicked()">
+        <option value="">Pick a service…</option>
+      </select>
+      <div id="nb-hourly-wrap" style="display:none;margin-top:10px">
+        <div class="nb-section-label">Hours (3–8, $40/hr)</div>
+        <input type="number" id="nb-hours" class="nb-input" min="3" max="8" value="3" oninput="HirayaAdmin.updatePriceHint()">
+      </div>
+      <div style="margin-top:6px;font-size:12px;color:var(--muted)" id="nb-price-hint"></div>
+    </div>
+
+    <!-- WHEN -->
+    <div class="nb-section">
+      <div class="nb-section-label">When</div>
+      <div class="nb-row">
+        <input type="date" id="nb-date" class="nb-input">
+        <select id="nb-time" class="nb-select">
+          <option value="">Time slot…</option>
+          <option value="8:00 am">8:00 am</option>
+          <option value="9:30 am">9:30 am</option>
+          <option value="11:00 am">11:00 am</option>
+          <option value="1:00 pm">1:00 pm</option>
+          <option value="2:30 pm">2:30 pm</option>
+          <option value="4:00 pm">4:00 pm</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- WHERE -->
+    <div class="nb-section">
+      <div class="nb-section-label">Address (from customer's saved addresses)</div>
+      <select id="nb-address" class="nb-select">
+        <option value="">Select a customer first…</option>
+      </select>
+    </div>
+
+    <!-- NOTES -->
+    <div class="nb-section">
+      <div class="nb-section-label">Customer notes (optional)</div>
+      <textarea id="nb-customer-notes" class="nb-textarea" placeholder="Anything the customer mentioned over the phone…"></textarea>
+    </div>
+    <div class="nb-section">
+      <div class="nb-section-label">Internal notes (optional — not shown to customer)</div>
+      <textarea id="nb-internal-notes" class="nb-textarea" placeholder="Reminders for you or Jewel…"></textarea>
+    </div>
+
+    <div id="nb-err" class="form-err"></div>
+    <div class="nb-actions">
+      <button class="btn-ghost" onclick="HirayaAdmin.closeNewBooking()">Cancel</button>
+      <button class="btn-primary" id="nb-submit" onclick="HirayaAdmin.submitNewBooking()">Create confirmed booking</button>
+    </div>
   </div>
 </div>
 
