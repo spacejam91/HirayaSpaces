@@ -1400,7 +1400,44 @@ const REVIEWS = [
 const TIMES = ['8:00 am','9:30 am','11:00 am','1:00 pm','2:30 pm','4:00 pm'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+// Multi-service selection. selSvcs is the Set of chosen top-level service
+// ids; selTiers maps each service id to its picked tier object. The legacy
+// selSvc / selTier scalars stay as thin pointers to the "primary" (first
+// picked) service so existing helpers (renderTimes, gatherBooking) still
+// work without a full rewrite. Hourly stays mutually exclusive.
+let selSvcs = new Set();
+let selTiers = new Map();
 let selSvc=null, selTier=null, selAddons=[], selDay=null, selTime=null, calM=4, calY=2026;
+
+function refreshPrimaryPointers() {
+  if (selHourly) {
+    selSvc = 'hourly';
+    selTier = synthesizeHourlyTier(selHours);
+    return;
+  }
+  if (!selSvcs.size) { selSvc = null; selTier = null; return; }
+  // Primary = first picked, in insertion order.
+  selSvc = [...selSvcs][0];
+  selTier = selTiers.get(selSvc) || null;
+}
+
+function getSelectedServiceLines() {
+  // Returns [{svc, tier}] for every chosen tier across all selected services.
+  // Hourly counts as a single virtual service line.
+  if (selHourly) {
+    return [{
+      svc: { id: 'hourly', name: 'Flexible Cleaning', icon: '⏱' },
+      tier: synthesizeHourlyTier(selHours),
+    }];
+  }
+  const lines = [];
+  for (const id of selSvcs) {
+    const svc = SERVICES.find(s => s.id === id);
+    const tier = selTiers.get(id);
+    if (svc && tier) lines.push({ svc, tier });
+  }
+  return lines;
+}
 
 // Flexible hourly state. selHours is what the stepper shows; selHourly flips
 // to true once the customer commits via the "Choose Flexible" button (so
@@ -1466,8 +1503,11 @@ function selectHourly() {
     return;
   }
   selHourly = true;
-  selSvc = 'hourly';
-  selTier = synthesizeHourlyTier(selHours);
+  // Hourly is mutually exclusive with the multi-select tiered grid — clear
+  // both the new sets AND the legacy pointers so nothing leaks through.
+  selSvcs.clear();
+  selTiers.clear();
+  refreshPrimaryPointers();
   // Wipe any tier selection from the services grid + clear add-ons (hourly
   // doesn't combine with them — keeps the math honest).
   SERVICES.forEach(s => {
@@ -1489,7 +1529,7 @@ function selectHourly() {
 
 function deselectHourly() {
   selHourly = false;
-  if (selSvc === 'hourly') { selSvc = null; selTier = null; }
+  refreshPrimaryPointers();
   renderHourlyState();
 }
 
@@ -1538,29 +1578,43 @@ function selectSvc(id){
   // Picking a tiered service must clear the hourly choice — they're mutually
   // exclusive (the customer is on one path or the other, not both).
   if (selHourly) deselectHourly();
-  selSvc=id;
-  selTier=null; // reset tier whenever the parent service changes
-  SERVICES.forEach(s=>{ document.getElementById('svc-'+s.id).classList.toggle('selected',s.id===id); });
+  const wasSelected = selSvcs.has(id);
+  if (wasSelected) {
+    selSvcs.delete(id);
+    selTiers.delete(id);
+  } else {
+    selSvcs.add(id);
+    // Auto-pick the first tier so newly-added services contribute to the
+    // total immediately and don't sit there with "pick an option" stuck.
+    const svc = SERVICES.find(s => s.id === id);
+    if (svc?.tiers?.length) selTiers.set(id, svc.tiers[0]);
+  }
+  const card = document.getElementById('svc-'+id);
+  if (card) card.classList.toggle('selected', selSvcs.has(id));
+  refreshPrimaryPointers();
   renderTierPicker();
   renderTimes();
   updateSummary();
   // On narrow viewports, smooth-scroll to the picker so the customer doesn't
   // have to hunt for it below the rest of the service cards.
-  if (window.innerWidth < 900) {
+  if (!wasSelected && window.innerWidth < 900) {
     const picker = document.getElementById('tier-picker');
     if (picker) setTimeout(() => picker.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   }
 }
 
-function selectTier(slug){
-  const svc = SERVICES.find(s => s.id === selSvc);
+function selectTier(svcId, slug){
+  // Backward-compat: old call sites passed just the slug — fall back to
+  // primary service in that case.
+  if (typeof slug === 'undefined') { slug = svcId; svcId = selSvc; }
+  const svc = SERVICES.find(s => s.id === svcId);
   if (!svc || !svc.tiers) return;
-  selTier = svc.tiers.find(t => t.slug === slug) || null;
+  const tier = svc.tiers.find(t => t.slug === slug) || null;
+  selTiers.set(svcId, tier);
+  refreshPrimaryPointers();
   renderTierPicker();
   renderTimes();
   updateSummary();
-  // No auto-scroll here — let customers flow naturally through add-ons before
-  // reaching the calendar. (Previous behaviour leaped over the add-ons section.)
 }
 
 // Move the tier picker to sit right after the last card in the selected
@@ -1587,35 +1641,48 @@ window.addEventListener('resize', positionTierPicker);
 function renderTierPicker(){
   const host = document.getElementById('tier-picker');
   if (!host) return;
-  const svc = SERVICES.find(s => s.id === selSvc);
-  if (!svc || !Array.isArray(svc.tiers) || svc.tiers.length === 0) {
+  // Pull any selected services that have tiers. Quote-only services with no
+  // tiers contribute nothing to render.
+  const tiered = [...selSvcs]
+    .map(id => SERVICES.find(s => s.id === id))
+    .filter(s => s && Array.isArray(s.tiers) && s.tiers.length > 0);
+  if (!tiered.length) {
     host.innerHTML = '';
     host.style.display = 'none';
     return;
   }
-  positionTierPicker();
+  // Multi-service: park the picker permanently below the grid (don't try
+  // to reposition under a specific row — there are multiple rows now).
+  const grid = document.getElementById('svc-grid');
+  if (grid && grid.parentElement && host.previousElementSibling !== grid) {
+    grid.parentElement.insertBefore(host, grid.nextSibling);
+  }
   const formatDur = (min) => {
     if (!min) return '';
     if (min < 60) return min + ' min';
     const h = Math.round(min / 60 * 10) / 10;
     return h + (h === 1 ? ' hr' : ' hrs');
   };
-  host.innerHTML = `
-    <div class="tier-picker-label">Choose your ${svc.name.toLowerCase()} option</div>
-    <div class="tier-grid">
-      ${svc.tiers.map(t => {
-        const priceText = t.basePrice == null ? 'Custom quote' : '$' + t.basePrice;
-        const durText = formatDur(t.durationMin);
-        const selected = selTier && selTier.slug === t.slug;
-        return `<div class="tier-card${selected ? ' selected' : ''}" onclick="selectTier('${t.slug}')">
-          <div class="tier-name">${t.name}</div>
-          <div class="tier-meta">
-            <span class="tier-price">${priceText}</span>
-            ${durText ? `<span class="tier-dur">~${durText}</span>` : ''}
-          </div>
-        </div>`;
-      }).join('')}
+  const sections = tiered.map(svc => {
+    const currentTier = selTiers.get(svc.id);
+    const tiersHtml = svc.tiers.map(t => {
+      const priceText = t.basePrice == null ? 'Custom quote' : '$' + t.basePrice;
+      const durText = formatDur(t.durationMin);
+      const selected = currentTier && currentTier.slug === t.slug;
+      return `<div class="tier-card${selected ? ' selected' : ''}" onclick="selectTier('${svc.id}', '${t.slug}')">
+        <div class="tier-name">${t.name}</div>
+        <div class="tier-meta">
+          <span class="tier-price">${priceText}</span>
+          ${durText ? `<span class="tier-dur">~${durText}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="tier-picker-section" style="margin-bottom:1.5rem">
+      <div class="tier-picker-label">${svc.icon} Choose your ${svc.name.toLowerCase()} option</div>
+      <div class="tier-grid">${tiersHtml}</div>
     </div>`;
+  });
+  host.innerHTML = sections.join('');
   host.style.display = '';
 }
 
@@ -1699,45 +1766,59 @@ function onFrequencyChange() {
 }
 
 function updateSummary(){
-  // 'hourly' is synthetic — not in SERVICES — so build a stand-in for it.
-  const svc = selSvc === 'hourly'
-    ? { id: 'hourly', name: 'Flexible Cleaning', icon: '⏱' }
-    : SERVICES.find(s=>s.id===selSvc);
-  let label = 'No service selected yet';
-  if (svc && selTier) {
-    const priceTxt = selTier.basePrice == null ? 'Custom quote' : '$' + selTier.basePrice;
-    label = `${svc.icon} ${svc.name} — ${selTier.name} (${priceTxt})`;
-  } else if (svc) {
-    label = `${svc.icon} ${svc.name} — pick an option below`;
+  const lines = getSelectedServiceLines();
+  let label;
+  if (!lines.length && !selSvcs.size && !selHourly) {
+    label = 'No service selected yet';
+  } else if (!lines.length) {
+    // Service picked but no tier yet (e.g. quote-only). Hint at next step.
+    const svcId = [...selSvcs][0];
+    const svc = SERVICES.find(s => s.id === svcId);
+    label = svc ? `${svc.icon} ${svc.name} — pick an option below` : 'Pick an option below';
+  } else {
+    label = lines.map(({ svc, tier }) => {
+      const priceTxt = tier.basePrice == null ? 'Custom quote' : '$' + tier.basePrice;
+      return `${svc.icon} ${svc.name} — ${tier.name} (${priceTxt})`;
+    }).join(' · ');
   }
   document.getElementById('bs-service').textContent = label;
   const addons = selAddons.map(i=>ADDONS.find(a=>a.id===i));
   document.getElementById('bs-addons').innerHTML = addons.length
     ? addons.map(a=>`+ ${a.name} ${a.price}`).join('<br>')
     : '';
-  updateQuote(svc, addons);
+  updateQuote(lines, addons);
 }
 
-function updateQuote(svc, addons) {
+function updateQuote(svcLines, addons) {
   const box = document.getElementById('quote-box');
   const lines = document.getElementById('quote-lines');
-  if (!svc) { box.classList.remove('visible'); return; }
-  box.classList.add('visible');
-
-  // Use the picked tier's price; if no tier yet, prompt the customer to pick one.
-  if (!selTier) {
-    lines.innerHTML = `<div class="quote-custom" style="color:var(--muted);font-size:13px">Pick a ${svc.name.toLowerCase()} option above to see pricing.</div>`;
+  if (!svcLines.length && !selSvcs.size && !selHourly) {
+    box.classList.remove('visible');
     return;
   }
-  const base = selTier.basePrice;
+  box.classList.add('visible');
 
-  if (base === null || base === undefined) {
+  // Service picked but no tier on at least one — prompt user to finish.
+  if (!svcLines.length) {
+    const svcId = [...selSvcs][0];
+    const svc = SERVICES.find(s => s.id === svcId);
+    lines.innerHTML = `<div class="quote-custom" style="color:var(--muted);font-size:13px">Pick an option above to see pricing.</div>`;
+    return;
+  }
+
+  // Any service that's still custom-quote means no firm total possible.
+  if (svcLines.some(l => l.tier.basePrice == null)) {
     lines.innerHTML = `<div class="quote-custom">📞 Custom quote required<br><span style="font-size:12px;font-weight:400;color:var(--muted)">Contact us at hirayaspaces@gmail.com</span></div>`;
     return;
   }
 
-  let html = `<div class="quote-line"><span>${svc.icon} ${selTier.name}</span><span>$${base}</span></div>`;
-  let total = base;
+  let html = '';
+  let total = 0;
+  for (const { svc, tier } of svcLines) {
+    const base = tier.basePrice || 0;
+    html += `<div class="quote-line"><span>${svc.icon} ${tier.name}</span><span>$${base}</span></div>`;
+    total += base;
+  }
 
   addons.forEach(a => {
     const ap = a.addonPrice;
@@ -1849,9 +1930,20 @@ function changeMonth(dir){
   selDay=null; renderCalendar();
 }
 
+// Total duration across every selected service (multi-service bookings can
+// stack durations). Falls back to the primary tier for older code paths.
+function getTotalDurationMin(){
+  if (selHourly) return selHours * 60;
+  let dur = 0;
+  for (const t of selTiers.values()) {
+    if (t?.durationMin) dur += t.durationMin;
+  }
+  return dur || (selTier?.durationMin || 0);
+}
+
 // Times
 function renderTimes(){
-  const dur = selTier ? selTier.durationMin : null;
+  const dur = getTotalDurationMin();
   document.getElementById('time-grid').innerHTML = TIMES.map(t => {
     const conflict = slotConflicts(t, dur || 0);
     const classes = ['time-btn'];
@@ -1870,7 +1962,7 @@ function renderTimes(){
 }
 
 function pickTime(t){
-  if (slotConflicts(t, selTier ? selTier.durationMin || 0 : 0)) return;
+  if (slotConflicts(t, getTotalDurationMin())) return;
   selTime = t;
   renderTimes();
 }
@@ -2119,7 +2211,7 @@ loadBlockedDates();
     </div>
 
     <div class="br-total-box">
-      <div class="br-line"><span>Service</span><span id="br-base"></span></div>
+      <div id="br-svc-lines"></div>
       <div class="br-line"><span>Add-ons</span><span id="br-addon-total"></span></div>
       <div class="br-line br-total"><span>Estimated total</span><span id="br-total"></span></div>
       <div class="br-note">Final price confirmed after walkthrough. Cancel free up to 24h before.</div>

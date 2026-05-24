@@ -55,7 +55,14 @@
 
   function bookingCardHtml(b, opts) {
     opts = opts || {};
-    const svc = b.service_name || 'Cleaning service';
+    // service_name from get_all_bookings is the joined string like
+    // "Regular Cleaning — 2BR/2BA · Carpet — Living room". Split it so
+    // multi-service bookings show one line per service for readability.
+    const rawSvc = b.service_name || 'Cleaning service';
+    const svcParts = rawSvc.split(' · ');
+    const svc = svcParts.length > 1
+      ? svcParts.map(s => `<div>${escapeHtml(s)}</div>`).join('')
+      : escapeHtml(rawSvc);
     const dateStr = formatBookingDate(b.preferred_date);
     const timeStr = b.preferred_time_slot ? ` at ${escapeHtml(b.preferred_time_slot)}` : '';
     const addr = [
@@ -113,7 +120,7 @@
       <div class="${classes.join(' ')}" data-id="${b.id}">
         <div class="booking-card-head">
           <div>
-            <div class="booking-card-svc">${escapeHtml(svc)}${freqBadge}</div>
+            <div class="booking-card-svc">${svc}${freqBadge}</div>
             <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
           </div>
           <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
@@ -1316,6 +1323,18 @@ Hiraya Spaces`
       console.warn('booking_addons fetch failed:', e);
     }
 
+    // Fetch the booking's extra services (anything beyond the primary). Each
+    // row gets its own line in the Additional services list.
+    let currentExtras = [];
+    try {
+      const { data: extraRows, error: extraErr } = await sb().rpc('admin_get_booking_services', { p_booking_id: id });
+      if (extraErr) throw extraErr;
+      currentExtras = extraRows || [];
+    } catch (e) {
+      console.warn('admin_get_booking_services failed:', e);
+    }
+    renderEditExtras(currentExtras);
+
     // Render addon checkboxes. Each is a labeled checkbox with the price hint.
     const addonsEl = $('edit-addons');
     if (addonsEl) {
@@ -1358,9 +1377,9 @@ Hiraya Spaces`
     if (event.target.id === 'edit-overlay') cancelEdit();
   }
 
-  // Recompute the estimated price field whenever the tier or addons change.
-  // Catalog base + sum of checked addon prices. Admin can still override
-  // afterwards by typing a custom number — we only auto-fill, never lock.
+  // Recompute the estimated price field whenever the tier, addons, OR
+  // additional services change. Catalog base + extras + checked addons.
+  // Admin can still type a custom override after.
   function recalcEditPrice() {
     const svcSel = $('edit-service');
     if (!svcSel) return;
@@ -1370,9 +1389,119 @@ Hiraya Spaces`
     const addonsCents = Array.from(document.querySelectorAll('.edit-addon-cb'))
       .filter(cb => cb.checked)
       .reduce((sum, cb) => sum + (parseInt(cb.dataset.price, 10) || 0), 0);
-    const totalDollars = Math.round((baseCents + addonsCents) / 100);
+    const extrasCents = Array.from(document.querySelectorAll('.edit-extra-row'))
+      .reduce((sum, row) => {
+        const priceInput = row.querySelector('.edit-extra-price');
+        const v = priceInput ? Number(priceInput.value) : 0;
+        return sum + (Number.isFinite(v) ? Math.round(v * 100) : 0);
+      }, 0);
+    const totalDollars = Math.round((baseCents + addonsCents + extrasCents) / 100);
     const priceEl = $('edit-price');
     if (priceEl) priceEl.value = totalDollars;
+  }
+
+  // ── Edit modal: additional services UI ─────────────────────────────────
+  // Each extra row carries: service_id (number), tier_slug, tier_name,
+  // price_cents. We re-render the list whenever it changes so the indexes
+  // stay clean for collection at save time.
+
+  function renderEditExtras(rows) {
+    const host = $('edit-extras-list');
+    if (!host) return;
+    host.innerHTML = '';
+    (rows || []).forEach(row => host.appendChild(buildEditExtraRow(row)));
+    if (!rows || !rows.length) {
+      const hint = document.createElement('div');
+      hint.style.cssText = 'color:var(--muted);font-size:13px;font-style:italic';
+      hint.textContent = 'No additional services. Click below to add one.';
+      hint.id = 'edit-extras-empty';
+      host.appendChild(hint);
+    }
+  }
+
+  function buildEditExtraRow(initial) {
+    const row = document.createElement('div');
+    row.className = 'edit-extra-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 110px 36px;gap:8px;align-items:center';
+
+    const svcSel = document.createElement('select');
+    svcSel.className = 'nb-input edit-extra-svc';
+    svcSel.innerHTML = '<option value="">Pick a service…</option>' + servicesCache.map(s => {
+      const price = s.requires_quote ? 'Quote' : '$' + Math.round((s.starting_price_cents || 0) / 100);
+      return `<option value="${s.id}" data-slug="${escapeHtml(s.slug)}" data-name="${escapeHtml(s.name)}" data-price="${s.starting_price_cents || 0}">${escapeHtml(s.name)} — ${price}</option>`;
+    }).join('');
+    if (initial?.service_id) svcSel.value = String(initial.service_id);
+
+    const priceInput = document.createElement('input');
+    priceInput.type = 'number';
+    priceInput.min = '0';
+    priceInput.step = '1';
+    priceInput.className = 'nb-input edit-extra-price';
+    priceInput.placeholder = '$';
+    if (initial?.price_cents != null) {
+      priceInput.value = Math.round(initial.price_cents / 100);
+    }
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-ghost';
+    removeBtn.style.cssText = 'padding:6px 10px;color:var(--rose);font-size:18px;line-height:1';
+    removeBtn.title = 'Remove this service';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = () => { row.remove(); recalcEditPrice(); maybeShowExtrasEmpty(); };
+
+    svcSel.onchange = () => {
+      // Auto-fill price from catalog when user picks a service.
+      const opt = svcSel.selectedOptions[0];
+      const cents = parseInt(opt?.dataset.price || '0', 10);
+      if (cents) priceInput.value = Math.round(cents / 100);
+      recalcEditPrice();
+    };
+    priceInput.oninput = recalcEditPrice;
+
+    row.appendChild(svcSel);
+    row.appendChild(priceInput);
+    row.appendChild(removeBtn);
+    return row;
+  }
+
+  function addEditExtra() {
+    const empty = $('edit-extras-empty');
+    if (empty) empty.remove();
+    const host = $('edit-extras-list');
+    if (!host) return;
+    host.appendChild(buildEditExtraRow(null));
+    recalcEditPrice();
+  }
+
+  function maybeShowExtrasEmpty() {
+    const host = $('edit-extras-list');
+    if (!host) return;
+    if (!host.querySelector('.edit-extra-row') && !$('edit-extras-empty')) {
+      const hint = document.createElement('div');
+      hint.style.cssText = 'color:var(--muted);font-size:13px;font-style:italic';
+      hint.textContent = 'No additional services. Click below to add one.';
+      hint.id = 'edit-extras-empty';
+      host.appendChild(hint);
+    }
+  }
+
+  function collectEditExtras() {
+    return Array.from(document.querySelectorAll('.edit-extra-row')).map(row => {
+      const svcSel = row.querySelector('.edit-extra-svc');
+      const priceInput = row.querySelector('.edit-extra-price');
+      if (!svcSel?.value) return null;
+      const opt = svcSel.selectedOptions[0];
+      const priceCents = priceInput?.value ? Math.round(Number(priceInput.value) * 100) : null;
+      return {
+        service_id: parseInt(svcSel.value, 10),
+        tier_slug: opt?.dataset.slug || null,
+        tier_name: opt?.dataset.name || null,
+        price_cents: priceCents,
+        duration_minutes: null, // unknown from catalog row alone
+        quantity: 1,
+      };
+    }).filter(Boolean);
   }
 
   async function submitEdit() {
@@ -1432,6 +1561,23 @@ Hiraya Spaces`
           showErr('edit-err', 'Booking saved, but add-ons could not sync — admin_set_booking_addons SQL function is missing. Paste the latest migration into Supabase SQL editor.');
         } else {
           showErr('edit-err', 'Booking saved, but add-ons failed: ' + msg);
+        }
+        await refreshAll();
+        refreshPending();
+        return;
+      }
+      // Sync additional services (booking_services rows).
+      const extrasPayload = collectEditExtras();
+      const { error: bsErr } = await sb().rpc('admin_set_booking_services', {
+        p_booking_id: id,
+        p_services: extrasPayload,
+      });
+      if (bsErr) {
+        const msg = bsErr.message || String(bsErr);
+        if (/does not exist|not found/i.test(msg)) {
+          showErr('edit-err', 'Booking + add-ons saved, but additional services could not sync — admin_set_booking_services SQL function is missing.');
+        } else {
+          showErr('edit-err', 'Booking saved, but additional services failed: ' + msg);
         }
         await refreshAll();
         refreshPending();
@@ -2520,6 +2666,7 @@ Hiraya Spaces`
     closeEditIfBackdrop,
     submitEdit,
     recalcEditPrice,
+    addEditExtra,
     sendInvoice,
     viewInvoice,
     closeInvoiceView,

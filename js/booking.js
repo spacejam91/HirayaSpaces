@@ -91,11 +91,16 @@
         return { error: 'Please enter a valid Canadian postal code (e.g. N2L 3G1).' };
       }
     }
-    if (typeof selSvc === 'undefined' || !selSvc) {
-      return { error: 'Please choose a service before booking.' };
-    }
-    if (typeof selTier === 'undefined' || !selTier) {
-      return { error: 'Please pick a specific option for your service (e.g. 1 BR / 1 BA).' };
+    // Multi-service: pull every chosen tier from the page. Hourly returns a
+    // single virtual line. getSelectedServiceLines is defined in index.html.
+    const svcLines = (typeof getSelectedServiceLines === 'function')
+      ? getSelectedServiceLines()
+      : (selSvc && selTier ? [{ svc: SERVICES.find(s => s.id === selSvc) || { id: selSvc, name: 'Service', icon: '🧹' }, tier: selTier }] : []);
+    if (!svcLines.length) {
+      if (!selSvc && (!selSvcs || !selSvcs.size)) {
+        return { error: 'Please choose a service before booking.' };
+      }
+      return { error: 'Please pick a specific option for each selected service.' };
     }
     if (typeof selDay === 'undefined' || !selDay || !selTime) {
       return { error: 'Please pick a date and time on the calendar.' };
@@ -107,18 +112,16 @@
       ? savedAddrSel.options[savedAddrSel.selectedIndex].dataset.full || savedAddrSel.options[savedAddrSel.selectedIndex].textContent
       : [street, unit, city, normalizedPostal].filter(Boolean).join(', ');
 
-    // 'hourly' isn't in SERVICES — it's a synthesized path. Stand-in metadata
-    // so the review modal / emails get the right icon and a sensible label.
-    const isHourly = selSvc === 'hourly';
-    const svc = isHourly
-      ? { id: 'hourly', name: 'Flexible Cleaning', icon: '⏱' }
-      : SERVICES.find(s => s.id === selSvc);
+    // Primary service line = the first one picked. Backwards-compat for the
+    // bookings.service_id column and any code that still expects a single svc.
+    const primary = svcLines[0];
+    const svc = primary.svc;
     const addons = selAddons
       .map(id => ADDONS.find(a => a.id === id))
       .filter(Boolean);
 
-    // The tier's slug is the authoritative DB service identifier now.
-    const dbServiceSlug = selTier.slug;
+    // The tier's slug is the authoritative DB service identifier.
+    const dbServiceSlug = primary.tier.slug;
     const dbAddonSlugs = selAddons
       .map(id => ADDON_SLUG_MAP[id])
       .filter(Boolean);
@@ -127,7 +130,18 @@
       return { error: 'This service is not available in our catalog yet. Please pick another.' };
     }
 
-    const basePrice = selTier.basePrice || 0;
+    // Every selected service line, ready to insert into booking_services for
+    // all-but-the-primary. Carries enough to render rich invoice/email lines
+    // without re-joining the services table.
+    const extraServiceLines = svcLines.slice(1).map(l => ({
+      slug: l.tier.slug,
+      tier_name: l.tier.name,
+      price_cents: Math.round((l.tier.basePrice || 0) * 100),
+      duration_minutes: l.tier.durationMin || null,
+      display_name: `${l.svc.name} — ${l.tier.name}`,
+    }));
+
+    const basePrice = svcLines.reduce((sum, l) => sum + (l.tier.basePrice || 0), 0);
     const addonTotal = addons.reduce((s, a) => s + (a.addonPrice || 0), 0);
     const subtotal = basePrice + addonTotal;
 
@@ -146,6 +160,14 @@
     const dateLabel = `${MONTHS[calM]} ${selDay}, ${calY}`;
     const isoDate = new Date(calY, calM, selDay).toISOString().slice(0, 10);
 
+    // Combined service name for the bookings row + email summaries. Joins
+    // all selected services so the admin card / customer email show the
+    // full scope at a glance ("Regular Cleaning — 2BR/2BA · Sofa · Carpet
+    // Living Room").
+    const combinedServiceName = svcLines
+      .map(l => `${l.svc.name} — ${l.tier.name}`)
+      .join(' · ');
+
     return {
       form: {
         customer_name: name,
@@ -162,13 +184,16 @@
         },
         saved_address_id: savedAddressId,
         save_to_account: saveToAccount,
-        service_id_page: selSvc,
-        service_name: svc?.name ? `${svc.name} — ${selTier.name}` : selTier.name,
+        service_id_page: svc.id,
+        service_name: combinedServiceName,
         addon_ids_page: selAddons.slice(),
         preferred_date: isoDate,
         preferred_time_slot: selTime,
         dbServiceSlug,
         dbAddonSlugs,
+        // All non-primary service lines — booking.js inserts these into
+        // booking_services after the bookings row is created.
+        extraServiceLines,
         estimated_total_dollars: total,
         // New: entry method + frequency
         entry_method: entryMethod,
@@ -185,6 +210,9 @@
         discountPct,
         discountAmount,
         frequency,
+        // Per-service lines for the review modal: each entry is the same
+        // shape getSelectedServiceLines returns.
+        svcLines,
       }
     };
   }
@@ -224,7 +252,22 @@
       : '<div class="br-line br-muted"><span>No add-ons</span><span>—</span></div>';
     $('br-addons').innerHTML = addonsHtml;
 
-    $('br-base').textContent = d.basePrice ? '$' + d.basePrice : 'Quote on request';
+    // One line per selected service in the total box. d.svcLines is the
+    // array of { svc, tier } from getSelectedServiceLines(). Falls back to
+    // a single-line render if the page didn't supply it (defensive).
+    const svcLinesEl = $('br-svc-lines');
+    if (svcLinesEl) {
+      const lines = (d.svcLines && d.svcLines.length)
+        ? d.svcLines.map(({ svc, tier }) => ({
+            label: `${svc.icon || ''} ${tier.name}`.trim(),
+            price: tier.basePrice != null ? '$' + tier.basePrice : 'Quote',
+          }))
+        : [{ label: 'Service', price: d.basePrice ? '$' + d.basePrice : 'Quote on request' }];
+      svcLinesEl.innerHTML = lines
+        .map(l => `<div class="br-line"><span>${escapeHtml(l.label)}</span><span>${escapeHtml(l.price)}</span></div>`)
+        .join('');
+    }
+
     $('br-addon-total').textContent = d.addonTotal ? '$' + d.addonTotal : '$0';
     $('br-total').textContent = f.estimated_total_dollars ? '$' + f.estimated_total_dollars : 'Quote on request';
   }
@@ -394,9 +437,17 @@
         }
       }
 
-      // 4. Calculate estimated total in cents (service + addons)
-      const totalCents = (svcRow.starting_price_cents || 0)
-        + addonRows.reduce((s, a) => s + (a.price_cents || 0), 0);
+      // 4. Calculate estimated total in cents.
+      // Prefer the client-side total (already includes all selected services,
+      // addons, and any recurring discount). Fall back to primary + addons
+      // only if the client total is missing for some reason.
+      const clientTotalCents = (typeof f.estimated_total_dollars === 'number')
+        ? Math.round(f.estimated_total_dollars * 100)
+        : null;
+      const totalCents = clientTotalCents ?? (
+        (svcRow.starting_price_cents || 0)
+        + addonRows.reduce((s, a) => s + (a.price_cents || 0), 0)
+      );
 
       // 5. Insert booking row
       const notesParts = [];
@@ -439,6 +490,37 @@
           .from('booking_addons')
           .insert(addonsToInsert);
         if (bkAddonErr) console.warn('booking_addons insert failed:', bkAddonErr.message);
+      }
+
+      // 6b. Insert booking_services rows for any extra services the customer
+      // picked beyond the primary one (e.g. Regular + Carpet + Sofa).
+      const extras = Array.isArray(f.extraServiceLines) ? f.extraServiceLines : [];
+      if (extras.length) {
+        const extraSlugs = extras.map(e => e.slug).filter(Boolean);
+        const { data: extraSvcRows, error: extraLookupErr } = await sb()
+          .from('services')
+          .select('id, slug')
+          .in('slug', extraSlugs);
+        if (extraLookupErr) {
+          console.warn('extra services lookup failed:', extraLookupErr.message);
+        } else if (extraSvcRows?.length) {
+          const slugToId = new Map(extraSvcRows.map(r => [r.slug, r.id]));
+          const toInsert = extras
+            .filter(e => slugToId.has(e.slug))
+            .map(e => ({
+              booking_id: bookingRow.id,
+              service_id: slugToId.get(e.slug),
+              tier_slug: e.slug,
+              tier_name: e.tier_name,
+              price_cents: e.price_cents,
+              duration_minutes: e.duration_minutes,
+              quantity: 1,
+            }));
+          if (toInsert.length) {
+            const { error: bsErr } = await sb().from('booking_services').insert(toInsert);
+            if (bsErr) console.warn('booking_services insert failed:', bsErr.message);
+          }
+        }
       }
 
       // 7. Show confirmation modal

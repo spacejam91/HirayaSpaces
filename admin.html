@@ -1169,8 +1169,14 @@
     <p class="nb-sub" id="edit-text">—</p>
 
     <div class="nb-section">
-      <div class="nb-section-label">Service tier</div>
+      <div class="nb-section-label">Primary service</div>
       <select id="edit-service" class="nb-input"></select>
+    </div>
+
+    <div class="nb-section">
+      <div class="nb-section-label">Additional services</div>
+      <div id="edit-extras-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      <button type="button" class="btn-ghost" style="margin-top:8px;align-self:flex-start" onclick="HirayaAdmin.addEditExtra()">+ Add another service</button>
     </div>
 
     <div class="nb-section">

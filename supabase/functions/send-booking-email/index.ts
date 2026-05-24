@@ -331,13 +331,14 @@ Deno.serve(async (req) => {
     }
     const sb = createClient(supabaseUrl, serviceKey);
 
-    // Fetch booking with joined service, addons, address, profile
+    // Fetch booking with joined service, addons, extra services, address, profile
     const { data: booking, error } = await sb
       .from("bookings")
       .select(`
         *,
         services ( name, slug, starting_price_cents, duration_minutes ),
         booking_addons ( quantity, price_cents, addons ( name, slug ) ),
+        booking_services ( tier_name, price_cents, duration_minutes, quantity, services ( name ) ),
         addresses ( street_address, unit, city, province, postal_code ),
         profiles ( full_name, phone )
       `)
@@ -424,6 +425,7 @@ Deno.serve(async (req) => {
       : (booking.customer_notes || "—");
 
     const bookingAddons = Array.isArray(booking.booking_addons) ? booking.booking_addons : [];
+    const extraServices = Array.isArray(booking.booking_services) ? booking.booking_services : [];
     const addonsHtml = bookingAddons.length
       ? `<ul style="margin:8px 0 0;padding-left:20px;color:#1a2e1e">${bookingAddons.map((ba: any) => {
           const name = ba.addons?.name || ba.addon_id;
@@ -441,10 +443,22 @@ Deno.serve(async (req) => {
     const addonsCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
     // Use the saved total when it's there, otherwise reconstruct from parts.
     const lineRows: string[] = [];
+    // Primary service first.
     lineRows.push(
       `<tr><td style="padding:6px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td>` +
       `<td style="padding:6px 0;text-align:right;color:#1a2e1e;font-weight:600">${baseCents ? dollars(baseCents) : "—"}</td></tr>`
     );
+    // Any extra services the customer added (Regular + Carpet + Sofa case).
+    for (const es of extraServices) {
+      const svcName = es.services?.name || "Service";
+      const tierLabel = es.tier_name ? ` — ${es.tier_name}` : "";
+      const qty = es.quantity > 1 ? ` × ${es.quantity}` : "";
+      const linePrice = (es.price_cents || 0) * (es.quantity || 1);
+      lineRows.push(
+        `<tr><td style="padding:6px 0;color:#1a2e1e">${escapeHtml(svcName + tierLabel)}${qty}</td>` +
+        `<td style="padding:6px 0;text-align:right;color:#1a2e1e;font-weight:600">${dollars(linePrice)}</td></tr>`
+      );
+    }
     for (const ba of bookingAddons) {
       const name = ba.addons?.name || "Add-on";
       const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
@@ -665,13 +679,23 @@ Deno.serve(async (req) => {
       // work), the gap shows as its own "Additional services provided" line so
       // the upcharge is transparent.
       const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
+      const extrasTotalCents = extraServices.reduce((s: number, es: any) => s + ((es.price_cents || 0) * (es.quantity || 1)), 0);
       const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
-      const lineSubtotalCents = baseCatalogCents + addonsTotalCents;
+      const lineSubtotalCents = baseCatalogCents + extrasTotalCents + addonsTotalCents;
       const additionalCents = invoiceTotal - lineSubtotalCents;
       // Build line items as structured data first so we can render to both
       // HTML (for email body) and PDF (for attachment / admin download).
       const lineItems: { name: string; priceLabel: string }[] = [];
       lineItems.push({ name: serviceName, priceLabel: dollars(baseCatalogCents) });
+      // Extra services come right after the primary so they read as part of
+      // the cleaning scope, before discrete add-ons.
+      for (const es of extraServices) {
+        const svcName = es.services?.name || "Service";
+        const tierLabel = es.tier_name ? ` — ${es.tier_name}` : "";
+        const qty = es.quantity > 1 ? ` × ${es.quantity}` : "";
+        const lineTotal = (es.price_cents || 0) * (es.quantity || 1);
+        lineItems.push({ name: svcName + tierLabel + qty, priceLabel: dollars(lineTotal) });
+      }
       for (const ba of bookingAddons) {
         const baseName = ba.addons?.name || "Add-on";
         const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
