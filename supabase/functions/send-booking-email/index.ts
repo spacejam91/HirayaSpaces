@@ -333,7 +333,11 @@ Deno.serve(async (req) => {
     }
     const lineItemsHtml = lineRows.join("");
 
-    const totalDisplay = dollars(booking.estimated_price_cents);
+    // Prefer the charged price once it's known (set during Mark complete).
+    // Falls back to the estimate for pre-completion emails (booked, confirmed,
+    // declined, cancelled) where final_price_cents is still null.
+    const totalCents = booking.final_price_cents ?? booking.estimated_price_cents;
+    const totalDisplay = dollars(totalCents);
     const isQuote = booking.estimated_price_cents == null || booking.status === "awaiting_quote";
 
     // ── CONFIRMED PATH (owner confirms a pending booking) ─────────────────

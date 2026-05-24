@@ -994,6 +994,7 @@ Hiraya Spaces`
   // customers (must have a profile in our DB) because creating an auth user
   // requires the service role key, which can't safely live in the browser.
   let servicesCache = [];
+  let addonsCache = [];
   let nbSelectedCustomer = null;
   let nbSelectedAddresses = [];
 
@@ -1001,7 +1002,7 @@ Hiraya Spaces`
     if (servicesCache.length || !sb()) return;
     const { data, error } = await sb()
       .from('services')
-      .select('slug, name, starting_price_cents, sort_order, is_active, requires_quote, category_id')
+      .select('id, slug, name, starting_price_cents, sort_order, is_active, requires_quote, category_id')
       .eq('is_active', true)
       .order('sort_order');
     if (error) {
@@ -1010,6 +1011,23 @@ Hiraya Spaces`
     }
     servicesCache = data || [];
     populateServiceSelect();
+    // Pull addons too — used by the Edit Booking modal so the admin can add
+    // or remove extras like Inside Oven / Fridge / Eco Products.
+    loadAddonsCache();
+  }
+
+  async function loadAddonsCache() {
+    if (addonsCache.length || !sb()) return;
+    const { data, error } = await sb()
+      .from('addons')
+      .select('id, slug, name, price_cents, is_active, sort_order')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (error) {
+      console.warn('addons fetch failed:', error.message);
+      return;
+    }
+    addonsCache = data || [];
   }
 
   function populateServiceSelect() {
@@ -1259,14 +1277,20 @@ Hiraya Spaces`
   // ── MANUAL EDIT (admin can adjust any pending/active booking) ──────────
   let editingId = null;
 
-  function askEdit(id) {
+  async function askEdit(id) {
     // Source of truth is allBookings (which has joined service_name etc).
     // Pending bookings come from pendingBookings, so fall back if needed.
     const b = allBookings.find(x => x.id === id) || pendingBookings.find(x => x.id === id);
     if (!b) return;
     editingId = id;
 
-    // Populate the service dropdown from the cached services list.
+    // Make sure caches are loaded — the modal may be opened before the
+    // user has navigated to anything that triggered loadServicesCache.
+    if (!servicesCache.length || !addonsCache.length) {
+      await loadServicesCache();
+    }
+
+    // Populate the service tier dropdown from the cached services list.
     const svcSel = $('edit-service');
     if (svcSel) {
       svcSel.innerHTML = servicesCache.map(s => {
@@ -1277,6 +1301,31 @@ Hiraya Spaces`
       // service_id in allBookings — only service_name).
       const match = servicesCache.find(s => s.name === b.service_name);
       if (match) svcSel.value = match.id;
+    }
+
+    // Fetch this booking's current addons so we can pre-check them.
+    let currentAddonIds = new Set();
+    try {
+      const { data: addonRows } = await sb()
+        .from('booking_addons')
+        .select('addon_id')
+        .eq('booking_id', id);
+      currentAddonIds = new Set((addonRows || []).map(r => r.addon_id));
+    } catch (e) {
+      console.warn('booking_addons fetch failed:', e);
+    }
+
+    // Render addon checkboxes. Each is a labeled checkbox with the price hint.
+    const addonsEl = $('edit-addons');
+    if (addonsEl) {
+      addonsEl.innerHTML = addonsCache.map(a => {
+        const checked = currentAddonIds.has(a.id) ? 'checked' : '';
+        const priceLabel = a.price_cents ? ` (+$${Math.round(a.price_cents / 100)})` : '';
+        return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" class="edit-addon-cb" value="${a.id}" ${checked}>
+          <span>${escapeHtml(a.name)}${priceLabel}</span>
+        </label>`;
+      }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
     }
 
     $('edit-date').value = b.preferred_date || '';
@@ -1326,6 +1375,12 @@ Hiraya Spaces`
     const customerNotes = $('edit-customer-notes').value.trim() || null;
     const internalNotes = $('edit-internal-notes').value.trim() || null;
 
+    // Collect the currently-checked addon IDs.
+    const addonIds = Array.from(document.querySelectorAll('.edit-addon-cb'))
+      .filter(cb => cb.checked)
+      .map(cb => parseInt(cb.value, 10))
+      .filter(n => Number.isFinite(n));
+
     const btn = $('edit-btn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
@@ -1339,6 +1394,13 @@ Hiraya Spaces`
         p_internal_notes: internalNotes,
       });
       if (error) throw error;
+      // Sync addons in a second call. Booking_addons get fully replaced with
+      // whatever was checked in the modal.
+      const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
+        p_booking_id: id,
+        p_addon_ids: addonIds,
+      });
+      if (addonErr) throw addonErr;
       if (data === false) {
         showErr('edit-err', 'Booking is not editable (only pending/confirmed/in-progress can be edited).');
         return;
