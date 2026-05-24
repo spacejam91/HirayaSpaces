@@ -42,6 +42,112 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// ── GOOGLE CALENDAR HELPERS ──────────────────────────────────────────────
+async function getGoogleAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`google token refresh failed: ${res.status} ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.access_token;
+}
+
+function parseSlotTo24h(slot: string): { hour: number; minute: number } | null {
+  const m = slot.match(/^(\d+):(\d+)\s*(am|pm)$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ampm = m[3].toLowerCase();
+  if (ampm === "pm" && h < 12) h += 12;
+  if (ampm === "am" && h === 12) h = 0;
+  return { hour: h, minute: min };
+}
+
+function buildEventDescription(parts: {
+  customerName: string; customerEmail: string; customerPhone: string;
+  serviceName: string; addonsText: string; totalDisplay: string; idShort: string;
+  notes: string;
+}): string {
+  const lines = [
+    `Service: ${parts.serviceName}`,
+    `Customer: ${parts.customerName}`,
+    `Email: ${parts.customerEmail}`,
+    parts.customerPhone ? `Phone: ${parts.customerPhone}` : null,
+    `Add-ons: ${parts.addonsText}`,
+    `Estimated total: ${parts.totalDisplay}`,
+    `Booking ref: ${parts.idShort}`,
+    parts.notes ? `\nNotes:\n${parts.notes}` : null,
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+async function createCalendarEvent(opts: {
+  refreshToken: string; clientId: string; clientSecret: string;
+  calendarId: string;
+  summary: string; location: string; description: string;
+  dateISO: string;        // "YYYY-MM-DD"
+  timeSlot: string;       // "11:00 am"
+  durationMin: number;
+}): Promise<string | null> {
+  const t = parseSlotTo24h(opts.timeSlot);
+  if (!t) return null;
+
+  const startMinutes = t.hour * 60 + t.minute;
+  const endMinutes = startMinutes + (opts.durationMin || 180);
+  const endHour = Math.floor(endMinutes / 60) % 24;
+  const endMin = endMinutes % 60;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const startDateTime = `${opts.dateISO}T${pad(t.hour)}:${pad(t.minute)}:00`;
+  // If the event runs past midnight, the date rolls forward by one day.
+  let endDate = opts.dateISO;
+  if (endMinutes >= 24 * 60) {
+    const d = new Date(opts.dateISO + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + 1);
+    endDate = d.toISOString().slice(0, 10);
+  }
+  const endDateTime = `${endDate}T${pad(endHour)}:${pad(endMin)}:00`;
+
+  const accessToken = await getGoogleAccessToken(opts.clientId, opts.clientSecret, opts.refreshToken);
+
+  const eventBody = {
+    summary: opts.summary,
+    location: opts.location || undefined,
+    description: opts.description,
+    start: { dateTime: startDateTime, timeZone: "America/Toronto" },
+    end: { dateTime: endDateTime, timeZone: "America/Toronto" },
+    reminders: { useDefault: true },
+  };
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(opts.calendarId)}/events`,
+    {
+      method: "POST",
+      headers: {
+        "authorization": `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(eventBody),
+    },
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`calendar event create failed: ${res.status} ${errText}`);
+  }
+  const data = await res.json();
+  return data.id || null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS });
@@ -83,7 +189,7 @@ Deno.serve(async (req) => {
       .from("bookings")
       .select(`
         *,
-        services ( name, slug, starting_price_cents ),
+        services ( name, slug, starting_price_cents, duration_minutes ),
         booking_addons ( quantity, price_cents, addons ( name, slug ) ),
         addresses ( street_address, unit, city, province, postal_code ),
         profiles ( full_name, phone )
@@ -328,6 +434,37 @@ Deno.serve(async (req) => {
     }
 
     await client.close();
+
+    // ── GOOGLE CALENDAR (best-effort — never fail the booking on a calendar error)
+    try {
+      const refreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN");
+      const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
+      const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
+      if (refreshToken && clientId && clientSecret && booking.preferred_date && booking.preferred_time_slot) {
+        const eventId = await createCalendarEvent({
+          refreshToken, clientId, clientSecret,
+          calendarId: Deno.env.get("GOOGLE_CALENDAR_ID") || "primary",
+          summary: `🌿 ${customerName} — ${serviceName}`,
+          location: booking.addresses ? addressLine : "",
+          description: buildEventDescription({
+            customerName, customerEmail, customerPhone, serviceName,
+            addonsText: bookingAddons.length
+              ? bookingAddons.map((ba: any) => `${ba.addons?.name || ba.addon_id}${ba.quantity > 1 ? " ×" + ba.quantity : ""}`).join(", ")
+              : "None",
+            totalDisplay, idShort,
+            notes: booking.customer_notes || "",
+          }),
+          dateISO: booking.preferred_date,
+          timeSlot: booking.preferred_time_slot,
+          durationMin: booking.services?.duration_minutes || 180,
+        });
+        if (eventId) {
+          await sb.from("bookings").update({ google_calendar_event_id: eventId }).eq("id", booking_id);
+        }
+      }
+    } catch (calErr) {
+      console.warn("calendar event creation failed:", calErr);
+    }
 
     return jsonResponse({ ok: true, booking_id });
   } catch (err) {
