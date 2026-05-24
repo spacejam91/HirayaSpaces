@@ -90,6 +90,21 @@ function buildEventDescription(parts: {
   return lines.join("\n");
 }
 
+async function deleteCalendarEvent(opts: {
+  refreshToken: string; clientId: string; clientSecret: string;
+  calendarId: string; eventId: string;
+}): Promise<boolean> {
+  const accessToken = await getGoogleAccessToken(opts.clientId, opts.clientSecret, opts.refreshToken);
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(opts.calendarId)}/events/${encodeURIComponent(opts.eventId)}`,
+    { method: "DELETE", headers: { authorization: `Bearer ${accessToken}` } },
+  );
+  // 204 = deleted, 410 = already gone, both are "success" for our purposes
+  if (res.status === 204 || res.status === 410) return true;
+  const errText = await res.text();
+  throw new Error(`calendar event delete failed: ${res.status} ${errText}`);
+}
+
 async function createCalendarEvent(opts: {
   refreshToken: string; clientId: string; clientSecret: string;
   calendarId: string;
@@ -157,7 +172,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { booking_id } = await req.json();
+    const body = await req.json();
+    const booking_id = body?.booking_id;
+    const mode: "booked" | "cancelled" = body?.mode === "cancelled" ? "cancelled" : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
     }
@@ -202,10 +219,24 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Booking not found", debug: error?.message || error?.code || "no row" }, 404);
     }
 
-    // Anti-abuse: only send for bookings created in the last 10 minutes.
-    const ageMs = Date.now() - new Date(booking.created_at).getTime();
-    if (ageMs > 10 * 60 * 1000) {
-      return jsonResponse({ error: "Booking too old to email" }, 410);
+    // Anti-abuse: pin to a recent timestamp depending on which kind of
+    // email we're sending. Booked = booking created < 10 min ago.
+    // Cancelled = booking cancelled < 10 min ago AND status is actually
+    // cancelled (a customer can't trigger a cancellation email for a
+    // booking they haven't actually cancelled).
+    if (mode === "cancelled") {
+      if (booking.status !== "cancelled" || !booking.cancelled_at) {
+        return jsonResponse({ error: "Booking is not cancelled" }, 400);
+      }
+      const cancelAgeMs = Date.now() - new Date(booking.cancelled_at).getTime();
+      if (cancelAgeMs > 10 * 60 * 1000) {
+        return jsonResponse({ error: "Cancellation too old to email" }, 410);
+      }
+    } else {
+      const ageMs = Date.now() - new Date(booking.created_at).getTime();
+      if (ageMs > 10 * 60 * 1000) {
+        return jsonResponse({ error: "Booking too old to email" }, 410);
+      }
     }
 
     // Look up the customer's email from auth.users (not exposed in profiles)
@@ -242,6 +273,162 @@ Deno.serve(async (req) => {
 
     const totalDisplay = dollars(booking.estimated_price_cents);
     const isQuote = booking.estimated_price_cents == null || booking.status === "awaiting_quote";
+
+    // ── CANCELLATION PATH ─────────────────────────────────────────────────
+    // When mode === "cancelled" we send a different pair of emails (customer
+    // confirmation of cancellation + owner alert) and delete the linked
+    // Google Calendar event. Then we return early so the booked-path code
+    // below doesn't try to re-send the confirmation email.
+    if (mode === "cancelled") {
+      const cancelledHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#1e4d2b;padding:28px 30px;text-align:center;color:white">
+          <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="64" height="64" style="display:block;margin:0 auto 14px;border-radius:14px;background:white;padding:6px;box-sizing:border-box">
+          <div style="font-family:Georgia,'Cinzel',serif;font-size:22px;letter-spacing:3px;text-transform:uppercase">HIRAYA SPACES</div>
+          <div style="font-size:10px;letter-spacing:2px;opacity:0.75;margin-top:6px">RESIDENTIAL CLEANING · WATERLOO REGION</div>
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">Booking cancelled</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            Hi ${escapeHtml(customerName)} — we've cancelled booking <strong style="color:#1e4d2b">${idShort}</strong>. You haven't been charged and your spot has been freed for someone else.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f9f6;border:1px solid #d4e2d8;border-radius:12px;margin-bottom:24px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:600;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Cancelled booking</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
+                <tr><td style="padding:4px 0;color:#6a7d6e">Service</td><td style="padding:4px 0;text-align:right">${escapeHtml(serviceName)}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Date</td><td style="padding:4px 0;text-align:right">${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Address</td><td style="padding:4px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <p style="font-size:13px;color:#6a7d6e;line-height:1.7;margin:0 0 18px">
+            Changed your mind? You're welcome to <a href="https://hirayaspaces.ca/#how" style="color:#1e4d2b;font-weight:600;text-decoration:none">book a new clean</a> anytime. We'd love to have you back.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const ownerCancelHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:32px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:14px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#b04a3a;padding:20px 26px;color:white">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td valign="middle" width="56">
+                <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:10px;background:white;padding:4px;box-sizing:border-box">
+              </td>
+              <td valign="middle" style="padding-left:14px">
+                <div style="font-family:Georgia,serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
+                <div style="font-size:20px;font-weight:600;margin-top:2px">Booking cancelled</div>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:22px 26px 8px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td><span style="background:#b04a3a;color:white;font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:6px">CANCELLED BY CUSTOMER</span></td>
+              <td style="text-align:right;font-size:12px;color:#6a7d6e">Ref <strong style="color:#1a2e1e">${idShort}</strong></td>
+            </tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:14px 26px 6px">
+          <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:500;margin:0 0 4px;color:#1a2e1e">${escapeHtml(serviceName)}</h2>
+          <div style="font-size:14px;color:#6a7d6e">${escapeHtml(dateDisplay)}${timeDisplay ? " · " + escapeHtml(timeDisplay) : ""}</div>
+        </td></tr>
+
+        <tr><td style="padding:14px 26px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f9f6;border:1px solid #d4e2d8;border-radius:10px">
+            <tr><td style="padding:14px 18px">
+              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Customer</div>
+              <div style="font-size:15px;font-weight:600;color:#1a2e1e">${escapeHtml(customerName)}</div>
+              <div style="font-size:13px;color:#1a2e1e;margin-top:4px"><a href="mailto:${escapeHtml(customerEmail)}" style="color:#1e4d2b;text-decoration:none">${escapeHtml(customerEmail)}</a></div>
+              ${customerPhone ? `<div style="font-size:13px;color:#1a2e1e;margin-top:2px">${escapeHtml(customerPhone)}</div>` : ""}
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:0 26px 22px">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f9f6;border:1px solid #d4e2d8;border-radius:10px">
+            <tr><td style="padding:14px 18px">
+              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Address</div>
+              <div style="font-size:13px;color:#1a2e1e;line-height:1.5">${escapeHtml(addressLine)}</div>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortCancel = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const useTlsCancel = smtpPortCancel === 465;
+      const cancelClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortCancel,
+          tls: useTlsCancel,
+          auth: {
+            username: Deno.env.get("SMTP_USER")!,
+            password: Deno.env.get("SMTP_PASS")!,
+          },
+        },
+      });
+
+      await cancelClient.send({
+        from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+        to: customerEmail,
+        subject: `Booking cancelled - ${idShort}`,
+        html: cancelledHtml,
+      });
+
+      const ownerEmailCancel = Deno.env.get("OWNER_EMAIL") || Deno.env.get("SMTP_USER")!;
+      try {
+        await cancelClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: ownerEmailCancel,
+          replyTo: customerEmail,
+          subject: `Booking cancelled: ${customerName} - ${dateDisplay} - ${idShort}`,
+          html: ownerCancelHtml,
+        });
+      } catch (ownerCancelErr) {
+        console.warn("owner cancel notification failed:", ownerCancelErr);
+      }
+      await cancelClient.close();
+
+      // Delete the linked Google Calendar event (best-effort) + clear the FK.
+      const refreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN");
+      const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
+      const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
+      if (booking.google_calendar_event_id && refreshToken && clientId && clientSecret) {
+        try {
+          await deleteCalendarEvent({
+            refreshToken, clientId, clientSecret,
+            calendarId: Deno.env.get("GOOGLE_CALENDAR_ID") || "primary",
+            eventId: booking.google_calendar_event_id,
+          });
+          await sb.from("bookings").update({ google_calendar_event_id: null }).eq("id", booking_id);
+        } catch (calErr) {
+          console.warn("calendar event delete failed:", calErr);
+        }
+      }
+
+      return jsonResponse({ ok: true, booking_id, mode: "cancelled" });
+    }
 
     const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">

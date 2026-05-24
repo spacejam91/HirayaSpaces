@@ -520,15 +520,24 @@
 
   async function confirmCancelBooking() {
     if (!cancellingBookingId || !sb()) return;
+    const cancelledId = cancellingBookingId;
     const btn = $('booking-cancel-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Cancelling…'; }
     try {
-      const { data, error } = await sb().rpc('cancel_booking', { booking_id: cancellingBookingId });
+      const { data, error } = await sb().rpc('cancel_booking', { booking_id: cancelledId });
       if (error) throw error;
       if (data === false) {
         showToast("Couldn't cancel — booking may already be completed.", 'error');
       } else {
         showToast('Booking cancelled.', 'success');
+        // Fire-and-forget: tell the edge function to send cancellation emails
+        // and delete the linked calendar event. Booking is already cancelled
+        // in the DB, so we don't block the UI on this.
+        sb().functions.invoke('send-booking-email', {
+          body: { booking_id: cancelledId, mode: 'cancelled' }
+        }).then(({ error: emailErr }) => {
+          if (emailErr) console.warn('cancellation notification failed:', emailErr.message || emailErr);
+        }).catch(err => console.warn('cancellation notification failed:', err));
       }
       cancellingBookingId = null;
       await refreshBookings();
