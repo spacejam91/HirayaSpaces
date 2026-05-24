@@ -661,9 +661,11 @@
     .logo > div { display: flex; flex-direction: column; }
     .logo > div > span:last-child { display: none !important; }
     .logo > div > span:first-child { font-size: 13px !important; letter-spacing: 1.5px !important; line-height: 1 !important; }
-    .nav-cta { padding: 9px 14px; font-size: 12px; }
-    .nav-login { padding: 8px 12px; font-size: 12px; }
+    .nav-cta { padding: 10px 18px; font-size: 12px; letter-spacing: 0.4px; }
+    .nav-login { padding: 9px 16px; font-size: 12px; }
     .nav-user-btn { padding: 7px 10px; font-size: 11px; }
+    .nav-phone { display: none !important; }
+    nav > div:last-child { gap: 8px !important; }
   }
 </style>
 <script type="application/ld+json">
@@ -731,8 +733,6 @@
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
       </div>
     </div>
-    <button class="nav-account-link" id="nav-account-link"
-            onclick="HirayaAccount.openAddresses()" style="display:none">Account</button>
     <button class="nav-cta" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Book now</button>
     <a href="tel:+12267514566" class="nav-phone" style="font-size:13px;color:var(--muted);text-decoration:none;font-weight:500">(226) 751-4566</a>
   </div>
