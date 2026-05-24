@@ -1119,11 +1119,18 @@ async function refreshBookedSlots(){
   }
 }
 
+// Two-tier check: with a known duration, full-window overlap; without one,
+// just check whether the slot's start time falls inside an existing booked
+// window. The second case shows demand even before the customer picks a
+// service, so popular slots aren't selectable in the first place.
 function slotConflicts(slot, durMin){
   const startMin = parseSlotToMinutes(slot);
   if (startMin == null) return false;
-  const endMin = startMin + (durMin || 60);
-  return bookedSlots.some(b => startMin < b.endMin && endMin > b.startMin);
+  if (durMin && durMin > 0) {
+    const endMin = startMin + durMin;
+    return bookedSlots.some(b => startMin < b.endMin && endMin > b.startMin);
+  }
+  return bookedSlots.some(b => startMin >= b.startMin && startMin < b.endMin);
 }
 function changeMonth(dir){
   calM+=dir;
@@ -1136,12 +1143,14 @@ function renderTimes(){
   const svc = SERVICES.find(s => s.id === selSvc);
   const dur = svc ? svc.durationMin : null;
   document.getElementById('time-grid').innerHTML = TIMES.map(t => {
-    const conflict = dur ? slotConflicts(t, dur) : false;
+    const conflict = slotConflicts(t, dur || 0);
     const classes = ['time-btn'];
     if (selTime === t) classes.push('selected');
     if (conflict) classes.push('disabled');
     const end = dur ? slotEndTime(t, dur) : '';
-    const endLine = end ? `<div class="time-btn-end">${conflict ? 'booked' : 'to ' + end}</div>` : '';
+    let endLine = '';
+    if (conflict) endLine = `<div class="time-btn-end">booked</div>`;
+    else if (end) endLine = `<div class="time-btn-end">to ${end}</div>`;
     const handler = conflict ? '' : `onclick="pickTime('${t}')"`;
     const title = conflict ? ' title="Already booked"' : '';
     return `<div class="${classes.join(' ')}"${title} ${handler}>
@@ -1152,7 +1161,7 @@ function renderTimes(){
 
 function pickTime(t){
   const svc = SERVICES.find(s => s.id === selSvc);
-  if (svc && svc.durationMin && slotConflicts(t, svc.durationMin)) return;
+  if (slotConflicts(t, svc ? svc.durationMin || 0 : 0)) return;
   selTime = t;
   renderTimes();
 }
