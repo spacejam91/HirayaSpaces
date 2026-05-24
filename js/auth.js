@@ -64,6 +64,29 @@
     });
   }
 
+  // ── POSTAL CODE FORMATTING (Canadian: A1A 1A1) ─────────────────────────
+  function formatPostal(value) {
+    let s = String(value == null ? '' : value).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    if (s.length > 3) s = s.slice(0, 3) + ' ' + s.slice(3);
+    return s;
+  }
+
+  function wirePostalInput(el) {
+    if (!el || el.dataset.postalWired === '1') return;
+    el.dataset.postalWired = '1';
+    el.addEventListener('input', function () {
+      const atEnd = el.selectionStart === el.value.length;
+      el.value = formatPostal(el.value);
+      if (atEnd) {
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      }
+    });
+    el.addEventListener('blur', function () {
+      if (el.value) el.value = formatPostal(el.value);
+    });
+  }
+
   // ── BOOKING FORM PREFILL ───────────────────────────────────────────────
   function prefillBookingForm(user) {
     if (!user) return;
@@ -425,6 +448,8 @@
     }
     wirePhoneInput($('f-phone'));
     wirePhoneInput($('su-phone'));
+    wirePostalInput($('f-postal'));
+    wirePostalInput($('addr-postal'));
   }
 
   async function boot() {
