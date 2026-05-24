@@ -1854,6 +1854,52 @@ Hiraya Spaces`
     sendInvoice(viewingInvoiceBookingId);
   }
 
+  async function downloadInvoicePdf() {
+    if (!viewingInvoiceBookingId || !sb()) return;
+    const btn = $('invoice-pdf-btn');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Generating PDF…';
+    try {
+      const { data, error } = await sb().functions.invoke('send-booking-email', {
+        body: { booking_id: viewingInvoiceBookingId, mode: 'invoice', download_pdf: true },
+      });
+      // Pull the real error reason out of the FunctionsHttpError context.
+      if (error) {
+        let debug = '';
+        try {
+          const resp = error.context?.response;
+          if (resp && typeof resp.json === 'function') {
+            const body = await resp.json();
+            debug = body?.debug || body?.error || '';
+          }
+        } catch (_) {}
+        throw new Error(debug || error.message || 'Unknown');
+      }
+      if (!data?.pdf_base64) {
+        throw new Error(data?.debug || data?.error || 'No PDF returned');
+      }
+      // Decode base64 → bytes → Blob → object URL → click.
+      const bin = atob(data.pdf_base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.pdf_filename || `invoice-${viewingInvoiceBookingId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('PDF downloaded.', 'success');
+    } catch (err) {
+      console.error('downloadInvoicePdf failed:', err);
+      showErr('invoice-err', 'PDF download failed: ' + (err?.message || err));
+    } finally {
+      btn.disabled = false; btn.textContent = original;
+    }
+  }
+
   // ── BLOCKED DATES ──────────────────────────────────────────────────────
   // Cached Map<YYYY-MM-DD, { reason }>. Refreshed alongside allBookings so
   // the calendar grid and the day detail drawer stay in sync after a toggle.
@@ -2480,6 +2526,7 @@ Hiraya Spaces`
     closeInvoiceIfBackdrop,
     toggleInvoicePaid,
     resendInvoice,
+    downloadInvoicePdf,
     exportBookingsCsv,
     askReschedule,
     cancelReschedule,

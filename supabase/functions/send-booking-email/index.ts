@@ -15,6 +15,125 @@
 
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+
+// ─── INVOICE PDF BUILDER ─────────────────────────────────────────────────
+// Programmatic PDF rendering (no headless browser) using pdf-lib. Matches
+// the HTML invoice layout: header, billed-to + service date stacked, line
+// items, total due, how-to-pay. US Letter, single page.
+async function buildInvoicePdf(opts: {
+  invoiceNumber: string;
+  issuedDisplay: string;
+  idShort: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  dateDisplay: string;
+  timeDisplay: string;
+  addressLine: string;
+  lineItems: { name: string; priceLabel: string }[];
+  totalDisplay: string;
+}): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([612, 792]); // US Letter @ 72 dpi
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const serif = await pdf.embedFont(StandardFonts.TimesRoman);
+
+  const sage = rgb(30 / 255, 77 / 255, 43 / 255);
+  const muted = rgb(106 / 255, 125 / 255, 110 / 255);
+  const text = rgb(26 / 255, 46 / 255, 30 / 255);
+  const border = rgb(212 / 255, 226 / 255, 216 / 255);
+
+  const left = 50;
+  const right = 562;
+  let y = 750;
+
+  const drawRight = (str: string, yPos: number, f = font, size = 11, color = text) => {
+    const w = f.widthOfTextAtSize(str, size);
+    page.drawText(str, { x: right - w, y: yPos, font: f, size, color });
+  };
+
+  // Brand header
+  page.drawText("HIRAYA SPACES", { x: left, y, font: bold, size: 14, color: sage });
+  drawRight("Waterloo, ON · hirayaspaces.ca", y, font, 10, muted);
+  y -= 14;
+  page.drawText("Turning homes into dream spaces", { x: left, y, font, size: 9, color: muted });
+
+  // Divider
+  y -= 16;
+  page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 2, color: sage });
+
+  // INVOICE badge
+  y -= 30;
+  page.drawRectangle({ x: left, y: y - 4, width: 68, height: 20, color: sage });
+  page.drawText("INVOICE", { x: left + 9, y, font: bold, size: 10, color: rgb(1, 1, 1) });
+
+  // Invoice number
+  y -= 32;
+  page.drawText(opts.invoiceNumber, { x: left, y, font: serif, size: 22, color: text });
+
+  y -= 16;
+  page.drawText(`Issued ${opts.issuedDisplay}  ·  Booking ${opts.idShort}`, { x: left, y, font, size: 10, color: muted });
+
+  // Billed to
+  y -= 32;
+  page.drawText("BILLED TO", { x: left, y, font: bold, size: 9, color: muted });
+  y -= 14;
+  page.drawText(opts.customerName, { x: left, y, font: bold, size: 11, color: text });
+  y -= 13;
+  page.drawText(opts.customerEmail, { x: left, y, font, size: 10, color: muted });
+  if (opts.customerPhone) {
+    y -= 13;
+    page.drawText(opts.customerPhone, { x: left, y, font, size: 10, color: muted });
+  }
+
+  // Service date
+  y -= 22;
+  page.drawText("SERVICE DATE", { x: left, y, font: bold, size: 9, color: muted });
+  y -= 14;
+  const dateLine = opts.dateDisplay + (opts.timeDisplay ? "  ·  " + opts.timeDisplay : "");
+  page.drawText(dateLine, { x: left, y, font: bold, size: 11, color: text });
+  y -= 13;
+  page.drawText(opts.addressLine, { x: left, y, font, size: 10, color: muted });
+
+  // Description header
+  y -= 30;
+  page.drawText("DESCRIPTION", { x: left, y, font: bold, size: 9, color: sage });
+  y -= 6;
+  page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.5, color: sage });
+
+  // Line items
+  y -= 18;
+  for (const item of opts.lineItems) {
+    page.drawText(item.name, { x: left, y, font, size: 11, color: text });
+    drawRight(item.priceLabel, y, font, 11, text);
+    y -= 18;
+  }
+
+  // Total
+  y -= 4;
+  page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.5, color: border });
+  y -= 20;
+  page.drawText("Total due", { x: left, y, font: bold, size: 13, color: text });
+  drawRight(opts.totalDisplay, y, bold, 14, sage);
+
+  // How to pay
+  y -= 50;
+  page.drawRectangle({ x: left, y: y - 60, width: right - left, height: 76, color: rgb(255 / 255, 251 / 255, 235 / 255), borderColor: rgb(229 / 255, 211 / 255, 160 / 255), borderWidth: 1 });
+  page.drawText("HOW TO PAY", { x: left + 14, y, font: bold, size: 9, color: rgb(90 / 255, 67 / 255, 24 / 255) });
+  y -= 18;
+  page.drawText("Cash: on arrival.", { x: left + 14, y, font, size: 10, color: rgb(61 / 255, 44 / 255, 13 / 255) });
+  y -= 14;
+  page.drawText(`E-transfer: hirayaspaces@gmail.com  —  reference ${opts.invoiceNumber}.`, { x: left + 14, y, font, size: 10, color: rgb(61 / 255, 44 / 255, 13 / 255) });
+
+  // Footer
+  y = 40;
+  page.drawText("Questions? Reply to the invoice email or call (226) 751-4566.", { x: left, y, font, size: 9, color: muted });
+
+  return await pdf.save();
+}
+
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -549,22 +668,24 @@ Deno.serve(async (req) => {
       const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
       const lineSubtotalCents = baseCatalogCents + addonsTotalCents;
       const additionalCents = invoiceTotal - lineSubtotalCents;
-      const lineRows: string[] = [];
-      lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(baseCatalogCents)}</td></tr>`);
+      // Build line items as structured data first so we can render to both
+      // HTML (for email body) and PDF (for attachment / admin download).
+      const lineItems: { name: string; priceLabel: string }[] = [];
+      lineItems.push({ name: serviceName, priceLabel: dollars(baseCatalogCents) });
       for (const ba of bookingAddons) {
-        const name = ba.addons?.name || "Add-on";
+        const baseName = ba.addons?.name || "Add-on";
         const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
         const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
-        lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(name)}${qty}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(lineTotal)}</td></tr>`);
+        lineItems.push({ name: baseName + qty, priceLabel: dollars(lineTotal) });
       }
       if (additionalCents > 0) {
-        lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">Additional services provided</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(additionalCents)}</td></tr>`);
+        lineItems.push({ name: "Additional services provided", priceLabel: dollars(additionalCents) });
       } else if (additionalCents < 0) {
-        // Final came in lower than the catalog total — show as a discount so
-        // the math still adds up cleanly.
-        lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">Discount</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">-${dollars(Math.abs(additionalCents))}</td></tr>`);
+        lineItems.push({ name: "Discount", priceLabel: "-" + dollars(Math.abs(additionalCents)) });
       }
-      const lineItemsHtml = lineRows.join("");
+      const lineItemsHtml = lineItems.map(item =>
+        `<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(item.name)}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${escapeHtml(item.priceLabel)}</td></tr>`
+      ).join("");
 
       const invoiceHtml = `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
@@ -623,6 +744,44 @@ Deno.serve(async (req) => {
   </table>
 </body></html>`;
 
+      // Build the PDF copy of the invoice. Used both as email attachment
+      // AND as the response payload for the admin "Download PDF" button.
+      const pdfBytes = await buildInvoicePdf({
+        invoiceNumber: invoiceNumber!,
+        issuedDisplay,
+        idShort,
+        customerName,
+        customerEmail,
+        customerPhone,
+        dateDisplay,
+        timeDisplay,
+        addressLine,
+        lineItems,
+        totalDisplay: subtotalDisplay,
+      });
+
+      // Admin "Download PDF" path: don't send email, just return the bytes
+      // base64-encoded so the browser can save it as a file.
+      if (body?.download_pdf === true) {
+        // Convert Uint8Array → base64 in chunks to avoid blowing the call
+        // stack on larger PDFs (btoa(String.fromCharCode(...big)) crashes).
+        let binary = "";
+        const chunk = 0x8000;
+        for (let i = 0; i < pdfBytes.length; i += chunk) {
+          binary += String.fromCharCode(...pdfBytes.subarray(i, i + chunk));
+        }
+        const base64 = btoa(binary);
+        return jsonResponse({
+          ok: true,
+          booking_id,
+          mode: "invoice",
+          invoice_number: invoiceNumber,
+          status: invoiceStatus,
+          pdf_base64: base64,
+          pdf_filename: `${invoiceNumber}.pdf`,
+        });
+      }
+
       const smtpPortInv = parseInt(Deno.env.get("SMTP_PORT") || "465");
       const invClient = new SMTPClient({
         connection: {
@@ -638,6 +797,12 @@ Deno.serve(async (req) => {
           to: customerEmail,
           subject: `Invoice ${invoiceNumber} - Hiraya Spaces`,
           html: tidyHtml(invoiceHtml),
+          attachments: [{
+            contentType: "application/pdf",
+            filename: `${invoiceNumber}.pdf`,
+            encoding: "binary",
+            content: pdfBytes,
+          }],
         });
       } catch (e) { console.warn("invoice email failed:", e); invErr = e; }
       try { await invClient.close(); } catch (_) {}
