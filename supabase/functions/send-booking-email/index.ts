@@ -181,7 +181,11 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const booking_id = body?.booking_id;
-    const mode: "booked" | "cancelled" = body?.mode === "cancelled" ? "cancelled" : "booked";
+    const declineReason: string | null = typeof body?.reason === "string" ? body.reason : null;
+    type Mode = "booked" | "cancelled" | "confirmed" | "declined";
+    const requestedMode = body?.mode;
+    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined")
+      ? requestedMode : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
     }
@@ -235,14 +239,17 @@ Deno.serve(async (req) => {
       if (booking.status !== "cancelled" || !booking.cancelled_at) {
         return jsonResponse({ error: "Booking is not cancelled" }, 400);
       }
-      // Cancellations are legitimate at any time. The status='cancelled' check
-      // above is the real anti-abuse gate (a caller can't trigger this email
-      // for a booking they haven't actually cancelled via the RPC). Keep a
-      // generous 24h window mostly to dodge replay attacks long after the
-      // fact, but allow customers to retry shortly after an initial failure.
       const cancelAgeMs = Date.now() - new Date(booking.cancelled_at).getTime();
       if (cancelAgeMs > 24 * 60 * 60 * 1000) {
         return jsonResponse({ error: "Cancellation too old to email" }, 410);
+      }
+    } else if (mode === "confirmed") {
+      if (booking.status !== "confirmed") {
+        return jsonResponse({ error: "Booking is not confirmed" }, 400);
+      }
+    } else if (mode === "declined") {
+      if (booking.status !== "cancelled") {
+        return jsonResponse({ error: "Booking is not declined" }, 400);
       }
     } else {
       const ageMs = Date.now() - new Date(booking.created_at).getTime();
@@ -285,6 +292,144 @@ Deno.serve(async (req) => {
 
     const totalDisplay = dollars(booking.estimated_price_cents);
     const isQuote = booking.estimated_price_cents == null || booking.status === "awaiting_quote";
+
+    // ── CONFIRMED PATH (owner confirms a pending booking) ─────────────────
+    if (mode === "confirmed") {
+      const confirmedHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">CONFIRMED</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">You're all set!</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            Hi ${escapeHtml(customerName)} — your booking <strong style="color:#1e4d2b">${idShort}</strong> is officially confirmed. See you on the day!
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:12px;margin-bottom:18px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Confirmed booking</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
+                <tr><td style="padding:4px 0;color:#6a7d6e">Service</td><td style="padding:4px 0;text-align:right">${escapeHtml(serviceName)}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Date</td><td style="padding:4px 0;text-align:right">${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Address</td><td style="padding:4px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+                <tr><td style="padding:8px 0 4px;color:#6a7d6e;font-weight:700;border-top:1px solid #5a9470">Estimated total</td><td style="padding:8px 0 4px;text-align:right;font-weight:700;color:#1e4d2b;border-top:1px solid #5a9470">${escapeHtml(totalDisplay)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:0 0 12px">
+            Need to make a change? Reply to this email or cancel from your account up to 24 hours before. We can't wait to clean for you.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortConf = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const confClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortConf, tls: smtpPortConf === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      try {
+        await confClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Booking confirmed - ${idShort}`,
+          html: tidyHtml(confirmedHtml),
+        });
+      } catch (e) { console.warn("confirmed email failed:", e); }
+      try { await confClient.close(); } catch (_) {}
+      return jsonResponse({ ok: true, booking_id, mode: "confirmed" });
+    }
+
+    // ── DECLINED PATH (owner declines a pending booking) ──────────────────
+    if (mode === "declined") {
+      const reasonText = declineReason && declineReason.trim() ? declineReason.trim() : null;
+      const declinedHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#b08c4a;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">UNABLE TO ACCEPT</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">We're sorry — we can't take this one</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 18px">
+            Hi ${escapeHtml(customerName)} — unfortunately we couldn't accept booking <strong style="color:#1e4d2b">${idShort}</strong>${reasonText ? ` for the following reason: <em>${escapeHtml(reasonText)}</em>` : "."}
+            ${reasonText ? "" : " We weren't able to fit it into our schedule."} You haven't been charged.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f9f6;border:1px solid #d4e2d8;border-radius:12px;margin-bottom:24px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:600;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Original request</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
+                <tr><td style="padding:4px 0;color:#6a7d6e">Service</td><td style="padding:4px 0;text-align:right">${escapeHtml(serviceName)}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Date</td><td style="padding:4px 0;text-align:right">${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Address</td><td style="padding:4px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <p style="font-size:13px;color:#6a7d6e;line-height:1.7;margin:0 0 12px">
+            We'd love to clean for you another time. <a href="https://hirayaspaces.ca/#how" style="color:#1e4d2b;font-weight:600;text-decoration:none">Try a different date or service →</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortDec = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const decClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortDec, tls: smtpPortDec === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      try {
+        await decClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Booking update - ${idShort}`,
+          html: tidyHtml(declinedHtml),
+        });
+      } catch (e) { console.warn("declined email failed:", e); }
+      try { await decClient.close(); } catch (_) {}
+
+      // Delete the linked Google Calendar event (best-effort) + clear the FK.
+      const refreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN");
+      const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
+      const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
+      if (booking.google_calendar_event_id && refreshToken && clientId && clientSecret) {
+        try {
+          await deleteCalendarEvent({
+            refreshToken, clientId, clientSecret,
+            calendarId: Deno.env.get("GOOGLE_CALENDAR_ID") || "primary",
+            eventId: booking.google_calendar_event_id,
+          });
+          await sb.from("bookings").update({ google_calendar_event_id: null }).eq("id", booking_id);
+        } catch (calErr) { console.warn("calendar event delete failed:", calErr); }
+      }
+      return jsonResponse({ ok: true, booking_id, mode: "declined" });
+    }
 
     // ── CANCELLATION PATH ─────────────────────────────────────────────────
     // When mode === "cancelled" we send a different pair of emails (customer

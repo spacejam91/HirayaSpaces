@@ -1621,6 +1621,7 @@ updateSummary();
     <div class="account-tabs" id="account-tabs">
       <button type="button" class="account-tab" data-tab="bookings" onclick="HirayaAccount.switchTab('bookings')">Bookings</button>
       <button type="button" class="account-tab active" data-tab="addresses" onclick="HirayaAccount.switchTab('addresses')">Addresses</button>
+      <button type="button" class="account-tab" data-tab="admin" id="account-tab-btn-admin" onclick="HirayaAccount.switchTab('admin')" style="display:none">Admin</button>
     </div>
 
     <!-- ── BOOKINGS TAB ─────────────────────────────────────────────────── -->
@@ -1717,6 +1718,34 @@ updateSummary();
       </div>
     </div>
     </div><!-- /account-tab-addresses -->
+
+    <!-- ── ADMIN TAB (owner-only) ────────────────────────────────────────── -->
+    <div id="account-tab-admin" style="display:none">
+      <div id="admin-list-view">
+        <p class="modal-sub">Pending bookings waiting for your review. Confirm to lock them in, decline to free up the slot.</p>
+        <div id="admin-pending-list" class="bookings-list" aria-live="polite"></div>
+        <div id="admin-pending-empty" class="addr-empty" style="display:none">
+          <div class="addr-empty-icon" aria-hidden="true">✨</div>
+          <p>Nothing pending right now. You're all caught up.</p>
+        </div>
+      </div>
+
+      <!-- Decline-with-reason view -->
+      <div id="admin-decline-view" style="display:none">
+        <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">📝</div>
+        <h3 class="modal-title" style="text-align:center;font-size:22px">Decline booking</h3>
+        <p class="modal-sub" style="text-align:center" id="admin-decline-text"></p>
+        <div class="modal-field">
+          <label for="admin-decline-reason">Reason (optional — shared with the customer)</label>
+          <input type="text" id="admin-decline-reason" placeholder="Schedule is full that day, out of service area, etc.">
+        </div>
+        <div class="modal-err" id="admin-decline-err" role="alert"></div>
+        <div class="br-actions">
+          <button class="modal-btn-ghost" onclick="HirayaAccount.cancelDecline()">Back</button>
+          <button class="modal-btn" id="admin-decline-btn" style="background:var(--rose)" onclick="HirayaAccount.confirmDecline()">Send decline</button>
+        </div>
+      </div>
+    </div><!-- /account-tab-admin -->
   </div>
 </div>
 

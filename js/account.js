@@ -68,20 +68,42 @@
 
   function getCachedAddresses() { return cachedAddresses.slice(); }
 
+  // ── OWNER GATE ─────────────────────────────────────────────────────────
+  // The "owner" sees the Admin tab. Keep this in lockstep with the
+  // is_owner() function in hiraya-schema.sql — both check the same email.
+  const OWNER_EMAIL = 'aaron-thompson@outlook.com';
+  let isOwner = false;
+
   // ── MODAL OPEN / CLOSE / TAB SWITCH ────────────────────────────────────
   let activeTab = 'addresses';
   let cancellingBookingId = null;
   let cancellingBookingLabel = '';
+  let decliningBookingId = null;
+  let decliningBookingLabel = '';
 
-  function openAccount(tab) {
+  async function openAccount(tab) {
     const modal = $('addresses-modal');
     if (!modal) return;
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
+    await refreshOwnerStatus();
     switchTab(tab || 'bookings');
   }
   function openAddresses() { openAccount('addresses'); }
   function openBookings() { openAccount('bookings'); }
+  function openAdmin() { openAccount('admin'); }
+
+  async function refreshOwnerStatus() {
+    if (!sb()) { isOwner = false; }
+    else {
+      try {
+        const { data: { user } } = await sb().auth.getUser();
+        isOwner = !!user && (user.email || '').toLowerCase() === OWNER_EMAIL.toLowerCase();
+      } catch (_) { isOwner = false; }
+    }
+    const btn = $('account-tab-btn-admin');
+    if (btn) btn.style.display = isOwner ? '' : 'none';
+  }
 
   function closeAddresses() {
     const modal = $('addresses-modal');
@@ -94,6 +116,9 @@
   }
 
   function switchTab(tab) {
+    // Block the admin tab for non-owners (defence in depth — the button is
+    // hidden but a direct openAdmin call shouldn't slip through).
+    if (tab === 'admin' && !isOwner) tab = 'bookings';
     activeTab = tab;
     // Tab button highlight
     document.querySelectorAll('.account-tab').forEach(btn => {
@@ -102,8 +127,10 @@
     // Top-level tab content panels
     const bookingsTab = $('account-tab-bookings');
     const addressesTab = $('account-tab-addresses');
+    const adminTab = $('account-tab-admin');
     if (bookingsTab) bookingsTab.style.display = tab === 'bookings' ? 'block' : 'none';
     if (addressesTab) addressesTab.style.display = tab === 'addresses' ? 'block' : 'none';
+    if (adminTab) adminTab.style.display = tab === 'admin' ? 'block' : 'none';
     // Reset sub-views to their list state
     if (tab === 'addresses') {
       showListView();
@@ -111,7 +138,20 @@
     } else if (tab === 'bookings') {
       showBookingsListView();
       refreshBookings();
+    } else if (tab === 'admin') {
+      showAdminListView();
+      refreshPending();
     }
+  }
+
+  // Admin sub-view toggles
+  function showAdminListView() {
+    $('admin-list-view').style.display = 'block';
+    $('admin-decline-view').style.display = 'none';
+  }
+  function showAdminDeclineView() {
+    $('admin-list-view').style.display = 'none';
+    $('admin-decline-view').style.display = 'block';
   }
 
   function showListView() {
@@ -550,6 +590,142 @@
     }
   }
 
+  // ── ADMIN (owner) — pending bookings list + confirm/decline ────────────
+  let pendingBookings = [];
+
+  async function fetchPending() {
+    if (!sb() || !isOwner) { pendingBookings = []; return []; }
+    const { data, error } = await sb().rpc('get_pending_bookings');
+    if (error) {
+      console.warn('get_pending_bookings failed:', error.message);
+      pendingBookings = [];
+    } else {
+      pendingBookings = data || [];
+    }
+    return pendingBookings;
+  }
+
+  async function refreshPending() {
+    await fetchPending();
+    renderPending();
+  }
+
+  function renderPending() {
+    const list = $('admin-pending-list');
+    const empty = $('admin-pending-empty');
+    if (!list) return;
+    if (!pendingBookings.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = pendingBookings.map(b => {
+      const svc = b.service_name || 'Cleaning service';
+      const dateStr = formatBookingDate(b.preferred_date);
+      const timeStr = b.preferred_time_slot ? ` at ${escapeHtml(b.preferred_time_slot)}` : '';
+      const addr = [
+        [b.street_address, b.unit].filter(Boolean).join(', '),
+        [b.city, b.postal_code].filter(Boolean).join(' '),
+      ].filter(Boolean).join(' · ');
+      const total = b.estimated_price_cents != null
+        ? '$' + Math.round(b.estimated_price_cents / 100)
+        : 'Quote on request';
+      const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}" style="color:var(--sage)">${escapeHtml(b.customer_phone)}</a>` : '';
+      const emailLink = b.customer_email ? `<a href="mailto:${escapeHtml(b.customer_email)}" style="color:var(--sage)">${escapeHtml(b.customer_email)}</a>` : '';
+      const mapsLink = addr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="color:var(--sage);font-size:12px">🗺 Maps →</a>` : '';
+      const notes = b.customer_notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic">📝 ${escapeHtml(b.customer_notes)}</div>` : '';
+      return `
+        <div class="booking-card is-upcoming" data-id="${b.id}">
+          <div class="booking-card-head">
+            <div>
+              <div class="booking-card-svc">${escapeHtml(svc)}</div>
+              <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
+            </div>
+            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
+          </div>
+          <div class="booking-card-body">
+            <div>👤 <strong>${escapeHtml(b.customer_name || 'Customer')}</strong></div>
+            ${emailLink ? `<div>✉️ ${emailLink}</div>` : ''}
+            ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
+            ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
+            <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
+            ${notes}
+          </div>
+          <div class="booking-card-actions">
+            <button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAccount.askDecline('${b.id}')">Decline</button>
+            <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAccount.adminConfirm('${b.id}')">Confirm</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function adminConfirm(id) {
+    if (!sb()) return;
+    try {
+      const { data, error } = await sb().rpc('confirm_booking', { booking_id: id });
+      if (error) throw error;
+      if (data === false) {
+        showToast("Booking already confirmed or no longer pending.", 'error');
+      } else {
+        showToast('Booking confirmed. Customer notified.', 'success');
+        sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'confirmed' } })
+          .then(({ error: emailErr }) => { if (emailErr) console.warn('confirmation email failed:', emailErr.message || emailErr); })
+          .catch(err => console.warn('confirmation email failed:', err));
+      }
+      await refreshPending();
+    } catch (err) {
+      console.error('confirm_booking failed:', err);
+      showToast(err.message || 'Could not confirm.', 'error');
+    }
+  }
+
+  function askDecline(id) {
+    const b = pendingBookings.find(x => x.id === id);
+    if (!b) return;
+    decliningBookingId = id;
+    decliningBookingLabel = `${b.service_name || 'this booking'} on ${formatBookingDate(b.preferred_date)} (${b.customer_name || 'Customer'})`;
+    $('admin-decline-text').textContent = decliningBookingLabel;
+    $('admin-decline-reason').value = '';
+    $('admin-decline-err').style.display = 'none';
+    showAdminDeclineView();
+  }
+
+  function cancelDecline() {
+    decliningBookingId = null;
+    showAdminListView();
+  }
+
+  async function confirmDecline() {
+    if (!decliningBookingId || !sb()) return;
+    const reason = ($('admin-decline-reason').value || '').trim();
+    const idToDecline = decliningBookingId;
+    const btn = $('admin-decline-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    try {
+      const { data, error } = await sb().rpc('decline_booking', { booking_id: idToDecline, reason: reason || null });
+      if (error) throw error;
+      if (data === false) {
+        $('admin-decline-err').textContent = 'Booking is no longer pending — refresh and try again.';
+        $('admin-decline-err').style.display = 'block';
+      } else {
+        showToast('Booking declined. Customer notified.', 'success');
+        sb().functions.invoke('send-booking-email', { body: { booking_id: idToDecline, mode: 'declined', reason: reason || null } })
+          .then(({ error: emailErr }) => { if (emailErr) console.warn('decline email failed:', emailErr.message || emailErr); })
+          .catch(err => console.warn('decline email failed:', err));
+        decliningBookingId = null;
+        await refreshPending();
+        showAdminListView();
+      }
+    } catch (err) {
+      console.error('decline_booking failed:', err);
+      $('admin-decline-err').textContent = err.message || 'Could not decline.';
+      $('admin-decline-err').style.display = 'block';
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send decline'; }
+    }
+  }
+
   // ── INIT ────────────────────────────────────────────────────────────────
   function wire() {
     const modal = $('addresses-modal');
@@ -564,9 +740,12 @@
       sb().auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           fetchAddresses();
+          refreshOwnerStatus();
         } else if (event === 'SIGNED_OUT') {
           cachedAddresses = [];
           cachedBookings = [];
+          pendingBookings = [];
+          isOwner = false;
           notifyListeners();
         }
       });
@@ -593,6 +772,13 @@
     cancelCancelBooking,
     confirmCancelBooking,
     refreshBookings,
+    // Admin tab (owner-only)
+    openAdmin,
+    adminConfirm,
+    askDecline,
+    cancelDecline,
+    confirmDecline,
+    refreshPending,
     // For booking.js to read the saved list and react to changes
     fetchAddresses,
     getCachedAddresses,
