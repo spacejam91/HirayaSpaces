@@ -248,7 +248,7 @@
       $('pending-list-view').style.display = 'block';
       $('confirm-view').style.display = 'none';
       $('decline-view').style.display = 'none';
-      const editView = $('edit-view'); if (editView) editView.style.display = 'none';
+      // Edit modal lives at top level now — closes on cancel, not on tab switch.
       refreshPending();
     } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed') {
       $('all-list-view').style.display = 'block';
@@ -257,7 +257,7 @@
       if (completeView) completeView.style.display = 'none';
       const rescheduleView = $('reschedule-view');
       if (rescheduleView) rescheduleView.style.display = 'none';
-      const editView = $('edit-view'); if (editView) editView.style.display = 'none';
+      // Edit modal lives at top level now — closes on cancel, not on tab switch.
       // Pre-apply the status filter so each tab shows its slice. The All
       // bookings tab resets to "no filter".
       const filterSel = $('all-status-filter');
@@ -1289,21 +1289,20 @@ Hiraya Spaces`
       `${b.service_name || 'Booking'} — ${b.customer_name || 'Customer'} (currently ${formatBookingDate(b.preferred_date)}${b.preferred_time_slot ? ' at ' + b.preferred_time_slot : ''})`;
     hideErr('edit-err');
 
-    // Hide whatever panel we came from so the overlay has the stage.
-    $('pending-list-view').style.display = 'none';
-    $('all-list-view').style.display = 'none';
-    $('owner-cancel-view').style.display = 'none';
-    const completeView = $('complete-view'); if (completeView) completeView.style.display = 'none';
-    $('reschedule-view').style.display = 'none';
-    $('edit-view').style.display = 'block';
+    // Edit modal is a top-level overlay (.nb-overlay pattern) — works from
+    // any tab. Just add the .open class to show it.
+    const overlay = $('edit-overlay');
+    if (overlay) overlay.classList.add('open');
   }
 
   function cancelEdit() {
     editingId = null;
-    $('edit-view').style.display = 'none';
-    // Return to whichever list the user was on.
-    if (activePanel === 'pending') $('pending-list-view').style.display = 'block';
-    else $('all-list-view').style.display = 'block';
+    const overlay = $('edit-overlay');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  function closeEditIfBackdrop(event) {
+    if (event.target.id === 'edit-overlay') cancelEdit();
   }
 
   async function submitEdit() {
@@ -2256,6 +2255,7 @@ Hiraya Spaces`
     submitComplete,
     askEdit,
     cancelEdit,
+    closeEditIfBackdrop,
     submitEdit,
     sendInvoice,
     exportBookingsCsv,

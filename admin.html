@@ -892,53 +892,6 @@
         </div>
       </div>
 
-      <!-- Edit overlay (manual adjustment of a booking) -->
-      <div id="edit-view" class="overlay-card" style="display:none">
-        <h3>Edit this booking</h3>
-        <p id="edit-text"></p>
-        <div style="display:grid;grid-template-columns:1fr;gap:14px;margin-top:8px">
-          <div>
-            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Service</label>
-            <select id="edit-service" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;background:white"></select>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div>
-              <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Date</label>
-              <input type="date" id="edit-date" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px">
-            </div>
-            <div>
-              <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Time slot</label>
-              <select id="edit-time" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;background:white">
-                <option value="8:00 am">8:00 am</option>
-                <option value="9:30 am">9:30 am</option>
-                <option value="11:00 am">11:00 am</option>
-                <option value="1:00 pm">1:00 pm</option>
-                <option value="2:30 pm">2:30 pm</option>
-                <option value="4:00 pm">4:00 pm</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Estimated price (CAD)</label>
-            <input type="number" id="edit-price" min="0" step="1" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px">
-          </div>
-          <div>
-            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Customer notes (visible to cleaner)</label>
-            <textarea id="edit-customer-notes" rows="2" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;resize:vertical"></textarea>
-          </div>
-          <div>
-            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Internal notes (admin only)</label>
-            <textarea id="edit-internal-notes" rows="2" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;resize:vertical"></textarea>
-          </div>
-        </div>
-        <p style="font-size:12px;color:var(--muted);margin-top:10px">Customer is not auto-notified. If price/date/service changed, send them a quick email or message.</p>
-        <div id="edit-err" class="form-err"></div>
-        <div class="overlay-actions">
-          <button class="btn-ghost" onclick="HirayaAdmin.cancelEdit()">Back</button>
-          <button class="btn-primary" id="edit-btn" onclick="HirayaAdmin.submitEdit()">Save changes</button>
-        </div>
-      </div>
-
       <!-- Reschedule overlay -->
       <div id="reschedule-view" class="overlay-card" style="display:none">
         <h3>Reschedule this booking</h3>
@@ -1200,6 +1153,65 @@
     <div class="nb-actions">
       <button class="btn-ghost" onclick="HirayaAdmin.closeNewBooking()">Cancel</button>
       <button class="btn-primary" id="nb-submit" onclick="HirayaAdmin.submitNewBooking()">Create confirmed booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT BOOKING MODAL ─────────────────────────────────────────────────
+     Top-level overlay so it works from any tab (Pending, Confirmed, In progress,
+     All bookings). Previously it was nested inside the All Bookings panel,
+     which meant clicking Edit from Pending hid the list and showed nothing
+     because the overlay's parent panel wasn't active. -->
+<div class="nb-overlay" id="edit-overlay" onclick="HirayaAdmin.closeEditIfBackdrop(event)">
+  <div class="nb-modal" role="dialog" aria-labelledby="edit-modal-title">
+    <button class="nb-close" onclick="HirayaAdmin.cancelEdit()" aria-label="Close">✕</button>
+    <h2 id="edit-modal-title">Edit booking</h2>
+    <p class="nb-sub" id="edit-text">—</p>
+
+    <div class="nb-section">
+      <div class="nb-section-label">Service</div>
+      <select id="edit-service" class="nb-input"></select>
+    </div>
+
+    <div class="nb-section" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <div class="nb-section-label">Date</div>
+        <input type="date" id="edit-date" class="nb-input">
+      </div>
+      <div>
+        <div class="nb-section-label">Time slot</div>
+        <select id="edit-time" class="nb-input">
+          <option value="8:00 am">8:00 am</option>
+          <option value="9:30 am">9:30 am</option>
+          <option value="11:00 am">11:00 am</option>
+          <option value="1:00 pm">1:00 pm</option>
+          <option value="2:30 pm">2:30 pm</option>
+          <option value="4:00 pm">4:00 pm</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="nb-section">
+      <div class="nb-section-label">Estimated price (CAD)</div>
+      <input type="number" id="edit-price" min="0" step="1" class="nb-input">
+    </div>
+
+    <div class="nb-section">
+      <div class="nb-section-label">Customer notes (visible to cleaner)</div>
+      <textarea id="edit-customer-notes" rows="2" class="nb-input" style="resize:vertical"></textarea>
+    </div>
+
+    <div class="nb-section">
+      <div class="nb-section-label">Internal notes (admin only)</div>
+      <textarea id="edit-internal-notes" rows="2" class="nb-input" style="resize:vertical"></textarea>
+    </div>
+
+    <p style="font-size:12px;color:var(--muted);margin:0 0 10px">Customer is not auto-notified. If price/date/service changed, send them a quick email or message.</p>
+    <div id="edit-err" class="form-err"></div>
+
+    <div class="nb-actions">
+      <button class="btn-ghost" onclick="HirayaAdmin.cancelEdit()">Cancel</button>
+      <button class="btn-primary" id="edit-btn" onclick="HirayaAdmin.submitEdit()">Save changes</button>
     </div>
   </div>
 </div>
