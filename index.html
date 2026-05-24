@@ -948,7 +948,7 @@
 <main>
 
 <!-- HERO -->
-<div class="hero">
+<div class="hero" id="hero">
   <div class="hero-left">
     <span class="hero-eyebrow fade-up">Trusted by 100+ families in the Waterloo Region</span>
     <h1 class="hero-h1 fade-up" style="transition-delay:.1s">A space that<br>feels <em>truly</em> clean.</h1>
@@ -1279,20 +1279,21 @@ document.addEventListener('click', function (e) {
   a.style.animation = 'step-num-bounce .55s ease';
 });
 
-// Hide the nav "Book now" CTA the moment the user enters the booking form.
-// Mid-flow users were getting bounced back to the top when they tapped it.
-// IntersectionObserver fires on entry/exit so the button reappears if they
-// scroll back up.
-(function hideNavCtaInBooking() {
+// Hide the nav "Book now" CTA once the user scrolls past the hero. The hero
+// already has its own big CTAs; once you're into How it works, Services, or
+// the booking form, the nav button is redundant and (worse) bounced people
+// back to the top mid-flow. Reappears if the user scrolls back to the hero.
+(function hideNavCtaPastHero() {
   const cta = document.getElementById('nav-cta-book');
-  const section = document.getElementById('booking');
-  if (!cta || !section || !('IntersectionObserver' in window)) return;
+  const hero = document.getElementById('hero');
+  if (!cta || !hero || !('IntersectionObserver' in window)) return;
   const io = new IntersectionObserver(function (entries) {
     for (const entry of entries) {
-      cta.style.display = entry.isIntersecting ? 'none' : '';
+      // Hero in view → show. Hero out of view → hide.
+      cta.style.display = entry.isIntersecting ? '' : 'none';
     }
   }, { threshold: 0.05 });
-  io.observe(section);
+  io.observe(hero);
 })();
 
 const SERVICES = [
