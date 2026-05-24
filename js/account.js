@@ -156,7 +156,7 @@
     $('addr-label').value = '';
     $('addr-street').value = '';
     $('addr-unit').value = '';
-    $('addr-city').value = 'Waterloo';
+    $('addr-city').value = '';
     $('addr-postal').value = '';
     $('addr-is-default').checked = cachedAddresses.length === 0; // first one defaults to default
     $('addr-form-err').style.display = 'none';
@@ -173,7 +173,7 @@
     $('addr-label').value = a.label || '';
     $('addr-street').value = a.street_address || '';
     $('addr-unit').value = a.unit || '';
-    $('addr-city').value = a.city || 'Waterloo';
+    $('addr-city').value = a.city || '';
     $('addr-postal').value = a.postal_code || '';
     $('addr-is-default').checked = !!a.is_default;
     $('addr-form-err').style.display = 'none';

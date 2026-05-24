@@ -480,7 +480,7 @@
       // "Enter a different address" — unlock and clear so the user can type.
       $('f-street').value = '';
       $('f-unit').value = '';
-      $('f-city').value = 'Waterloo';
+      $('f-city').value = '';
       $('f-postal').value = '';
       setAddressFieldsLocked(false);
       setTimeout(() => { const s = $('f-street'); if (s) s.focus(); }, 30);
@@ -519,10 +519,9 @@
   }
 
   function clearBookingAddressFields() {
-    ['f-street', 'f-unit', 'f-postal'].forEach(function (id) {
+    ['f-street', 'f-unit', 'f-city', 'f-postal'].forEach(function (id) {
       const el = $(id); if (el) el.value = '';
     });
-    const city = $('f-city'); if (city) city.value = 'Waterloo';
     setAddressFieldsLocked(false);
   }
 

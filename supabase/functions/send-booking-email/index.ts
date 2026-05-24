@@ -310,12 +310,15 @@ Deno.serve(async (req) => {
       },
     });
 
+    // HTML-only sends (no parallel text/plain) — keeps the envelope a simple
+    // single-part message, which renders cleanly in Gmail. The previous
+    // multipart/mixed > multipart/alternative wrapping caused some clients
+    // to show raw MIME source instead of rendered HTML.
     await client.send({
       from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
       to: customerEmail,
-      subject: `${isQuote ? "Quote request" : "Booking confirmed"} — ${idShort}`,
+      subject: `${isQuote ? "Quote request" : "Booking confirmed"} - ${idShort}`,
       html,
-      content: `Hi ${customerName}, your Hiraya Spaces ${isQuote ? "quote request" : "booking"} (${idShort}) for ${serviceName} on ${dateDisplay}${timeDisplay ? " at " + timeDisplay : ""} has been received. ${isQuote ? "We'll send a tailored quote soon." : "Estimated total: " + totalDisplay + "."} Reply to this email with any questions.`,
     });
 
     // ── OWNER NOTIFICATION (best-effort — don't fail the request if this errors)
@@ -425,9 +428,8 @@ Deno.serve(async (req) => {
         from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
         to: ownerEmail,
         replyTo: customerEmail,
-        subject: `🌿 New booking: ${customerName} — ${dateDisplay}${timeDisplay ? " " + timeDisplay : ""} — ${idShort}`,
+        subject: `New booking: ${customerName} - ${dateDisplay}${timeDisplay ? " " + timeDisplay : ""} - ${idShort}`,
         html: ownerHtml,
-        content: `New booking ${idShort}\nCustomer: ${customerName} (${customerEmail}${customerPhone ? ", " + customerPhone : ""})\nService: ${serviceName}\nWhen: ${dateDisplay}${timeDisplay ? " at " + timeDisplay : ""}\nAddress: ${addressLine}\nTotal: ${totalDisplay}${booking.customer_notes ? "\n\nNotes: " + booking.customer_notes : ""}`,
       });
     } catch (ownerErr) {
       console.warn("owner notification failed:", ownerErr);
