@@ -307,12 +307,29 @@
     const btn = $('login-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Logging in…'; }
 
-    const { error } = await sb().auth.signInWithPassword({ email, password: pass });
+    const { data, error } = await sb().auth.signInWithPassword({ email, password: pass });
 
     if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
 
     if (error) { showErr('login-err', friendly(error)); return; }
+
+    // Belt-and-suspenders: verify the session actually persisted before
+    // closing the modal. iOS Safari Private Mode / strict ITP can return
+    // success but silently drop the session because localStorage is blocked,
+    // which manifests as "modal closed but I'm not logged in".
+    const { data: sessionData } = await sb().auth.getSession();
+    if (!sessionData?.session) {
+      showErr('login-err', 'Signed in, but the session was blocked by your browser. Try a non-private tab.');
+      return;
+    }
+
+    // Force a fresh load so the entire UI re-renders against the new auth.
+    // Previously we relied on onAuthStateChange firing SIGNED_IN, but on
+    // second-login-after-logout (especially when scrolled) the listener
+    // doesn't always fire, leaving the user feeling like nothing happened.
+    // Reload is the simplest guaranteed fix.
     closeAuthModal();
+    window.location.reload();
   }
 
   // ── LOGOUT ─────────────────────────────────────────────────────────────

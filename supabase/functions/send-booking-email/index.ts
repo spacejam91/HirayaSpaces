@@ -580,7 +580,7 @@ Deno.serve(async (req) => {
               ${customerPhone ? `<div style="color:#6a7d6e;font-size:13px">${escapeHtml(customerPhone)}</div>` : ""}
             </td></tr>
             <tr><td style="padding:16px 18px">
-              <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Service</div>
+              <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Service date</div>
               <div style="font-weight:600">${escapeHtml(dateDisplay)}${timeDisplay ? " · " + escapeHtml(timeDisplay) : ""}</div>
               <div style="color:#6a7d6e;font-size:13px">${escapeHtml(addressLine)}</div>
             </td></tr>
@@ -596,8 +596,8 @@ Deno.serve(async (req) => {
             <tr><td style="padding:16px 20px">
               <div style="font-size:11px;font-weight:700;color:#5a4318;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">How to pay</div>
               <div style="font-size:13px;color:#3d2c0d;line-height:1.7">
-                <strong>Cash:</strong> hand to your cleaner on arrival.<br>
-                <strong>E-transfer:</strong> send to <a href="mailto:hirayaspaces@gmail.com" style="color:#1e4d2b;font-weight:600">hirayaspaces@gmail.com</a> — reference <strong>${escapeHtml(invoiceNumber!)}</strong>.
+                <strong>Cash:</strong> on arrival.<br>
+                <strong>E-transfer:</strong> <a href="mailto:hirayaspaces@gmail.com" style="color:#1e4d2b;font-weight:600">hirayaspaces@gmail.com</a> — reference <strong>${escapeHtml(invoiceNumber!)}</strong>.
               </div>
             </td></tr>
           </table>

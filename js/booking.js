@@ -292,9 +292,20 @@
       showToast('Booking system is not configured yet.', 'error');
       return;
     }
-    submittingInFlight = true;
 
-    const { data: { user } } = await sb().auth.getUser();
+    // Look up the current user FIRST. We only flip submittingInFlight once
+    // we know we're going to actually save — previously, an exception or
+    // a not-logged-in branch could leave the flag stuck at true, which made
+    // every subsequent "Confirm booking" tap a no-op.
+    let user = null;
+    try {
+      const { data } = await sb().auth.getUser();
+      user = data?.user || null;
+    } catch (e) {
+      console.error('auth.getUser failed:', e);
+      showToast('Could not check your session. Please try again.', 'error');
+      return;
+    }
 
     if (!user) {
       // Not logged in → save the pending booking and prompt signup.
@@ -319,6 +330,8 @@
       return;
     }
 
+    // Now we're committed to saving — set the in-flight guard and go.
+    submittingInFlight = true;
     await saveBookingFor(user, pendingBooking);
   }
 

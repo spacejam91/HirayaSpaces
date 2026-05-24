@@ -62,8 +62,11 @@
       [b.street_address, b.unit].filter(Boolean).join(', '),
       [b.city, b.postal_code].filter(Boolean).join(' '),
     ].filter(Boolean).join(' · ');
-    const total = b.estimated_price_cents != null
-      ? '$' + Math.round(b.estimated_price_cents / 100)
+    // Prefer the final/charged price once a booking is completed, otherwise
+    // show the estimate. final_price_cents only gets set on Mark complete.
+    const priceCents = b.final_price_cents ?? b.estimated_price_cents;
+    const total = priceCents != null
+      ? '$' + Math.round(priceCents / 100)
       : 'Quote on request';
     const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}" style="color:var(--sage)">${escapeHtml(b.customer_phone)}</a>` : '';
     const emailLink = b.customer_email ? `<a href="mailto:${escapeHtml(b.customer_email)}" style="color:var(--sage)">${escapeHtml(b.customer_email)}</a>` : '';
