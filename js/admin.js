@@ -71,6 +71,24 @@
     const notes = b.customer_notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic">📝 ${escapeHtml(b.customer_notes)}</div>` : '';
     const internal = (opts.showInternal && b.internal_notes) ? `<div style="margin-top:6px;font-size:12px;color:var(--muted)">🔒 ${escapeHtml(b.internal_notes)}</div>` : '';
 
+    // Entry method — show it inline. Only "home" stays terse since it's the
+    // common case; the others need the instructions text to be useful.
+    const entryLabels = { home: "Customer will be home", lockbox: '🔐 Lockbox', hidden_key: '🗝 Hidden key', fob: '🏢 Building fob/code', concierge: '🛎 Concierge', other: '📋 Other' };
+    let entryLine = '';
+    if (b.entry_method && b.entry_method !== 'home') {
+      const label = entryLabels[b.entry_method] || '📋 Other';
+      const instr = b.entry_instructions ? `: ${b.entry_instructions}` : '';
+      entryLine = `<div style="margin-top:6px;font-size:12px;color:var(--text);background:#fffbeb;padding:6px 10px;border-radius:8px;border-left:3px solid #b08c4a">${escapeHtml(label)}${escapeHtml(instr)}</div>`;
+    } else if (b.entry_method === 'home') {
+      entryLine = `<div style="margin-top:4px;font-size:11px;color:var(--muted)">🏠 Customer will be home</div>`;
+    }
+
+    // Recurring frequency badge — visible when not a one-time booking.
+    const freqLabels = { weekly: 'Weekly · 20% off', biweekly: 'Every 2 weeks · 15% off', monthly: 'Monthly · 10% off' };
+    const freqBadge = (b.frequency && b.frequency !== 'one_time' && freqLabels[b.frequency])
+      ? `<span style="display:inline-block;font-size:10px;font-weight:600;letter-spacing:0.5px;background:var(--sage-light);color:var(--sage);padding:2px 8px;border-radius:10px;margin-left:6px">↻ ${escapeHtml(freqLabels[b.frequency])}</span>`
+      : '';
+
     const classes = ['booking-card'];
     if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
     if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
@@ -79,7 +97,7 @@
       <div class="${classes.join(' ')}" data-id="${b.id}">
         <div class="booking-card-head">
           <div>
-            <div class="booking-card-svc">${escapeHtml(svc)}</div>
+            <div class="booking-card-svc">${escapeHtml(svc)}${freqBadge}</div>
             <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
           </div>
           <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
@@ -90,6 +108,7 @@
           ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
           ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
           <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
+          ${entryLine}
           ${notes}
           ${internal}
         </div>
@@ -1493,9 +1512,10 @@ Hiraya Spaces`
                 ${mapsHref ? `<div class="meta"><a href="${mapsHref}">${escapeHtml(mapsHref)}</a></div>` : ''}
               </td>
               <td>
+                ${b.entry_method && b.entry_method !== 'home' ? `<div class="entry-print"><strong>${escapeHtml({lockbox:'Lockbox',hidden_key:'Hidden key',fob:'Fob/code',concierge:'Concierge',other:'Entry'}[b.entry_method] || 'Entry')}:</strong> ${escapeHtml(b.entry_instructions || '(see customer)')}</div>` : ''}
                 ${notes ? `<div>${escapeHtml(notes)}</div>` : ''}
                 ${internal ? `<div class="internal">🔒 ${escapeHtml(internal)}</div>` : ''}
-                ${!notes && !internal ? '<div class="meta">—</div>' : ''}
+                ${!notes && !internal && !b.entry_method ? '<div class="meta">—</div>' : ''}
               </td>
             </tr>`;
         }).join('');
@@ -1521,6 +1541,7 @@ Hiraya Spaces`
   .service { font-weight: 500; }
   .meta { font-size: 11px; color: #666; }
   .internal { background: #fffbeb; border-left: 3px solid #b08c4a; padding: 4px 8px; margin-top: 4px; font-size: 11px; }
+  .entry-print { background: #e4f0e9; border-left: 3px solid #1e4d2b; padding: 4px 8px; margin-bottom: 4px; font-size: 11px; }
   .empty { text-align: center; padding: 30px; color: #888; font-style: italic; }
   footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 10px; color: #888; text-align: center; }
   a { color: #1e4d2b; text-decoration: none; }

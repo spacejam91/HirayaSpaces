@@ -357,6 +357,33 @@
   .stat-n { font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 400; color: #fff; line-height: 1; }
   .stat-l { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
 
+  /* ── TRUST STRIP ── */
+  .trust-strip { background: white; padding: 3rem 8vw; border-bottom: 1px solid var(--border); }
+  .trust-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;
+  }
+  .trust-item {
+    text-align: center; padding: 0.5rem 1rem;
+  }
+  .trust-icon {
+    font-size: 32px; margin-bottom: 0.5rem;
+  }
+  .trust-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 500; color: var(--text);
+    margin-bottom: 4px;
+  }
+  .trust-sub {
+    font-size: 12px; color: var(--muted); line-height: 1.5;
+  }
+  @media (max-width: 720px) {
+    .trust-strip { padding: 2rem 5vw; }
+    .trust-inner { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .trust-icon { font-size: 26px; }
+    .trust-title { font-size: 17px; }
+  }
+
   /* ── SECTION COMMON ── */
   section { padding: 6rem 8vw; }
   .section-label {
@@ -617,12 +644,13 @@
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   .form-group.full { grid-column: 1 / -1; }
   .form-group label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; }
-  .form-group input, .form-group select {
+  .form-group input, .form-group select, .form-group textarea {
     padding: 12px 16px; border: 1.5px solid var(--border); border-radius: 12px;
     font-size: 14px; font-family: 'Jost', sans-serif; color: var(--text);
     background: white; outline: none; transition: border-color .2s;
+    resize: vertical;
   }
-  .form-group input:focus, .form-group select:focus { border-color: var(--sage); }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--sage); }
   .submit-btn {
     width: 100%; background: var(--rose); color: white; border: none;
     padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 600;
@@ -896,6 +924,32 @@
   <div class="stat-item"><div class="stat-n">100%</div><div class="stat-l">Satisfaction guaranteed</div></div>
 </div>
 
+<!-- TRUST STRIP — TODO(Aaron): confirm/replace the specifics below before push -->
+<section id="trust" class="trust-strip">
+  <div class="trust-inner">
+    <div class="trust-item">
+      <div class="trust-icon">🛡️</div>
+      <div class="trust-title">Fully Insured</div>
+      <div class="trust-sub">Liability coverage on every booking</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">🔍</div>
+      <div class="trust-title">Background-Checked</div>
+      <div class="trust-sub">Every cleaner vetted before they enter your home</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">✨</div>
+      <div class="trust-title">100% Satisfaction</div>
+      <div class="trust-sub">Not happy? We'll re-clean within 24 hours, on us</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">📅</div>
+      <div class="trust-title">Free Cancellation</div>
+      <div class="trust-sub">Cancel or reschedule up to 24 hours before</div>
+    </div>
+  </div>
+</section>
+
 <!-- HOW IT WORKS -->
 <section id="how">
   <div style="text-align:center">
@@ -1044,6 +1098,35 @@
             <span>Save this address to my account for next time</span>
           </label>
         </div>
+
+        <!-- ENTRY METHOD — how we get in -->
+        <div class="form-group full">
+          <label>How will we get in? <span style="color:var(--rose)">*</span></label>
+          <select id="f-entry-method" onchange="onEntryMethodChange()" class="form-select">
+            <option value="home" selected>I'll be home to let you in</option>
+            <option value="lockbox">Lockbox</option>
+            <option value="hidden_key">Hidden key (under mat, in planter, etc.)</option>
+            <option value="fob">Building fob / door code</option>
+            <option value="concierge">Concierge / front desk</option>
+            <option value="other">Other (explain below)</option>
+          </select>
+        </div>
+        <div class="form-group full" id="f-entry-instructions-group" style="display:none">
+          <label>Instructions for getting in <span class="form-optional">(only your cleaner sees this)</span></label>
+          <textarea id="f-entry-instructions" rows="2" placeholder="e.g. Lockbox on the gas meter, code 1234. Or: key is under the brown mat to the right."></textarea>
+        </div>
+
+        <!-- FREQUENCY — recurring discount -->
+        <div class="form-group full">
+          <label>How often?</label>
+          <select id="f-frequency" onchange="onFrequencyChange()" class="form-select">
+            <option value="one_time" selected>One-time</option>
+            <option value="weekly">Weekly — save 20%</option>
+            <option value="biweekly">Every 2 weeks — save 15%</option>
+            <option value="monthly">Monthly — save 10%</option>
+          </select>
+          <div id="f-frequency-note" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5"></div>
+        </div>
       </div>
       <button class="submit-btn" onclick="HirayaBooking.openReview()">Confirm booking →</button>
       <div class="confirm-msg" id="conf-msg">
@@ -1176,6 +1259,25 @@ const SERVICES = [
      {slug:'commercial-cleaning',     name:'Office / general commercial',       basePrice:null, durationMin:null, quoteOnly:true},
      {slug:'commercial-carpet-small', name:'Small office carpet cleaning',      basePrice:150, durationMin:120},
      {slug:'commercial-carpet-large', name:'Large office / commercial carpet',  basePrice:null, durationMin:null, quoteOnly:true},
+   ]},
+  {id:'senior',icon:'🌷',name:'Senior Care Cleaning',price:'From $120',
+   desc:'Gentler pace, extra patience, careful with belongings. Built for older adults who want a thorough clean without the rush.',
+   tiers: [
+     {slug:'senior-1br', name:'1 BR / 1 BA', basePrice:120, durationMin:180},
+     {slug:'senior-2br', name:'2 BR / 2 BA', basePrice:180, durationMin:240},
+     {slug:'senior-3br', name:'3 BR / 2 BA', basePrice:220, durationMin:270},
+   ]},
+  {id:'airbnb',icon:'🏘️',name:'AirBnB Turnover',price:'From $120',
+   desc:'Between-guest cleans for short-term rental hosts. Linen change, restock check, trash out, photo-ready finish.',
+   tiers: [
+     {slug:'airbnb-1br', name:'1 BR', basePrice:120, durationMin:120},
+     {slug:'airbnb-2br', name:'2 BR', basePrice:160, durationMin:150},
+     {slug:'airbnb-3br', name:'3 BR+', basePrice:200, durationMin:180},
+   ]},
+  {id:'postreno',icon:'🔨',name:'Post-Renovation',price:'Custom quote',
+   desc:'After paint, flooring, or full renovations. Dust, debris, splatter and construction residue. Quote based on scope.',
+   tiers: [
+     {slug:'post-renovation', name:'Post-renovation clean', basePrice:null, durationMin:null, quoteOnly:true},
    ]},
 ];
 const ADDONS = [
@@ -1437,6 +1539,37 @@ function toggleAddon(id){
   updateSummary();
 }
 
+// Recurring frequency discounts (matches Hellamaid's cadence). v1 applies the
+// discount immediately on the first booking and stores frequency on the
+// booking record; the admin is responsible for creating future bookings.
+const FREQUENCY_DISCOUNTS = {
+  one_time: 0,
+  weekly: 20,
+  biweekly: 15,
+  monthly: 10,
+};
+
+function onEntryMethodChange() {
+  // Show the instructions textarea for everything except "I'll be home".
+  const method = document.getElementById('f-entry-method').value;
+  const wrap = document.getElementById('f-entry-instructions-group');
+  if (wrap) wrap.style.display = method === 'home' ? 'none' : '';
+}
+
+function onFrequencyChange() {
+  const note = document.getElementById('f-frequency-note');
+  const freq = document.getElementById('f-frequency').value;
+  const pct = FREQUENCY_DISCOUNTS[freq] || 0;
+  if (!note) return;
+  if (pct === 0) {
+    note.textContent = 'One-time clean — no recurring discount applied.';
+  } else {
+    note.innerHTML = `A <strong>${pct}% recurring discount</strong> is applied to this booking and any future cleans we schedule together.`;
+  }
+  // Re-run the quote so the discounted total reflects in the summary.
+  updateSummary();
+}
+
 function updateSummary(){
   // 'hourly' is synthetic — not in SERVICES — so build a stand-in for it.
   const svc = selSvc === 'hourly'
@@ -1487,6 +1620,16 @@ function updateQuote(svc, addons) {
       html += `<div class="quote-line"><span>${a.icon} ${a.name}</span><span>On request</span></div>`;
     }
   });
+
+  // Apply recurring-frequency discount if the customer picked one.
+  const freqEl = document.getElementById('f-frequency');
+  const freq = freqEl ? freqEl.value : 'one_time';
+  const pct = FREQUENCY_DISCOUNTS[freq] || 0;
+  if (pct > 0) {
+    const discount = Math.round(total * (pct / 100));
+    html += `<div class="quote-line" style="color:var(--sage)"><span>${pct}% recurring discount</span><span>−$${discount}</span></div>`;
+    total = total - discount;
+  }
 
   html += `<div class="quote-line total"><span>Estimated total</span><span>$${total}+</span></div>`;
   lines.innerHTML = html;

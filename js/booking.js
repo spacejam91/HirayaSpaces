@@ -129,7 +129,19 @@
 
     const basePrice = selTier.basePrice || 0;
     const addonTotal = addons.reduce((s, a) => s + (a.addonPrice || 0), 0);
-    const total = basePrice + addonTotal;
+    const subtotal = basePrice + addonTotal;
+
+    // Recurring discount (matches the FREQUENCY_DISCOUNTS map in index.html).
+    const frequencyEl = $('f-frequency');
+    const frequency = frequencyEl ? frequencyEl.value : 'one_time';
+    const discountPct = ({ one_time: 0, weekly: 20, biweekly: 15, monthly: 10 })[frequency] || 0;
+    const discountAmount = Math.round(subtotal * (discountPct / 100));
+    const total = subtotal - discountAmount;
+
+    // Entry method — defaults to "home" so customers who skip the picker
+    // (e.g. on an older cached page load) don't break submission.
+    const entryMethod = ($('f-entry-method')?.value || 'home').trim();
+    const entryInstructions = ($('f-entry-instructions')?.value || '').trim();
 
     const dateLabel = `${MONTHS[calM]} ${selDay}, ${calY}`;
     const isoDate = new Date(calY, calM, selDay).toISOString().slice(0, 10);
@@ -157,14 +169,22 @@
         preferred_time_slot: selTime,
         dbServiceSlug,
         dbAddonSlugs,
-        estimated_total_dollars: total
+        estimated_total_dollars: total,
+        // New: entry method + frequency
+        entry_method: entryMethod,
+        entry_instructions: entryInstructions || null,
+        frequency,
+        recurring_discount_pct: discountPct,
       },
       display: {
         dateLabel,
         serviceIcon: svc?.icon || '🧹',
         basePrice,
         addonTotal,
-        addons // each has {id, name, addonPrice}
+        addons, // each has {id, name, addonPrice}
+        discountPct,
+        discountAmount,
+        frequency,
       }
     };
   }
@@ -375,7 +395,11 @@
           preferred_time_slot: f.preferred_time_slot,
           estimated_price_cents: svcRow.requires_quote ? null : totalCents,
           status,
-          customer_notes: customerNotes
+          customer_notes: customerNotes,
+          entry_method: f.entry_method || 'home',
+          entry_instructions: f.entry_instructions || null,
+          frequency: f.frequency || 'one_time',
+          recurring_discount_pct: f.recurring_discount_pct || 0,
         })
         .select()
         .single();
