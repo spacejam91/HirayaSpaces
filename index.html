@@ -1730,6 +1730,18 @@ updateSummary();
         </div>
       </div>
 
+      <!-- Confirm-before-confirm view -->
+      <div id="admin-confirm-view" style="display:none">
+        <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">✅</div>
+        <h3 class="modal-title" style="text-align:center;font-size:22px">Confirm this booking?</h3>
+        <p class="modal-sub" style="text-align:center" id="admin-confirm-text"></p>
+        <p class="modal-sub" style="text-align:center;font-size:12px">The customer will receive a "You're all set!" email immediately.</p>
+        <div class="br-actions">
+          <button class="modal-btn-ghost" onclick="HirayaAccount.cancelAdminConfirm()">Back</button>
+          <button class="modal-btn" id="admin-confirm-btn" onclick="HirayaAccount.confirmAdminConfirm()">Yes, confirm</button>
+        </div>
+      </div>
+
       <!-- Decline-with-reason view -->
       <div id="admin-decline-view" style="display:none">
         <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">📝</div>

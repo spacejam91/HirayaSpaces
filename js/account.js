@@ -154,10 +154,17 @@
   function showAdminListView() {
     $('admin-list-view').style.display = 'block';
     $('admin-decline-view').style.display = 'none';
+    const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
   }
   function showAdminDeclineView() {
     $('admin-list-view').style.display = 'none';
     $('admin-decline-view').style.display = 'block';
+    const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
+  }
+  function showAdminConfirmView() {
+    $('admin-list-view').style.display = 'none';
+    $('admin-decline-view').style.display = 'none';
+    $('admin-confirm-view').style.display = 'block';
   }
 
   function showListView() {
@@ -666,23 +673,50 @@
     }).join('');
   }
 
-  async function adminConfirm(id) {
-    if (!sb()) return;
+  let confirmingBookingId = null;
+  let confirmingBookingLabel = '';
+
+  // Clicking the green Confirm button on a pending card just opens the
+  // are-you-sure view. The actual RPC + email don't fire until the owner
+  // explicitly clicks "Yes, confirm" — prevents accidental approvals.
+  function adminConfirm(id) {
+    const b = pendingBookings.find(x => x.id === id);
+    if (!b) return;
+    confirmingBookingId = id;
+    confirmingBookingLabel = `${b.service_name || 'this booking'} on ${formatBookingDate(b.preferred_date)} (${b.customer_name || 'Customer'})`;
+    $('admin-confirm-text').textContent = confirmingBookingLabel;
+    showAdminConfirmView();
+  }
+
+  function cancelAdminConfirm() {
+    confirmingBookingId = null;
+    showAdminListView();
+  }
+
+  async function confirmAdminConfirm() {
+    if (!confirmingBookingId || !sb()) return;
+    const idToConfirm = confirmingBookingId;
+    const btn = $('admin-confirm-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Confirming…'; }
     try {
-      const { data, error } = await sb().rpc('confirm_booking', { booking_id: id });
+      const { data, error } = await sb().rpc('confirm_booking', { booking_id: idToConfirm });
       if (error) throw error;
       if (data === false) {
         showToast("Booking already confirmed or no longer pending.", 'error');
       } else {
         showToast('Booking confirmed. Customer notified.', 'success');
-        sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'confirmed' } })
+        sb().functions.invoke('send-booking-email', { body: { booking_id: idToConfirm, mode: 'confirmed' } })
           .then(({ error: emailErr }) => { if (emailErr) console.warn('confirmation email failed:', emailErr.message || emailErr); })
           .catch(err => console.warn('confirmation email failed:', err));
       }
+      confirmingBookingId = null;
       await refreshPending();
+      showAdminListView();
     } catch (err) {
       console.error('confirm_booking failed:', err);
       showToast(err.message || 'Could not confirm.', 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Yes, confirm'; }
     }
   }
 
@@ -781,6 +815,8 @@
     // Admin tab (owner-only)
     openAdmin,
     adminConfirm,
+    cancelAdminConfirm,
+    confirmAdminConfirm,
     askDecline,
     cancelDecline,
     confirmDecline,
