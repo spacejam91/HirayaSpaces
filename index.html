@@ -810,23 +810,76 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "CleaningService",
+  "@type": "HouseCleaningService",
+  "@id": "https://hirayaspaces.ca/#business",
   "name": "Hiraya Spaces",
   "url": "https://hirayaspaces.ca",
-  "image": "https://hirayaspaces.ca/logo.png",
-  "description": "Residential cleaning services in Waterloo Region.",
-  "areaServed": [
-    "Waterloo",
-    "Kitchener",
-    "Cambridge"
-  ],
+  "image": "https://hirayaspaces.ca/logo-horizontal.jpg",
+  "logo": "https://hirayaspaces.ca/logo-square.jpg",
+  "description": "Residential cleaning services in Waterloo Region — Waterloo, Kitchener, Cambridge. Regular, deep, move-in/out, carpet, upholstery, AirBnB turnover and hourly cleaning.",
   "telephone": "+1-226-751-4566",
+  "email": "hirayaspaces@gmail.com",
   "priceRange": "$$",
+  "currenciesAccepted": "CAD",
+  "paymentAccepted": "Cash, E-transfer, Credit Card",
   "address": {
     "@type": "PostalAddress",
-    "addressRegion": "Ontario",
+    "addressLocality": "Waterloo",
+    "addressRegion": "ON",
     "addressCountry": "CA"
-  }
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 43.4643,
+    "longitude": -80.5204
+  },
+  "areaServed": [
+    { "@type": "City", "name": "Waterloo" },
+    { "@type": "City", "name": "Kitchener" },
+    { "@type": "City", "name": "Cambridge" }
+  ],
+  "openingHoursSpecification": [
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "08:00", "closes": "18:00" },
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "09:00", "closes": "16:00" }
+  ],
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.9",
+    "reviewCount": "100",
+    "bestRating": "5",
+    "worstRating": "1"
+  },
+  "review": [
+    {
+      "@type": "Review",
+      "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+      "author": { "@type": "Person", "name": "Aaron" },
+      "reviewBody": "Been using Hiraya Spaces for weekly cleanings and she's fantastic. Always on time, thorough, and my one bedroom looks brand new after every visit."
+    },
+    {
+      "@type": "Review",
+      "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+      "author": { "@type": "Person", "name": "Dejan" },
+      "reviewBody": "She did an amazing job cleaning, pays attention to details. Highly recommend her."
+    },
+    {
+      "@type": "Review",
+      "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+      "author": { "@type": "Person", "name": "Sarah" },
+      "reviewBody": "She did a wonderful job cleaning my home and was a pleasure to work with — very kind, professional, and thorough."
+    }
+  ],
+  "makesOffer": [
+    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Regular Residential Cleaning" }, "priceCurrency": "CAD", "price": "120" },
+    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Deep Cleaning" }, "priceCurrency": "CAD", "price": "220" },
+    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Move-In / Move-Out Cleaning" }, "priceCurrency": "CAD", "price": "250" },
+    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Carpet Cleaning" }, "priceCurrency": "CAD", "price": "25" },
+    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "AirBnB Turnover Cleaning" }, "priceCurrency": "CAD", "price": "120" },
+    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hourly Cleaning" }, "priceCurrency": "CAD", "price": "40" }
+  ],
+  "sameAs": [
+    "https://www.google.com/maps/place/?q=hiraya+spaces+waterloo"
+  ]
 }
 </script>
 <link rel="stylesheet" href="/css/auth.css">

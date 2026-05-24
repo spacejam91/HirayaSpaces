@@ -1,0 +1,203 @@
+/* Hiraya Spaces — shared landing-page styles (service + neighborhood pages) */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --rose: #2d5a3d;
+  --rose-light: #eaf2ec;
+  --rose-mid: #7aaa8a;
+  --sage: #1e4d2b;
+  --sage-light: #e4f0e9;
+  --sage-mid: #5a9470;
+  --cream: #f8faf8;
+  --warm: #f0f5f1;
+  --text: #1a2e1e;
+  --muted: #6a7d6e;
+  --border: #d4e2d8;
+  --gold: #8faa6a;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Jost', sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* ── NAV ── */
+.lnd-nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(250,247,242,0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 5vw;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 68px;
+}
+.lnd-brand {
+  font-family: 'Cinzel', serif;
+  font-size: 17px; font-weight: 500; letter-spacing: 2.5px;
+  color: var(--sage); text-decoration: none;
+  text-transform: uppercase;
+}
+.lnd-nav-cta {
+  background: var(--sage); color: #fff; border: none;
+  padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: 'Jost', sans-serif;
+  text-decoration: none; display: inline-block;
+}
+.lnd-nav-cta:hover { background: #0f2e18; }
+
+/* ── HERO ── */
+.lnd-hero {
+  padding: 5rem 5vw 4rem;
+  max-width: 1100px; margin: 0 auto;
+  text-align: center;
+}
+.lnd-eyebrow {
+  display: inline-block;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--sage); margin-bottom: 1.25rem;
+  padding: 6px 14px; background: var(--sage-light);
+  border-radius: 20px;
+}
+.lnd-h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 400; line-height: 1.1;
+  margin-bottom: 1rem;
+}
+.lnd-h1 em { font-style: italic; color: var(--sage); }
+.lnd-lede {
+  font-size: 17px; color: var(--muted);
+  max-width: 720px; margin: 0 auto 2rem;
+  line-height: 1.7;
+}
+.lnd-hero-cta {
+  display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+}
+.btn-primary, .btn-secondary {
+  display: inline-block; padding: 14px 28px; border-radius: 30px;
+  font-size: 14px; font-weight: 600; letter-spacing: 0.4px;
+  text-decoration: none; cursor: pointer;
+  font-family: 'Jost', sans-serif; border: 2px solid;
+  transition: all .2s;
+}
+.btn-primary { background: var(--sage); color: white; border-color: var(--sage); }
+.btn-primary:hover { background: #0f2e18; transform: translateY(-1px); }
+.btn-secondary { background: white; color: var(--sage); border-color: var(--sage); }
+.btn-secondary:hover { background: var(--sage-light); }
+
+/* ── SECTIONS ── */
+.lnd-section {
+  padding: 4rem 5vw;
+  max-width: 1100px; margin: 0 auto;
+}
+.lnd-section h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(28px, 3.5vw, 40px);
+  font-weight: 400; line-height: 1.15;
+  margin-bottom: 1rem;
+}
+.lnd-section h2 em { font-style: italic; color: var(--sage); }
+.lnd-section h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px; font-weight: 500;
+  margin-bottom: 0.5rem; margin-top: 1.5rem;
+}
+.lnd-section p {
+  font-size: 15px; color: var(--text);
+  margin-bottom: 1rem; line-height: 1.75;
+}
+.lnd-section p.muted { color: var(--muted); }
+.lnd-section ul {
+  list-style: none; padding: 0; margin-bottom: 1.25rem;
+}
+.lnd-section ul li {
+  padding: 8px 0 8px 32px; position: relative;
+  font-size: 15px;
+}
+.lnd-section ul li::before {
+  content: '✓'; position: absolute; left: 0; top: 8px;
+  color: var(--sage); font-weight: 700;
+}
+
+/* ── INCLUDED GRID ── */
+.lnd-included {
+  background: white; border: 1px solid var(--border);
+  border-radius: 18px; padding: 2rem;
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 1rem 2rem;
+}
+.lnd-included h3 {
+  grid-column: 1 / -1; margin: 0 0 0.5rem;
+}
+@media (max-width: 640px) {
+  .lnd-included { grid-template-columns: 1fr; }
+}
+
+/* ── PRICE STRIP ── */
+.lnd-prices {
+  background: var(--warm); border-radius: 18px;
+  padding: 2rem; margin: 2rem 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+.lnd-price-card {
+  background: white; border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.5rem;
+  text-align: center;
+}
+.lnd-price-tier {
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 0.5rem;
+}
+.lnd-price-amount {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 36px; font-weight: 500; color: var(--sage);
+  margin-bottom: 0.5rem;
+}
+.lnd-price-sub {
+  font-size: 12px; color: var(--muted);
+}
+
+/* ── CTA BAND ── */
+.lnd-cta-band {
+  background: var(--sage); color: white;
+  padding: 4rem 5vw; text-align: center;
+  margin-top: 4rem;
+}
+.lnd-cta-band h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(28px, 4vw, 42px); font-weight: 400;
+  margin-bottom: 1rem; color: white;
+}
+.lnd-cta-band p {
+  color: rgba(255,255,255,0.85);
+  font-size: 16px; max-width: 600px; margin: 0 auto 2rem;
+}
+.lnd-cta-band .btn-primary {
+  background: white; color: var(--sage); border-color: white;
+}
+.lnd-cta-band .btn-primary:hover { background: var(--cream); }
+
+/* ── FOOTER ── */
+.lnd-footer {
+  padding: 2.5rem 5vw; text-align: center;
+  font-size: 13px; color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+.lnd-footer a { color: var(--sage); text-decoration: none; margin: 0 8px; }
+.lnd-footer a:hover { text-decoration: underline; }
+
+/* ── BREADCRUMB ── */
+.lnd-crumb {
+  max-width: 1100px; margin: 0 auto;
+  padding: 1rem 5vw 0;
+  font-size: 12px; color: var(--muted);
+}
+.lnd-crumb a { color: var(--muted); text-decoration: none; }
+.lnd-crumb a:hover { color: var(--sage); }

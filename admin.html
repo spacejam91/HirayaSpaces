@@ -946,6 +946,7 @@
         <h2 id="cal-title">Calendar</h2>
         <div class="panel-controls">
           <button class="panel-refresh" onclick="HirayaAdmin.printDay()" title="Print the selected day (today by default)">🖨 Print day</button>
+          <button class="panel-refresh" onclick="HirayaAdmin.emailDailySummary()" title="Email today's schedule to yourself">✉ Email me today</button>
           <button class="panel-refresh" onclick="HirayaAdmin.calPrev()" aria-label="Previous month">‹</button>
           <button class="panel-refresh" onclick="HirayaAdmin.calToday()">Today</button>
           <button class="panel-refresh" onclick="HirayaAdmin.calNext()" aria-label="Next month">›</button>
@@ -1044,6 +1045,19 @@
           <div class="customer-stat">
             <div class="customer-stat-label">Status mix</div>
             <div class="customer-stat-value" id="customer-stat-mix">—</div>
+          </div>
+        </div>
+
+        <div class="customer-section">
+          <h3>Notes & tags <span style="font-size:12px;color:var(--muted);font-weight:400">— private, only visible to you and Jewel</span></h3>
+          <div style="background:white;border:1px solid var(--border);border-radius:14px;padding:1.25rem">
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);font-weight:500">Notes</label>
+            <textarea id="customer-meta-notes" rows="3" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:6px;resize:vertical" placeholder="Has cats, prefers eco products, prefers Tuesdays…"></textarea>
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);font-weight:500;margin-top:14px;display:block">Tags (comma-separated)</label>
+            <input id="customer-meta-tags" type="text" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:6px" placeholder="VIP, allergies, easy access">
+            <div style="margin-top:12px;display:flex;justify-content:flex-end">
+              <button class="btn-primary" onclick="HirayaAdmin.saveCustomerMetaFromForm()">Save notes & tags</button>
+            </div>
           </div>
         </div>
 

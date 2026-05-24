@@ -182,9 +182,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const booking_id = body?.booking_id;
     const declineReason: string | null = typeof body?.reason === "string" ? body.reason : null;
-    type Mode = "booked" | "cancelled" | "confirmed" | "declined";
+    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed";
     const requestedMode = body?.mode;
-    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined")
+    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed")
       ? requestedMode : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
@@ -352,6 +352,80 @@ Deno.serve(async (req) => {
       } catch (e) { console.warn("confirmed email failed:", e); }
       try { await confClient.close(); } catch (_) {}
       return jsonResponse({ ok: true, booking_id, mode: "confirmed" });
+    }
+
+    // ── COMPLETED PATH (owner marks a booking done — tip + review asks) ───
+    if (mode === "completed") {
+      const completedHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">CLEAN COMPLETE</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">Thanks ${escapeHtml(customerName.split(' ')[0])}!</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            Your clean is done and we hope your space feels amazing. Booking <strong style="color:#1e4d2b">${idShort}</strong> is officially wrapped up.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:12px;margin-bottom:18px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Completed</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
+                <tr><td style="padding:4px 0;color:#6a7d6e">Service</td><td style="padding:4px 0;text-align:right">${escapeHtml(serviceName)}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Date</td><td style="padding:4px 0;text-align:right">${escapeHtml(dateDisplay)}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Address</td><td style="padding:4px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+                <tr><td style="padding:8px 0 4px;color:#6a7d6e;font-weight:700;border-top:1px solid #5a9470">Total</td><td style="padding:8px 0 4px;text-align:right;font-weight:700;color:#1e4d2b;border-top:1px solid #5a9470">${escapeHtml(totalDisplay)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fffbeb;border:1px solid #e5d3a0;border-radius:12px;margin-bottom:14px">
+            <tr><td style="padding:16px 20px">
+              <div style="font-size:13px;color:#5a4318;line-height:1.6">
+                <strong style="color:#3d2c0d">Love your clean?</strong> Tips are never expected but always appreciated — you can send one by e-transfer to <a href="mailto:hirayaspaces@gmail.com" style="color:#1e4d2b;font-weight:600">hirayaspaces@gmail.com</a>. 100% goes to your cleaner.
+              </div>
+            </td></tr>
+          </table>
+
+          <p style="font-size:13px;color:#1a2e1e;line-height:1.7;margin:0 0 18px">
+            And if you have a moment, leaving a Google review helps us out more than anything else:<br>
+            <a href="https://g.page/r/hirayaspaces/review" style="display:inline-block;margin-top:8px;background:#1e4d2b;color:white;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:13px">★ Leave a Google review</a>
+          </p>
+
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:0">
+            Want to book another? Reply to this email or grab a slot at <a href="https://hirayaspaces.ca" style="color:#1e4d2b">hirayaspaces.ca</a>.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortDone = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const doneClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortDone, tls: smtpPortDone === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      try {
+        await doneClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Clean complete — thanks! - ${idShort}`,
+          html: tidyHtml(completedHtml),
+        });
+      } catch (e) { console.warn("completed email failed:", e); }
+      try { await doneClient.close(); } catch (_) {}
+      return jsonResponse({ ok: true, booking_id, mode: "completed" });
     }
 
     // ── DECLINED PATH (owner declines a pending booking) ──────────────────

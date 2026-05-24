@@ -89,6 +89,19 @@
       ? `<span style="display:inline-block;font-size:10px;font-weight:600;letter-spacing:0.5px;background:var(--sage-light);color:var(--sage);padding:2px 8px;border-radius:10px;margin-left:6px">↻ ${escapeHtml(freqLabels[b.frequency])}</span>`
       : '';
 
+    // Check-in / check-out timeline — shows what actually happened on site.
+    let timeLine = '';
+    if (b.check_in_at || b.check_out_at) {
+      const inT = b.check_in_at ? timeOnly(b.check_in_at) : '—';
+      const outT = b.check_out_at ? timeOnly(b.check_out_at) : '—';
+      let duration = '';
+      if (b.check_in_at && b.check_out_at) {
+        const mins = Math.round((new Date(b.check_out_at) - new Date(b.check_in_at)) / 60000);
+        duration = ` · <strong>${formatDuration(mins)}</strong>`;
+      }
+      timeLine = `<div style="margin-top:6px;font-size:12px;color:#2b5a73;background:#e0eef7;padding:4px 10px;border-radius:8px;border-left:3px solid #3b82a8">⏱ ${inT} → ${outT}${duration}</div>`;
+    }
+
     const classes = ['booking-card'];
     if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
     if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
@@ -109,6 +122,7 @@
           ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
           <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
           ${entryLine}
+          ${timeLine}
           ${notes}
           ${internal}
         </div>
@@ -298,10 +312,11 @@
 
   async function refreshAll() {
     if (!sb() || !isOwner) return;
-    // Bookings + blocked dates in parallel — calendar needs both to render.
+    // Bookings + blocked dates + customer meta in parallel.
     const [bookingsRes] = await Promise.all([
       sb().rpc('get_all_bookings'),
       refreshBlockedDates(),
+      refreshCustomerMeta(),
     ]);
     const { data, error } = bookingsRes;
     if (error) {
@@ -448,9 +463,17 @@
       const reschedulable = ['pending_review', 'awaiting_quote', 'confirmed', 'in_progress'].includes(b.status);
       const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
       const completable = ['confirmed', 'in_progress'].includes(b.status);
+      const canCheckIn = b.status === 'confirmed' && !b.check_in_at;
+      const canCheckOut = b.status === 'in_progress' && b.check_in_at && !b.check_out_at;
       let actions = '';
-      if (completable || ownerCancellable || reschedulable) {
+      if (canCheckIn || canCheckOut || completable || ownerCancellable || reschedulable) {
         const parts = [];
+        if (canCheckIn) {
+          parts.push(`<button class="booking-card-btn" style="background:#3b82a8;color:white" onclick="HirayaAdmin.checkInBooking('${b.id}')">▶ Check in</button>`);
+        }
+        if (canCheckOut) {
+          parts.push(`<button class="booking-card-btn" style="background:#3b82a8;color:white" onclick="HirayaAdmin.checkOutBooking('${b.id}')">⏹ Check out</button>`);
+        }
         if (completable) {
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askComplete('${b.id}')">Mark complete</button>`);
         }
@@ -464,6 +487,40 @@
       }
       return bookingCardHtml(b, { actions, showInternal: true });
     }).join('');
+  }
+
+  // ── CUSTOMER META (per-customer notes + tags) ──────────────────────────
+  let customerMetaMap = new Map(); // user_id → { notes, tags }
+
+  async function refreshCustomerMeta() {
+    if (!sb() || !isOwner) { customerMetaMap = new Map(); return; }
+    const { data, error } = await sb()
+      .from('customer_meta')
+      .select('user_id, notes, tags');
+    if (error) {
+      console.warn('customer_meta fetch failed:', error.message);
+      customerMetaMap = new Map();
+      return;
+    }
+    customerMetaMap = new Map((data || []).map(r => [r.user_id, { notes: r.notes || '', tags: r.tags || [] }]));
+  }
+
+  async function saveCustomerMeta(userId, notes, tags) {
+    if (!sb() || !isOwner) return;
+    try {
+      const { error } = await sb().rpc('admin_upsert_customer_meta', {
+        p_user_id: userId,
+        p_notes: notes || null,
+        p_tags: tags,
+      });
+      if (error) throw error;
+      customerMetaMap.set(userId, { notes: notes || '', tags });
+      showToast('Customer notes saved.', 'success');
+      renderCustomers();
+    } catch (err) {
+      console.error('admin_upsert_customer_meta failed:', err);
+      showToast(err.message || 'Could not save.', 'error');
+    }
   }
 
   // ── CUSTOMERS ──────────────────────────────────────────────────────────
@@ -637,6 +694,10 @@
       const dueBadge = c.due_for_rebook
         ? `<span class="customer-due-badge" title="${c.days_since_last} days since last clean">Due ${c.days_since_last}d</span>`
         : '';
+      const meta = customerMetaMap.get(c.user_id);
+      const tagChips = (meta?.tags || []).slice(0, 4).map(t =>
+        `<span style="display:inline-block;font-size:10px;font-weight:500;background:var(--warm);color:var(--text);padding:2px 7px;border-radius:8px;margin-right:4px">${escapeHtml(t)}</span>`
+      ).join('');
       return `
         <div class="customer-card" onclick="HirayaAdmin.openCustomerDetail('${c.user_id}')">
           <div class="customer-card-head">
@@ -646,6 +707,7 @@
                 <div class="customer-card-name">${escapeHtml(c.name)}${dueBadge}</div>
                 <div class="customer-card-email">${escapeHtml(c.email || 'No email')}</div>
                 ${c.phone ? `<div class="customer-card-phone">${escapeHtml(c.phone)}</div>` : ''}
+                ${tagChips ? `<div style="margin-top:6px">${tagChips}</div>` : ''}
               </div>
             </div>
           </div>
@@ -710,6 +772,15 @@ Hiraya Spaces`
         banner.style.display = 'none';
       }
     }
+
+    // Customer meta editor — pre-fill from cache.
+    const meta = customerMetaMap.get(c.user_id) || { notes: '', tags: [] };
+    const notesEl = $('customer-meta-notes');
+    const tagsEl = $('customer-meta-tags');
+    if (notesEl) notesEl.value = meta.notes || '';
+    if (tagsEl) tagsEl.value = (meta.tags || []).join(', ');
+    // Stash the user_id on a known DOM node so the save button can find it.
+    if (notesEl) notesEl.dataset.userId = c.user_id;
 
     $('customer-stat-bookings').textContent = c.bookings.length;
     $('customer-stat-ltv').textContent = formatLtv(c.ltv_cents);
@@ -798,6 +869,17 @@ Hiraya Spaces`
   function closeCustomerDetail() {
     $('customer-detail-view').style.display = 'none';
     $('customers-list-view').style.display = 'block';
+  }
+
+  function saveCustomerMetaFromForm() {
+    const notesEl = $('customer-meta-notes');
+    const tagsEl = $('customer-meta-tags');
+    if (!notesEl) return;
+    const userId = notesEl.dataset.userId;
+    if (!userId) return;
+    const notes = notesEl.value.trim();
+    const tags = tagsEl.value.split(',').map(t => t.trim()).filter(Boolean);
+    saveCustomerMeta(userId, notes, tags);
   }
 
   // ── NOTIFICATIONS (realtime + browser Notification API) ────────────────
@@ -1107,6 +1189,56 @@ Hiraya Spaces`
     }
   }
 
+  // ── CHECK-IN / CHECK-OUT (cleaner timestamps on-site) ──────────────────
+  async function checkInBooking(id) {
+    if (!sb()) return;
+    try {
+      const { data, error } = await sb().rpc('checkin_booking', { booking_id: id });
+      if (error) throw error;
+      if (data === false) {
+        showToast('Could not check in — booking is not confirmed.', 'error');
+        return;
+      }
+      showToast('Checked in. Have a great clean!', 'success');
+      await refreshAll();
+      refreshPending();
+    } catch (err) {
+      console.error('checkin_booking failed:', err);
+      showToast(err.message || 'Could not check in.', 'error');
+    }
+  }
+
+  async function checkOutBooking(id) {
+    if (!sb()) return;
+    try {
+      const { data, error } = await sb().rpc('checkout_booking', { booking_id: id });
+      if (error) throw error;
+      if (data === false) {
+        showToast('Could not check out — booking is not in progress.', 'error');
+        return;
+      }
+      showToast('Checked out. Don\'t forget to Mark Complete with the final price.', 'success');
+      await refreshAll();
+    } catch (err) {
+      console.error('checkout_booking failed:', err);
+      showToast(err.message || 'Could not check out.', 'error');
+    }
+  }
+
+  function formatDuration(mins) {
+    if (mins == null || mins < 0) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h}h ${m}m`;
+    if (h) return `${h}h`;
+    return `${m}m`;
+  }
+  function timeOnly(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
   // ── RESCHEDULE (edit date/time without losing the booking) ─────────────
   let reschedulingId = null;
 
@@ -1241,7 +1373,11 @@ Hiraya Spaces`
       if (data === false) {
         showErr('complete-err', 'Booking is no longer eligible — refresh and try again.');
       } else {
-        showToast('Booking marked complete.', 'success');
+        showToast('Booking marked complete. Thank-you email sent.', 'success');
+        // Fire the 'completed' email with tip + review CTAs (fire and forget).
+        sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'completed' } })
+          .then(({ error: e }) => { if (e) console.warn('completed email failed:', e.message || e); })
+          .catch(err => console.warn('completed email failed:', err));
         completingId = null;
         await refreshAll();
         refreshPending();
@@ -1468,6 +1604,60 @@ Hiraya Spaces`
     document.querySelectorAll('#cal-grid .cal-cell.is-selected').forEach(el => el.classList.remove('is-selected'));
     const drawer = $('cal-day-detail');
     if (drawer) drawer.style.display = 'none';
+  }
+
+  // Build a plain-text summary of today's bookings and open a pre-filled
+  // mailto to the logged-in admin. v1 is manual — for a true scheduled
+  // email, set up a pg_cron job that calls send-booking-email with a
+  // mode='daily_summary'. Doing it client-side keeps things simple.
+  function emailDailySummary() {
+    if (!currentUser?.email) {
+      showToast('No admin email on file.', 'error');
+      return;
+    }
+    const todayStr = ymd(new Date());
+    const events = (bookingsByDate().get(todayStr) || [])
+      .filter(b => ['confirmed', 'in_progress', 'pending_review', 'awaiting_quote'].includes(b.status))
+      .sort((a, b) => (a.preferred_time_slot || '').localeCompare(b.preferred_time_slot || ''));
+
+    const dateLabel = new Date(todayStr + 'T12:00:00')
+      .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    let body = `Hiraya Spaces — schedule for ${dateLabel}\n\n`;
+    if (!events.length) {
+      body += `No bookings on the books today. Enjoy the day off!\n`;
+    } else {
+      const revenue = events.reduce((sum, b) => sum + (b.estimated_price_cents || 0), 0);
+      body += `${events.length} ${events.length === 1 ? 'job' : 'jobs'} · est. $${Math.round(revenue / 100)}\n`;
+      body += `${'─'.repeat(40)}\n\n`;
+      events.forEach((b, i) => {
+        const time = b.preferred_time_slot || 'time TBD';
+        const who = b.customer_name || 'Customer';
+        const phone = b.customer_phone || '';
+        const addr = [
+          [b.street_address, b.unit].filter(Boolean).join(', '),
+          [b.city, b.postal_code].filter(Boolean).join(' '),
+        ].filter(Boolean).join(', ');
+        const svc = b.service_name || 'Cleaning';
+        const status = statusLabel(b.status);
+        body += `${i + 1}. ${time} — ${who} (${status})\n`;
+        body += `   ${svc}\n`;
+        if (addr) body += `   📍 ${addr}\n`;
+        if (phone) body += `   📞 ${phone}\n`;
+        if (b.entry_method && b.entry_method !== 'home') {
+          const labels = { lockbox: 'Lockbox', hidden_key: 'Hidden key', fob: 'Fob/code', concierge: 'Concierge', other: 'Entry' };
+          body += `   🔑 ${labels[b.entry_method] || 'Entry'}: ${b.entry_instructions || '(see customer)'}\n`;
+        }
+        if (b.customer_notes) body += `   📝 ${b.customer_notes}\n`;
+        if (b.internal_notes) body += `   🔒 ${b.internal_notes}\n`;
+        body += `\n`;
+      });
+    }
+    body += `\nFull dashboard: https://hirayaspaces.ca/admin\n`;
+
+    const subject = encodeURIComponent(`Hiraya schedule — ${dateLabel}`);
+    const mailto = `mailto:${currentUser.email}?subject=${subject}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
   }
 
   // Print a clean, paper-friendly schedule for one day. Defaults to the
@@ -1820,6 +2010,8 @@ Hiraya Spaces`
     askReschedule,
     cancelReschedule,
     submitReschedule,
+    checkInBooking,
+    checkOutBooking,
     // Calendar
     calPrev,
     calNext,
@@ -1830,10 +2022,12 @@ Hiraya Spaces`
     jumpToAllAndCancel,
     toggleBlockedDate,
     printDay,
+    emailDailySummary,
     // Customers
     renderCustomers,
     openCustomerDetail,
     closeCustomerDetail,
+    saveCustomerMetaFromForm,
     // New booking
     openNewBooking,
     closeNewBooking,
