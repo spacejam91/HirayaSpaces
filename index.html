@@ -1280,6 +1280,27 @@ const SERVICES = [
      {slug:'movein-23br',  name:'2–3 Bedroom Home',   basePrice:350, durationMin:360},
      {slug:'movein-4br',   name:'4+ Bedroom Home',    basePrice:450, durationMin:480},
    ]},
+  {id:'senior',icon:'🌷',name:'Senior Care Cleaning',price:'From $120',
+   desc:'Gentler pace, extra patience, careful with belongings. Built for older adults who want a thorough clean without the rush.',
+   tiers: [
+     {slug:'senior-1br', name:'1 BR / 1 BA', basePrice:120, durationMin:180},
+     {slug:'senior-2br', name:'2 BR / 2 BA', basePrice:180, durationMin:240},
+     {slug:'senior-3br', name:'3 BR / 2 BA', basePrice:220, durationMin:270},
+   ]},
+  {id:'airbnb',icon:'🏘️',name:'AirBnB Turnover',price:'From $120',
+   desc:'Between-guest cleans for short-term rental hosts. Linen change, restock check, trash out, photo-ready finish.',
+   tiers: [
+     {slug:'airbnb-1br', name:'1 BR', basePrice:120, durationMin:120},
+     {slug:'airbnb-2br', name:'2 BR', basePrice:160, durationMin:150},
+     {slug:'airbnb-3br', name:'3 BR+', basePrice:200, durationMin:180},
+   ]},
+  {id:'commercial',icon:'🏢',name:'Commercial / Office',price:'Custom quote',
+   desc:'Customized pricing based on square footage, frequency, number of washrooms & type of business.',
+   tiers: [
+     {slug:'commercial-cleaning',     name:'Office / general commercial',       basePrice:null, durationMin:null, quoteOnly:true},
+     {slug:'commercial-carpet-small', name:'Small office carpet cleaning',      basePrice:150, durationMin:120},
+     {slug:'commercial-carpet-large', name:'Large office / commercial carpet',  basePrice:null, durationMin:null, quoteOnly:true},
+   ]},
   {id:'carpet',icon:'🏠',name:'Carpet Cleaning',price:'From $25/room',
    desc:'Professional carpet cleaning. Single rooms, full homes, staircases & specialty treatments available.',
    tiers: [
@@ -1300,27 +1321,6 @@ const SERVICES = [
      {slug:'dining-chair', name:'Dining chair (each)', basePrice:15,  durationMin:15},
      {slug:'mattress',     name:'Mattress',           basePrice:70,  durationMin:60},
      {slug:'area-rug',     name:'Area rug',           basePrice:50,  durationMin:30},
-   ]},
-  {id:'commercial',icon:'🏢',name:'Commercial / Office',price:'Custom quote',
-   desc:'Customized pricing based on square footage, frequency, number of washrooms & type of business.',
-   tiers: [
-     {slug:'commercial-cleaning',     name:'Office / general commercial',       basePrice:null, durationMin:null, quoteOnly:true},
-     {slug:'commercial-carpet-small', name:'Small office carpet cleaning',      basePrice:150, durationMin:120},
-     {slug:'commercial-carpet-large', name:'Large office / commercial carpet',  basePrice:null, durationMin:null, quoteOnly:true},
-   ]},
-  {id:'senior',icon:'🌷',name:'Senior Care Cleaning',price:'From $120',
-   desc:'Gentler pace, extra patience, careful with belongings. Built for older adults who want a thorough clean without the rush.',
-   tiers: [
-     {slug:'senior-1br', name:'1 BR / 1 BA', basePrice:120, durationMin:180},
-     {slug:'senior-2br', name:'2 BR / 2 BA', basePrice:180, durationMin:240},
-     {slug:'senior-3br', name:'3 BR / 2 BA', basePrice:220, durationMin:270},
-   ]},
-  {id:'airbnb',icon:'🏘️',name:'AirBnB Turnover',price:'From $120',
-   desc:'Between-guest cleans for short-term rental hosts. Linen change, restock check, trash out, photo-ready finish.',
-   tiers: [
-     {slug:'airbnb-1br', name:'1 BR', basePrice:120, durationMin:120},
-     {slug:'airbnb-2br', name:'2 BR', basePrice:160, durationMin:150},
-     {slug:'airbnb-3br', name:'3 BR+', basePrice:200, durationMin:180},
    ]},
   {id:'postreno',icon:'🔨',name:'Post-Renovation',price:'Custom quote',
    desc:'After paint, flooring, or full renovations. Dust, debris, splatter and construction residue. Quote based on scope.',
@@ -1359,13 +1359,32 @@ const HOURLY_MAX = 8;
 let selHours = HOURLY_MIN;
 let selHourly = false;
 
+// Anti-undercut floor: hourly should never be cheaper than the most
+// expensive tier whose duration fits inside the requested hour count.
+// Otherwise a 6hr hourly booking ($300) lets a customer get the same
+// labor as Move-In 2-3BR ($350) for less.
+function computeHourlyFloor(hours) {
+  const minutes = hours * 60;
+  let floor = 0;
+  for (const svc of SERVICES) {
+    if (!svc.tiers) continue;
+    for (const t of svc.tiers) {
+      if (!t.basePrice || !t.durationMin) continue;
+      if (t.durationMin <= minutes && t.basePrice > floor) floor = t.basePrice;
+    }
+  }
+  return floor;
+}
+
 function synthesizeHourlyTier(hours) {
+  const raw = hours * HOURLY_RATE;
+  const floor = computeHourlyFloor(hours);
   return {
     slug: 'hourly-flexible',
     // Just the duration — booking.js composes the full service_name as
     // "Flexible Cleaning — N hours" via the parent svc.name + tier.name.
     name: `${hours} hours`,
-    basePrice: hours * HOURLY_RATE,
+    basePrice: Math.max(raw, floor),
     durationMin: hours * 60,
   };
 }
@@ -1428,8 +1447,15 @@ function renderHourlyState() {
   const btn = document.getElementById('flex-pick-btn');
   if (!card) return;
   if (hoursEl) hoursEl.textContent = selHours;
-  if (totalEl) totalEl.textContent = '$' + (selHours * HOURLY_RATE);
-  if (mathEl) mathEl.textContent = `${selHours} × $${HOURLY_RATE}/hr`;
+  const raw = selHours * HOURLY_RATE;
+  const floor = computeHourlyFloor(selHours);
+  const total = Math.max(raw, floor);
+  if (totalEl) totalEl.textContent = '$' + total;
+  if (mathEl) {
+    mathEl.textContent = total > raw
+      ? `${selHours} hr · package minimum`
+      : `${selHours} × $${HOURLY_RATE}/hr`;
+  }
   card.classList.toggle('selected', selHourly);
   if (btn) btn.textContent = selHourly ? '✓ Selected — tap to change' : 'Choose Flexible';
   // Disable +/- at the bounds so the customer doesn't smash a no-op button.

@@ -197,6 +197,12 @@
     if (result.error) { showToast(result.error, 'error'); return; }
     pendingBooking = result;
     populateReviewModal(result);
+    // Fresh booking attempt → reset the in-flight guard + restore the button
+    // so the user can submit. (After a prior successful booking we leave them
+    // disabled to block double-submits.)
+    submittingInFlight = false;
+    const submitBtn = $('br-submit');
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Confirm booking'; }
     $('booking-review-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
@@ -278,12 +284,15 @@
   }
 
   // ── SUBMIT ──────────────────────────────────────────────────────────────
+  let submittingInFlight = false;
   async function confirmAndSubmit() {
+    if (submittingInFlight) return;
     if (!pendingBooking) return;
     if (!sb()) {
       showToast('Booking system is not configured yet.', 'error');
       return;
     }
+    submittingInFlight = true;
 
     const { data: { user } } = await sb().auth.getUser();
 
@@ -442,12 +451,17 @@
       if (f.save_to_account && f.address_parts && window.HirayaAccount) {
         window.HirayaAccount.fetchAddresses();
       }
+      // Success path: leave the submit button disabled — the review modal is
+      // closed and the confirmation modal is showing. Re-enabling would let
+      // a stuck/scrolled-off modal turn into a 7x duplicate-submission.
+      if (btn) btn.textContent = 'Booked ✓';
     } catch (err) {
       console.error('Booking failed:', err);
       const msg = (err && err.message) || 'Could not save booking. Please try again.';
       showToast(msg, 'error');
-    } finally {
+      // Only re-enable on real failure so the customer can correct & retry.
       if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+      submittingInFlight = false;
     }
   }
 
