@@ -1668,31 +1668,38 @@ Hiraya Spaces`
         showErr('reschedule-err', 'Booking is no longer eligible — refresh and try again.');
         return;
       }
-      showToast('Booking rescheduled. Now let the customer know.', 'success');
-      // Open mailto with a pre-filled reschedule note so Aaron only has to
-      // tweak + send. We don't auto-fire the edge function because the
-      // existing email templates don't have a "rescheduled" mode yet.
+      showToast('Booking rescheduled. Emailing the customer…', 'success');
+      // Fire the 'rescheduled' email via Gmail SMTP through the edge function.
+      // Replaces the old mailto auto-click which Safari blocks as "auto-
+      // composing an email." Old date/time are passed in the body because
+      // the booking row has already been overwritten with the new values.
       if (original?.customer_email) {
-        const firstName = (original.customer_name || 'there').split(' ')[0];
-        const oldStr = `${formatBookingDate(original.preferred_date)}${original.preferred_time_slot ? ' at ' + original.preferred_time_slot : ''}`;
-        const newStr = `${formatBookingDate(newDate)}${newTime || original.preferred_time_slot ? ' at ' + (newTime || original.preferred_time_slot) : ''}`;
-        const subject = encodeURIComponent('Your Hiraya cleaning has been rescheduled');
-        const body = encodeURIComponent(
-`Hi ${firstName},
-
-Quick heads up — your cleaning that was scheduled for ${oldStr} has been moved to ${newStr}.
-
-If that new time doesn't work, just reply to this email and I'll find another slot for you.
-
-Thanks for your flexibility!
-Aaron
-Hiraya Spaces`
-        );
-        const link = document.createElement('a');
-        link.href = `mailto:${original.customer_email}?subject=${subject}&body=${body}`;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.click();
+        sb().functions.invoke('send-booking-email', {
+          body: {
+            booking_id: id,
+            mode: 'rescheduled',
+            old_date: original.preferred_date,
+            old_time_slot: original.preferred_time_slot,
+          },
+        }).then(async ({ data: d, error: e }) => {
+          let debug = d?.debug || d?.error || '';
+          if (e) {
+            try {
+              const resp = e.context?.response;
+              if (resp) {
+                const clone = typeof resp.clone === 'function' ? resp.clone() : resp;
+                const text = await clone.text();
+                try { const j = JSON.parse(text); debug = j?.debug || j?.error || text; }
+                catch (_) { debug = text; }
+              }
+            } catch (_) {}
+          }
+          if (e || debug) {
+            showToast('Rescheduled, but the customer email returned a warning — verify if needed.', 'success');
+          }
+        }).catch(err => {
+          showToast('Rescheduled, but the customer email returned a warning: ' + (err?.message || err), 'success');
+        });
       }
       reschedulingId = null;
       await refreshAll();
@@ -1765,20 +1772,26 @@ Hiraya Spaces`
             if (e) {
               try {
                 const resp = e.context?.response;
-                if (resp && typeof resp.json === 'function') {
-                  const body = await resp.json();
-                  debug = body?.debug || body?.error || debug;
+                if (resp) {
+                  const clone = typeof resp.clone === 'function' ? resp.clone() : resp;
+                  const text = await clone.text();
+                  try {
+                    const j = JSON.parse(text);
+                    debug = j?.debug || j?.error || text;
+                  } catch (_) { debug = text; }
                 }
               } catch (_) {}
             }
             if (e || debug) {
-              console.warn('completed email failed:', e?.message || debug || e);
-              showToast('Booking complete, but thank-you email failed: ' + (debug || e?.message || 'unknown'), 'error');
+              console.warn('completed email warning:', e?.message || debug || e);
+              // Some SMTP errors fire after Gmail already accepted the message,
+              // so the email often DID land. Word the toast accordingly.
+              showToast('Booking complete. Thank-you email returned a warning — verify with the customer if needed.', 'success');
             }
           })
           .catch(err => {
-            console.warn('completed email failed:', err);
-            showToast('Booking complete, but thank-you email failed: ' + (err?.message || err), 'error');
+            console.warn('completed email warning:', err);
+            showToast('Booking complete. Thank-you email returned a warning — verify with the customer if needed.', 'success');
           });
         completingId = null;
         await refreshAll();
@@ -1812,18 +1825,30 @@ Hiraya Spaces`
         body: { booking_id: id, mode: 'invoice' },
       });
       // Supabase's FunctionsHttpError swallows the response body and just says
-      // "non-2xx status code" — pull the real reason out of error.context.
+      // "non-2xx status code" — try several paths to get the real reason.
       if (error) {
         let debug = '';
         try {
           const resp = error.context?.response;
-          if (resp && typeof resp.json === 'function') {
-            const body = await resp.json();
-            debug = body?.debug || body?.error || '';
+          if (resp) {
+            // Clone first so the body can still be read if the client consumed it.
+            const clone = typeof resp.clone === 'function' ? resp.clone() : resp;
+            const text = await clone.text();
+            try {
+              const j = JSON.parse(text);
+              debug = j?.debug || j?.error || text;
+            } catch (_) {
+              debug = text;
+            }
           }
-        } catch (_) { /* body wasn't JSON */ }
+        } catch (_) { /* body unreadable */ }
         console.error('sendInvoice non-2xx:', error, 'debug:', debug);
-        showToast('Invoice failed: ' + (debug || error.message || 'Unknown'), 'error');
+        // Map common server errors to actionable hints for Aaron.
+        if (/booking_services|relation .* does not exist/i.test(debug)) {
+          showToast('Invoice failed: missing booking_services SQL table. Run the latest migration in Supabase.', 'error');
+        } else {
+          showToast('Invoice failed: ' + (debug || error.message || 'Unknown'), 'error');
+        }
         return;
       }
       const fallbackDebug = data?.debug || data?.error;
@@ -2014,9 +2039,15 @@ Hiraya Spaces`
         let debug = '';
         try {
           const resp = error.context?.response;
-          if (resp && typeof resp.json === 'function') {
-            const body = await resp.json();
-            debug = body?.debug || body?.error || '';
+          if (resp) {
+            const clone = typeof resp.clone === 'function' ? resp.clone() : resp;
+            const text = await clone.text();
+            try {
+              const j = JSON.parse(text);
+              debug = j?.debug || j?.error || text;
+            } catch (_) {
+              debug = text;
+            }
           }
         } catch (_) {}
         throw new Error(debug || error.message || 'Unknown');

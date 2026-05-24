@@ -301,9 +301,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const booking_id = body?.booking_id;
     const declineReason: string | null = typeof body?.reason === "string" ? body.reason : null;
-    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice" | "updated";
+    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice" | "updated" | "rescheduled";
     const requestedMode = body?.mode;
-    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice" || requestedMode === "updated")
+    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice" || requestedMode === "updated" || requestedMode === "rescheduled")
       ? requestedMode : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
@@ -394,6 +394,10 @@ Deno.serve(async (req) => {
       // Edit notifications: only meaningful for active/editable bookings.
       if (!["pending_review","awaiting_quote","confirmed","in_progress"].includes(booking.status)) {
         return jsonResponse({ error: "Cannot send update for a non-active booking" }, 400);
+      }
+    } else if (mode === "rescheduled") {
+      if (!["pending_review","awaiting_quote","confirmed","in_progress"].includes(booking.status)) {
+        return jsonResponse({ error: "Cannot send reschedule for a non-active booking" }, 400);
       }
     } else {
       const ageMs = Date.now() - new Date(booking.created_at).getTime();
@@ -835,6 +839,90 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Invoice email failed", debug: msg }, 502);
       }
       return jsonResponse({ ok: true, booking_id, mode: "invoice", invoice_number: invoiceNumber, status: invoiceStatus });
+    }
+
+    // ── RESCHEDULED PATH (admin moved date/time) ──────────────────────────
+    if (mode === "rescheduled") {
+      // Old slot is passed in the request body — we can't pull it from the
+      // booking row anymore because it's already been overwritten.
+      const oldDateRaw = typeof body?.old_date === "string" ? body.old_date : "";
+      const oldTime = typeof body?.old_time_slot === "string" ? body.old_time_slot : "";
+      const oldDateDisplay = oldDateRaw
+        ? new Date(oldDateRaw).toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" })
+        : "";
+      const oldLine = oldDateDisplay
+        ? `${escapeHtml(oldDateDisplay)}${oldTime ? " at " + escapeHtml(oldTime) : ""}`
+        : "your previously-scheduled time";
+      const newLine = `${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}`;
+
+      const rescheduledHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">RESCHEDULED</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">We've moved your clean, ${escapeHtml(customerName.split(' ')[0])}</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            Booking <strong style="color:#1e4d2b">${idShort}</strong> has been rescheduled. If the new time doesn't work, just reply to this email and we'll find another slot.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fffbeb;border:1px solid #e5d3a0;border-radius:12px;margin-bottom:14px">
+            <tr><td style="padding:16px 20px">
+              <div style="font-size:11px;font-weight:700;color:#5a4318;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Was</div>
+              <div style="font-size:14px;color:#3d2c0d;text-decoration:line-through">${oldLine}</div>
+            </td></tr>
+          </table>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:12px;margin-bottom:18px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px">Now</div>
+              <div style="font-size:16px;font-weight:600;color:#1a2e1e;margin-bottom:10px">${newLine}</div>
+              <div style="font-size:13px;color:#6a7d6e;line-height:1.6">
+                ${escapeHtml(serviceName)}<br>
+                ${escapeHtml(addressLine)}
+              </div>
+            </td></tr>
+          </table>
+
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:0">
+            Need this changed again? Reply to this email or call (226) 751-4566. Thanks for being flexible.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortRsch = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const rschClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortRsch, tls: smtpPortRsch === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      let rschErr: unknown = null;
+      try {
+        await rschClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Booking rescheduled - ${idShort}`,
+          html: tidyHtml(rescheduledHtml),
+        });
+      } catch (e) { console.warn("rescheduled email failed:", e); rschErr = e; }
+      try { await rschClient.close(); } catch (_) {}
+      if (rschErr) {
+        const msg = (rschErr as Error)?.message || String(rschErr);
+        return jsonResponse({ error: "Rescheduled email failed", debug: msg }, 502);
+      }
+      return jsonResponse({ ok: true, booking_id, mode: "rescheduled" });
     }
 
     // ── UPDATED PATH (admin manually edited a booking) ────────────────────

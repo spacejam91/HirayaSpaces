@@ -1157,11 +1157,6 @@
         <li><span class="t-dot"></span>100% satisfaction guarantee</li>
         <li><span class="t-dot"></span>Eco-friendly products available</li>
       </ul>
-      <div class="booking-summary">
-        <div class="bs-label">Your selections</div>
-        <div class="bs-service" id="bs-service">No service selected yet</div>
-        <div class="bs-addons" id="bs-addons"></div>
-      </div>
       <div class="quote-total-box" id="quote-box">
         <div class="quote-total-label">💰 Your estimate</div>
         <div id="quote-lines"></div>
@@ -1805,9 +1800,14 @@ function updateSummary(){
       return `${svc.icon} ${svc.name} — ${tier.name} (${priceTxt})`;
     }).join(' · ');
   }
-  document.getElementById('bs-service').textContent = label;
+  // "Your selections" block was removed — the same info is in the estimate
+  // box below, so writing to bs-service / bs-addons is a no-op now. Guarded
+  // so old layouts don't crash if the elements reappear.
+  const bsSvc = document.getElementById('bs-service');
+  if (bsSvc) bsSvc.textContent = label;
   const addons = selAddons.map(i=>ADDONS.find(a=>a.id===i));
-  document.getElementById('bs-addons').innerHTML = addons.length
+  const bsAddons = document.getElementById('bs-addons');
+  if (bsAddons) bsAddons.innerHTML = addons.length
     ? addons.map(a=>`+ ${a.name} ${a.price}`).join('<br>')
     : '';
   updateQuote(lines, addons);
