@@ -42,6 +42,13 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// Strip trailing whitespace from every line of the HTML body. denomailer
+// 1.6.0 double-encodes trailing spaces (=20 in QP becomes =3D20 → decoded
+// as the literal text "=20" by Gmail), so we don't give it any to chew on.
+function tidyHtml(s: string): string {
+  return s.split("\n").map(l => l.replace(/[\t ]+$/, "")).join("\n");
+}
+
 // ── GOOGLE CALENDAR HELPERS ──────────────────────────────────────────────
 async function getGoogleAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
@@ -285,10 +292,8 @@ Deno.serve(async (req) => {
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
-        <tr><td style="background:#1e4d2b;padding:28px 30px;text-align:center;color:white">
-          <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="64" height="64" style="display:block;margin:0 auto 14px;border-radius:14px;background:white;padding:6px;box-sizing:border-box">
-          <div style="font-family:Georgia,'Cinzel',serif;font-size:22px;letter-spacing:3px;text-transform:uppercase">HIRAYA SPACES</div>
-          <div style="font-size:10px;letter-spacing:2px;opacity:0.75;margin-top:6px">RESIDENTIAL CLEANING · WATERLOO REGION</div>
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">Booking cancelled</h1>
@@ -328,7 +333,7 @@ Deno.serve(async (req) => {
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
               <td valign="middle" width="56">
-                <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:10px;background:white;padding:4px;box-sizing:border-box">
+                <img src="https://hirayaspaces.ca/logo-mark.jpg" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:8px">
               </td>
               <td valign="middle" style="padding-left:14px">
                 <div style="font-family:Georgia,serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
@@ -393,7 +398,7 @@ Deno.serve(async (req) => {
         from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
         to: customerEmail,
         subject: `Booking cancelled - ${idShort}`,
-        html: cancelledHtml,
+        html: tidyHtml(cancelledHtml),
       });
 
       const ownerEmailCancel = Deno.env.get("OWNER_EMAIL") || Deno.env.get("SMTP_USER")!;
@@ -403,7 +408,7 @@ Deno.serve(async (req) => {
           to: ownerEmailCancel,
           replyTo: customerEmail,
           subject: `Booking cancelled: ${customerName} - ${dateDisplay} - ${idShort}`,
-          html: ownerCancelHtml,
+          html: tidyHtml(ownerCancelHtml),
         });
       } catch (ownerCancelErr) {
         console.warn("owner cancel notification failed:", ownerCancelErr);
@@ -435,10 +440,8 @@ Deno.serve(async (req) => {
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
-        <tr><td style="background:#1e4d2b;padding:28px 30px;text-align:center;color:white">
-          <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="64" height="64" style="display:block;margin:0 auto 14px;border-radius:14px;background:white;padding:6px;box-sizing:border-box">
-          <div style="font-family:Georgia,'Cinzel',serif;font-size:22px;letter-spacing:3px;text-transform:uppercase">HIRAYA SPACES</div>
-          <div style="font-size:10px;letter-spacing:2px;opacity:0.75;margin-top:6px">RESIDENTIAL CLEANING · WATERLOO REGION</div>
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">${isQuote ? "Quote request received" : "You're booked!"}</h1>
@@ -506,7 +509,7 @@ Deno.serve(async (req) => {
       from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
       to: customerEmail,
       subject: `${isQuote ? "Quote request" : "Booking confirmed"} - ${idShort}`,
-      html,
+      html: tidyHtml(html),
     });
 
     // ── OWNER NOTIFICATION (best-effort — don't fail the request if this errors)
@@ -538,7 +541,7 @@ Deno.serve(async (req) => {
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
               <td valign="middle" width="56">
-                <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:10px;background:white;padding:4px;box-sizing:border-box">
+                <img src="https://hirayaspaces.ca/logo-mark.jpg" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:8px">
               </td>
               <td valign="middle" style="padding-left:14px">
                 <div style="font-family:Georgia,serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
@@ -624,7 +627,7 @@ Deno.serve(async (req) => {
         to: ownerEmail,
         replyTo: customerEmail,
         subject: `New booking: ${customerName} - ${dateDisplay}${timeDisplay ? " " + timeDisplay : ""} - ${idShort}`,
-        html: ownerHtml,
+        html: tidyHtml(ownerHtml),
       });
     } catch (ownerErr) {
       console.warn("owner notification failed:", ownerErr);
