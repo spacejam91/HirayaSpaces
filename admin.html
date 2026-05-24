@@ -77,6 +77,8 @@
     transition: border-color .2s, color .2s;
   }
   .admin-nav-btn:hover { border-color: var(--sage); color: var(--sage); }
+  .admin-bell.is-on { background: var(--sage-light); border-color: var(--sage-mid); color: var(--sage); }
+  .admin-bell.is-on:hover { background: var(--sage); color: white; border-color: var(--sage); }
 
   /* ── PAGE LAYOUT ── */
   .admin-shell {
@@ -454,6 +456,36 @@
     font-size: 14px; margin-top: 2px;
   }
   .customer-card-phone { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .customer-due-badge {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    background: #fbf3df; color: #7a5a18;
+    padding: 3px 8px; border-radius: 10px;
+    margin-left: 6px; vertical-align: middle;
+  }
+  .nudge-banner {
+    background: linear-gradient(135deg, #fbf3df, #f5e6c1);
+    border: 1px solid #e5d3a0;
+    border-radius: 14px;
+    padding: 1.1rem 1.3rem;
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+  }
+  .nudge-banner-text {
+    flex: 1; min-width: 220px;
+    font-size: 13px; color: #5a4318;
+  }
+  .nudge-banner-text strong { color: #3d2c0d; font-weight: 600; }
+  .nudge-banner-btn {
+    background: var(--sage); color: white; border: none;
+    padding: 10px 18px; border-radius: 30px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: 'Jost', sans-serif;
+    text-decoration: none; display: inline-block;
+    transition: background .2s, transform .15s;
+  }
+  .nudge-banner-btn:hover { background: #0f2e18; transform: translateY(-1px); }
 
   /* Customer detail */
   .customer-detail-head {
@@ -600,6 +632,10 @@
     </a>
     <div class="admin-nav-right">
       <span class="admin-greet" id="admin-greet"></span>
+      <button class="admin-nav-btn admin-bell" id="admin-bell-btn" onclick="HirayaAdmin.toggleNotifications()" aria-label="Toggle new-booking alerts">
+        <span id="admin-bell-icon">🔕</span>
+        <span id="admin-bell-label">Alerts off</span>
+      </button>
       <a href="/" class="admin-nav-btn">View site</a>
       <button class="admin-nav-btn" onclick="HirayaAdmin.doLogout()">Sign out</button>
     </div>
@@ -808,6 +844,7 @@
             <input type="search" id="customers-search" placeholder="Search by name or email…" oninput="HirayaAdmin.renderCustomers()">
             <select id="customers-sort" onchange="HirayaAdmin.renderCustomers()">
               <option value="recent">Most recent</option>
+              <option value="due">Due for rebook</option>
               <option value="value">Lifetime value</option>
               <option value="count">Most bookings</option>
               <option value="name">Name (A–Z)</option>
@@ -829,6 +866,11 @@
         <div class="customer-detail-head">
           <h2 id="customer-detail-name"></h2>
           <div class="customer-detail-meta" id="customer-detail-meta"></div>
+        </div>
+
+        <div id="customer-nudge-banner" class="nudge-banner" style="display:none">
+          <div class="nudge-banner-text" id="customer-nudge-text"></div>
+          <a class="nudge-banner-btn" id="customer-nudge-btn" href="#">Send rebook nudge</a>
         </div>
 
         <div class="customer-stats">

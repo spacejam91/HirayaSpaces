@@ -181,6 +181,12 @@
     $('admin-greet').textContent = currentUser.email;
     $('admin-first-name').textContent = first || 'back';
 
+    // Restore the notification preference and start realtime if it was on.
+    updateBellState();
+    if (notificationsEnabled() && 'Notification' in window && Notification.permission === 'granted') {
+      startBookingsRealtime();
+    }
+
     // Load initial panel (pending)
     await refreshPending();
     // Load all bookings in the background so the count is ready
@@ -487,6 +493,8 @@
     }
 
     // Second pass: profitability metrics that need the full per-customer set.
+    const todayStr = ymd(new Date());
+    const REBOOK_THRESHOLD_DAYS = 30;
     for (const c of map.values()) {
       // Average ticket: divide by earned bookings only, not pending/cancelled.
       const earned = c.bookings.filter(b => EARNED_STATUSES.includes(b.status));
@@ -507,6 +515,25 @@
           gaps.push(Math.round((curr - prev) / 86400000));
         }
         c.avg_gap_days = Math.round(gaps.reduce((s, x) => s + x, 0) / gaps.length);
+      }
+
+      // Due-for-rebook: customer with completed history but no booking on the
+      // books, where the last clean was 30+ days ago. Skipping people with a
+      // pending or confirmed booking avoids nudging customers who already
+      // have one in flight.
+      c.last_completed = completedDates.length ? completedDates[completedDates.length - 1] : null;
+      c.has_upcoming = c.bookings.some(b =>
+        b.preferred_date && b.preferred_date >= todayStr &&
+        ['pending_review', 'awaiting_quote', 'confirmed', 'in_progress'].includes(b.status)
+      );
+      if (c.last_completed && !c.has_upcoming) {
+        const last = new Date(c.last_completed + 'T12:00:00');
+        const today = new Date(todayStr + 'T12:00:00');
+        c.days_since_last = Math.round((today - last) / 86400000);
+        c.due_for_rebook = c.days_since_last >= REBOOK_THRESHOLD_DAYS;
+      } else {
+        c.days_since_last = null;
+        c.due_for_rebook = false;
       }
     }
     return Array.from(map.values());
@@ -542,16 +569,24 @@
       );
     }
 
-    rows.sort((a, b) => {
-      if (sort === 'value') return b.ltv_cents - a.ltv_cents;
-      if (sort === 'count') return b.bookings.length - a.bookings.length;
-      if (sort === 'name') return a.name.localeCompare(b.name);
-      // recent: by last_booking desc, falling back to bookings array (already newest-first from RPC)
-      const la = a.last_booking || '';
-      const lb = b.last_booking || '';
-      if (la === lb) return 0;
-      return la < lb ? 1 : -1;
-    });
+    if (sort === 'due') {
+      // Filter to only those due for rebook; sort by oldest-last-clean first
+      // so Aaron tackles the coldest customers first.
+      rows = rows
+        .filter(c => c.due_for_rebook)
+        .sort((a, b) => (b.days_since_last || 0) - (a.days_since_last || 0));
+    } else {
+      rows.sort((a, b) => {
+        if (sort === 'value') return b.ltv_cents - a.ltv_cents;
+        if (sort === 'count') return b.bookings.length - a.bookings.length;
+        if (sort === 'name') return a.name.localeCompare(b.name);
+        // recent: by last_booking desc, falling back to bookings array (already newest-first from RPC)
+        const la = a.last_booking || '';
+        const lb = b.last_booking || '';
+        if (la === lb) return 0;
+        return la < lb ? 1 : -1;
+      });
+    }
 
     if (count) {
       count.textContent = q
@@ -568,13 +603,16 @@
 
     list.innerHTML = rows.map(c => {
       const lastStr = c.last_booking ? formatBookingDate(c.last_booking) : '—';
+      const dueBadge = c.due_for_rebook
+        ? `<span class="customer-due-badge" title="${c.days_since_last} days since last clean">Due ${c.days_since_last}d</span>`
+        : '';
       return `
         <div class="customer-card" onclick="HirayaAdmin.openCustomerDetail('${c.user_id}')">
           <div class="customer-card-head">
             <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
               <div class="customer-avatar">${escapeHtml(customerInitials(c.name))}</div>
               <div style="min-width:0">
-                <div class="customer-card-name">${escapeHtml(c.name)}</div>
+                <div class="customer-card-name">${escapeHtml(c.name)}${dueBadge}</div>
                 <div class="customer-card-email">${escapeHtml(c.email || 'No email')}</div>
                 ${c.phone ? `<div class="customer-card-phone">${escapeHtml(c.phone)}</div>` : ''}
               </div>
@@ -614,6 +652,33 @@
       metaParts.push(`<a href="tel:${escapeHtml(dialable)}">📞 ${escapeHtml(c.phone)}</a>`);
     }
     $('customer-detail-meta').innerHTML = metaParts.join('') || '<span>No contact info on file</span>';
+
+    // Rebook nudge banner — only when due (30+ days since last clean, no upcoming).
+    const banner = $('customer-nudge-banner');
+    const bannerText = $('customer-nudge-text');
+    const bannerBtn = $('customer-nudge-btn');
+    if (banner && bannerText && bannerBtn) {
+      if (c.due_for_rebook && c.email) {
+        bannerText.innerHTML = `<strong>${escapeHtml(c.name.split(' ')[0])}</strong> hasn't booked in <strong>${c.days_since_last} days</strong> — last clean was ${escapeHtml(formatBookingDate(c.last_completed))}. Send a friendly nudge?`;
+        const subject = encodeURIComponent('Time for another clean?');
+        const firstName = c.name.split(' ')[0];
+        const body = encodeURIComponent(
+`Hi ${firstName},
+
+It's been about ${c.days_since_last} days since your last clean with Hiraya Spaces — hope your space has been treating you well!
+
+If you'd like to book another one (regular, deep, or just an hourly tidy-up), you can grab a slot any time at https://hirayaspaces.ca/#booking — or just reply to this email and I'll get you on the schedule.
+
+Talk soon,
+Aaron
+Hiraya Spaces`
+        );
+        bannerBtn.href = `mailto:${c.email}?subject=${subject}&body=${body}`;
+        banner.style.display = 'flex';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
 
     $('customer-stat-bookings').textContent = c.bookings.length;
     $('customer-stat-ltv').textContent = formatLtv(c.ltv_cents);
@@ -702,6 +767,96 @@
   function closeCustomerDetail() {
     $('customer-detail-view').style.display = 'none';
     $('customers-list-view').style.display = 'block';
+  }
+
+  // ── NOTIFICATIONS (realtime + browser Notification API) ────────────────
+  // Aaron opts in by clicking the bell — we don't auto-request permission on
+  // page load because Chrome shows a scary banner if you do that aggressively.
+  // Preference persists in localStorage so once turned on, it stays on across
+  // /admin visits.
+  const NOTIF_STORAGE_KEY = 'hiraya:admin-notifications-enabled';
+  let realtimeChannel = null;
+
+  function notificationsEnabled() {
+    try { return localStorage.getItem(NOTIF_STORAGE_KEY) === '1'; }
+    catch (_) { return false; }
+  }
+  function setNotificationsEnabled(on) {
+    try { localStorage.setItem(NOTIF_STORAGE_KEY, on ? '1' : '0'); }
+    catch (_) { /* private mode, no-op */ }
+    updateBellState();
+  }
+
+  function updateBellState() {
+    const btn = $('admin-bell-btn');
+    const icon = $('admin-bell-icon');
+    const label = $('admin-bell-label');
+    if (!btn) return;
+    const on = notificationsEnabled() && Notification.permission === 'granted';
+    btn.classList.toggle('is-on', on);
+    if (icon) icon.textContent = on ? '🔔' : '🔕';
+    if (label) label.textContent = on ? 'Alerts on' : 'Alerts off';
+  }
+
+  async function toggleNotifications() {
+    if (!('Notification' in window)) {
+      showToast('This browser does not support notifications.', 'error');
+      return;
+    }
+    if (notificationsEnabled() && Notification.permission === 'granted') {
+      setNotificationsEnabled(false);
+      stopBookingsRealtime();
+      showToast('Alerts turned off.', 'success');
+      return;
+    }
+    let perm = Notification.permission;
+    if (perm === 'default') perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      showToast('Browser blocked notifications. Allow them in site settings to enable alerts.', 'error');
+      setNotificationsEnabled(false);
+      return;
+    }
+    setNotificationsEnabled(true);
+    startBookingsRealtime();
+    showToast("Alerts on — you'll be pinged when a new booking lands.", 'success');
+  }
+
+  function notifyNewBooking(booking) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const who = booking?.customer_name ? ` from ${booking.customer_name}` : '';
+    const n = new Notification('New Hiraya booking', {
+      body: `Pending review${who}. Open /admin to confirm or decline.`,
+      icon: '/apple-touch-icon.png',
+      tag: 'hiraya-new-booking',
+    });
+    n.onclick = () => { window.focus(); switchPanel('pending'); n.close(); };
+  }
+
+  function startBookingsRealtime() {
+    if (realtimeChannel || !sb()) return;
+    realtimeChannel = sb()
+      .channel('admin-bookings')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, async () => {
+        // Refetch via the authorized RPC — realtime payload may be partial.
+        const prevPending = pendingBookings.length;
+        await refreshPending();
+        refreshAll();
+        const fresh = pendingBookings[0];
+        // Only fire a notification when the pending list actually grew.
+        // Some inserts (e.g. an admin-created booking that's instantly
+        // confirmed) shouldn't trigger an alert.
+        if (pendingBookings.length > prevPending && fresh) {
+          notifyNewBooking(fresh);
+        }
+      })
+      .subscribe();
+  }
+
+  function stopBookingsRealtime() {
+    if (realtimeChannel && sb()) {
+      sb().removeChannel(realtimeChannel);
+    }
+    realtimeChannel = null;
   }
 
   // ── MARK COMPLETE (confirmed/in_progress → completed + final price) ────
@@ -1111,6 +1266,7 @@
       } else if (event === 'SIGNED_OUT') {
         currentUser = null;
         isOwner = false;
+        stopBookingsRealtime();
         showView('login');
       }
     });
@@ -1125,6 +1281,7 @@
   window.HirayaAdmin = {
     doLogin,
     doLogout,
+    toggleNotifications,
     switchPanel,
     refreshPending,
     refreshAll,
