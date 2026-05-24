@@ -329,11 +329,12 @@
 
   async function refreshAll() {
     if (!sb() || !isOwner) return;
-    // Bookings + blocked dates + customer meta in parallel.
+    // Bookings + blocked dates + customer meta + customer roster in parallel.
     const [bookingsRes] = await Promise.all([
       sb().rpc('get_all_bookings'),
       refreshBlockedDates(),
       refreshCustomerMeta(),
+      refreshCustomerRoster(),
     ]);
     const { data, error } = bookingsRes;
     if (error) {
@@ -555,13 +556,46 @@
   }
 
   // ── CUSTOMERS ──────────────────────────────────────────────────────────
-  // Group allBookings by user_id into a customer summary. We don't need a
-  // new RPC for this — get_all_bookings() already returns every field we
-  // need (name, email, phone, address parts, prices, statuses).
+  // Group allBookings by user_id into a customer summary. We also seed the
+  // map from get_all_customers() so people who signed up but haven't booked
+  // yet still appear here.
   const COUNTED_FOR_LTV = ['confirmed', 'in_progress', 'completed'];
+
+  let allCustomers = []; // raw rows from get_all_customers()
+
+  async function refreshCustomerRoster() {
+    if (!sb() || !isOwner) { allCustomers = []; return; }
+    const { data, error } = await sb().rpc('get_all_customers');
+    if (error) {
+      console.warn('get_all_customers failed:', error.message);
+      allCustomers = [];
+      return;
+    }
+    allCustomers = data || [];
+  }
 
   function aggregateCustomers() {
     const map = new Map();
+    // Seed with everyone who has a profile — even no-booking signups.
+    for (const u of allCustomers) {
+      if (!u.user_id) continue;
+      map.set(u.user_id, {
+        user_id: u.user_id,
+        name: u.full_name || u.email || 'Customer',
+        email: u.email || '',
+        phone: u.phone || '',
+        signup_at: u.created_at || null,
+        bookings: [],
+        addresses: new Map(),
+        ltv_cents: 0,
+        first_booking: null,
+        last_booking: null,
+        status_counts: {},
+        avg_ticket_cents: 0,
+        earned_count: 0,
+        avg_gap_days: null,
+      });
+    }
     for (const b of allBookings) {
       if (!b.user_id) continue;
       let c = map.get(b.user_id);
