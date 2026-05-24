@@ -1946,19 +1946,21 @@ loadBlockedDates();
     <div id="form-login">
       <h2 class="modal-title" id="auth-modal-title">Welcome back</h2>
       <p class="modal-sub">Log in to view your bookings, past cleans, and invoices.</p>
-      <div class="modal-field">
-        <label for="login-email">Email</label>
-        <input type="email" id="login-email" autocomplete="email" placeholder="you@email.com">
-      </div>
-      <div class="modal-field">
-        <label for="login-pass">Password</label>
-        <input type="password" id="login-pass" autocomplete="current-password" placeholder="••••••••">
-      </div>
-      <div class="modal-field-row">
-        <button type="button" class="modal-forgot-link" onclick="HirayaAuth.switchAuthView('forgot')">Forgot password?</button>
-      </div>
-      <div class="modal-err" id="login-err" role="alert"></div>
-      <button class="modal-btn" id="login-submit" onclick="HirayaAuth.doLogin()">Log in</button>
+      <form onsubmit="event.preventDefault(); HirayaAuth.doLogin();">
+        <div class="modal-field">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" name="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" placeholder="you@email.com">
+        </div>
+        <div class="modal-field">
+          <label for="login-pass">Password</label>
+          <input type="password" id="login-pass" name="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••••••">
+        </div>
+        <div class="modal-field-row">
+          <button type="button" class="modal-forgot-link" onclick="HirayaAuth.switchAuthView('forgot')">Forgot password?</button>
+        </div>
+        <div class="modal-err" id="login-err" role="alert"></div>
+        <button type="submit" class="modal-btn" id="login-submit">Log in</button>
+      </form>
       <div class="modal-switch">Don't have an account? <a onclick="HirayaAuth.switchAuthView('signup')">Sign up</a></div>
     </div>
 
@@ -1966,28 +1968,30 @@ loadBlockedDates();
     <div id="form-signup" style="display:none">
       <h2 class="modal-title">Create account</h2>
       <p class="modal-sub">Sign up to book cleans and track your cleaning history.</p>
-      <div class="modal-field">
-        <label for="su-name">Full name</label>
-        <input type="text" id="su-name" autocomplete="name" placeholder="Jane Smith">
-      </div>
-      <div class="modal-field">
-        <label for="su-email">Email</label>
-        <input type="email" id="su-email" autocomplete="email" placeholder="you@email.com">
-      </div>
-      <div class="modal-field">
-        <label for="su-phone">Phone <span class="modal-field-optional">(optional)</span></label>
-        <input type="tel" id="su-phone" autocomplete="tel" placeholder="(519) 555-0100">
-      </div>
-      <div class="modal-field">
-        <label for="su-pass">Password</label>
-        <input type="password" id="su-pass" autocomplete="new-password" placeholder="At least 8 characters">
-      </div>
-      <div class="modal-field">
-        <label for="su-pass2">Confirm password</label>
-        <input type="password" id="su-pass2" autocomplete="new-password" placeholder="Re-enter password">
-      </div>
-      <div class="modal-err" id="su-err" role="alert"></div>
-      <button class="modal-btn" id="su-submit" onclick="HirayaAuth.doSignup()">Create account</button>
+      <form onsubmit="event.preventDefault(); HirayaAuth.doSignup();">
+        <div class="modal-field">
+          <label for="su-name">Full name</label>
+          <input type="text" id="su-name" name="name" autocomplete="name" placeholder="Jane Smith">
+        </div>
+        <div class="modal-field">
+          <label for="su-email">Email</label>
+          <input type="email" id="su-email" name="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" placeholder="you@email.com">
+        </div>
+        <div class="modal-field">
+          <label for="su-phone">Phone <span class="modal-field-optional">(optional)</span></label>
+          <input type="tel" id="su-phone" name="phone" autocomplete="tel" inputmode="tel" placeholder="(519) 555-0100">
+        </div>
+        <div class="modal-field">
+          <label for="su-pass">Password</label>
+          <input type="password" id="su-pass" name="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="At least 8 characters">
+        </div>
+        <div class="modal-field">
+          <label for="su-pass2">Confirm password</label>
+          <input type="password" id="su-pass2" name="password-confirm" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Re-enter password">
+        </div>
+        <div class="modal-err" id="su-err" role="alert"></div>
+        <button type="submit" class="modal-btn" id="su-submit">Create account</button>
+      </form>
       <div class="modal-switch">Already have an account? <a onclick="HirayaAuth.switchAuthView('login')">Log in</a></div>
     </div>
 
@@ -2014,12 +2018,14 @@ loadBlockedDates();
     <div id="form-forgot" style="display:none">
       <h2 class="modal-title">Reset your password</h2>
       <p class="modal-sub">Enter your email and we'll send you a link to set a new password.</p>
-      <div class="modal-field">
-        <label for="fp-email">Email</label>
-        <input type="email" id="fp-email" autocomplete="email" placeholder="you@email.com">
-      </div>
-      <div class="modal-err" id="fp-err" role="alert"></div>
-      <button class="modal-btn" id="fp-submit" onclick="HirayaAuth.doForgotPassword()">Send reset link</button>
+      <form onsubmit="event.preventDefault(); HirayaAuth.doForgotPassword();">
+        <div class="modal-field">
+          <label for="fp-email">Email</label>
+          <input type="email" id="fp-email" name="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" placeholder="you@email.com">
+        </div>
+        <div class="modal-err" id="fp-err" role="alert"></div>
+        <button type="submit" class="modal-btn" id="fp-submit">Send reset link</button>
+      </form>
       <div class="modal-switch">Remembered it? <a onclick="HirayaAuth.switchAuthView('login')">Back to log in</a></div>
     </div>
   </div>
