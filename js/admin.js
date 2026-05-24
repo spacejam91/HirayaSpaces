@@ -213,6 +213,13 @@
       // background so stale data doesn't make the user wait.
       renderCalendar();
       refreshAll();
+    } else if (name === 'customers') {
+      // Always return to the list view when entering the tab — closing a
+      // detail drawer by switching tabs is the natural reset.
+      $('customers-list-view').style.display = 'block';
+      $('customer-detail-view').style.display = 'none';
+      renderCustomers();
+      refreshAll();
     }
   }
 
@@ -344,6 +351,9 @@
 
     renderStats();
     renderCalendar();
+    // Only re-render customers if the panel is actually visible — avoids
+    // a flicker when refreshAll runs from other tabs.
+    if (activePanel === 'customers') renderCustomers();
 
     const filter = ($('all-status-filter')?.value || '').trim();
     const rows = filter ? allBookings.filter(b => b.status === filter) : allBookings;
@@ -362,6 +372,228 @@
         : '';
       return bookingCardHtml(b, { actions, showInternal: true });
     }).join('');
+  }
+
+  // ── CUSTOMERS ──────────────────────────────────────────────────────────
+  // Group allBookings by user_id into a customer summary. We don't need a
+  // new RPC for this — get_all_bookings() already returns every field we
+  // need (name, email, phone, address parts, prices, statuses).
+  const COUNTED_FOR_LTV = ['confirmed', 'in_progress', 'completed'];
+
+  function aggregateCustomers() {
+    const map = new Map();
+    for (const b of allBookings) {
+      if (!b.user_id) continue;
+      let c = map.get(b.user_id);
+      if (!c) {
+        c = {
+          user_id: b.user_id,
+          name: b.customer_name || 'Customer',
+          email: b.customer_email || '',
+          phone: b.customer_phone || '',
+          bookings: [],
+          addresses: new Map(),
+          ltv_cents: 0,
+          first_booking: null,
+          last_booking: null,
+          status_counts: {},
+        };
+        map.set(b.user_id, c);
+      }
+      c.bookings.push(b);
+      if (COUNTED_FOR_LTV.includes(b.status)) {
+        c.ltv_cents += (b.final_price_cents ?? b.estimated_price_cents ?? 0);
+      }
+      // Earliest preferred_date = "member since" (closest to signup we can
+      // get without joining auth.users.created_at).
+      if (b.preferred_date) {
+        if (!c.first_booking || b.preferred_date < c.first_booking) c.first_booking = b.preferred_date;
+        if (!c.last_booking || b.preferred_date > c.last_booking) c.last_booking = b.preferred_date;
+      }
+      c.status_counts[b.status] = (c.status_counts[b.status] || 0) + 1;
+
+      // Dedupe addresses by full string — same person sometimes books from
+      // different addresses (home + parents', etc.), and we want to show all.
+      if (b.street_address) {
+        const key = [b.street_address, b.unit, b.city, b.postal_code].filter(Boolean).join('|');
+        if (!c.addresses.has(key)) {
+          c.addresses.set(key, {
+            street_address: b.street_address,
+            unit: b.unit,
+            city: b.city,
+            postal_code: b.postal_code,
+          });
+        }
+      }
+    }
+    return Array.from(map.values());
+  }
+
+  function customerInitials(name) {
+    const parts = String(name || 'Customer').trim().split(/\s+/);
+    const first = parts[0]?.[0] || 'C';
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (first + last).toUpperCase();
+  }
+
+  function formatLtv(cents) {
+    return '$' + Math.round((cents || 0) / 100).toLocaleString();
+  }
+
+  function renderCustomers() {
+    const list = $('customers-list');
+    const empty = $('customers-empty');
+    const count = $('customers-count');
+    if (!list) return;
+
+    const customers = aggregateCustomers();
+    const q = ($('customers-search')?.value || '').trim().toLowerCase();
+    const sort = $('customers-sort')?.value || 'recent';
+
+    let rows = customers;
+    if (q) {
+      rows = rows.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        (c.phone && c.phone.toLowerCase().includes(q))
+      );
+    }
+
+    rows.sort((a, b) => {
+      if (sort === 'value') return b.ltv_cents - a.ltv_cents;
+      if (sort === 'count') return b.bookings.length - a.bookings.length;
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      // recent: by last_booking desc, falling back to bookings array (already newest-first from RPC)
+      const la = a.last_booking || '';
+      const lb = b.last_booking || '';
+      if (la === lb) return 0;
+      return la < lb ? 1 : -1;
+    });
+
+    if (count) {
+      count.textContent = q
+        ? `· ${rows.length} of ${customers.length}`
+        : `· ${customers.length}`;
+    }
+
+    if (!rows.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    list.innerHTML = rows.map(c => {
+      const lastStr = c.last_booking ? formatBookingDate(c.last_booking) : '—';
+      return `
+        <div class="customer-card" onclick="HirayaAdmin.openCustomerDetail('${c.user_id}')">
+          <div class="customer-card-head">
+            <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+              <div class="customer-avatar">${escapeHtml(customerInitials(c.name))}</div>
+              <div style="min-width:0">
+                <div class="customer-card-name">${escapeHtml(c.name)}</div>
+                <div class="customer-card-email">${escapeHtml(c.email || 'No email')}</div>
+                ${c.phone ? `<div class="customer-card-phone">${escapeHtml(c.phone)}</div>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="customer-card-body">
+            <div>
+              <div class="customer-card-stat-label">Bookings</div>
+              <div class="customer-card-stat-value">${c.bookings.length}</div>
+            </div>
+            <div>
+              <div class="customer-card-stat-label">Lifetime (est.)</div>
+              <div class="customer-card-stat-value">${escapeHtml(formatLtv(c.ltv_cents))}</div>
+            </div>
+            <div>
+              <div class="customer-card-stat-label">Last clean</div>
+              <div class="customer-card-stat-value" style="font-size:12px;font-weight:500">${escapeHtml(lastStr)}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function openCustomerDetail(userId) {
+    const customers = aggregateCustomers();
+    const c = customers.find(x => x.user_id === userId);
+    if (!c) return;
+
+    $('customers-list-view').style.display = 'none';
+    $('customer-detail-view').style.display = 'block';
+
+    $('customer-detail-name').textContent = c.name;
+    const metaParts = [];
+    if (c.email) metaParts.push(`<a href="mailto:${escapeHtml(c.email)}">✉️ ${escapeHtml(c.email)}</a>`);
+    if (c.phone) {
+      const dialable = c.phone.replace(/[^\d+]/g, '');
+      metaParts.push(`<a href="tel:${escapeHtml(dialable)}">📞 ${escapeHtml(c.phone)}</a>`);
+    }
+    $('customer-detail-meta').innerHTML = metaParts.join('') || '<span>No contact info on file</span>';
+
+    $('customer-stat-bookings').textContent = c.bookings.length;
+    $('customer-stat-ltv').textContent = formatLtv(c.ltv_cents);
+    $('customer-stat-since').textContent = c.first_booking ? formatBookingDate(c.first_booking) : '—';
+
+    const mix = Object.entries(c.status_counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([s, n]) => `${n} ${statusLabel(s).toLowerCase()}`)
+      .join(' · ');
+    $('customer-stat-mix').textContent = mix || '—';
+    $('customer-stat-mix').style.fontSize = '13px';
+    $('customer-stat-mix').style.fontWeight = '500';
+    $('customer-stat-mix').style.fontFamily = "'Jost', sans-serif";
+
+    // Addresses
+    const addrEl = $('customer-addresses');
+    if (!c.addresses.size) {
+      addrEl.innerHTML = `<div class="customer-no-addresses">No saved addresses yet.</div>`;
+    } else {
+      addrEl.innerHTML = Array.from(c.addresses.values()).map(a => {
+        const street = [a.street_address, a.unit].filter(Boolean).join(', ');
+        const cityLine = [a.city, a.postal_code].filter(Boolean).join(' ');
+        const full = [street, cityLine].filter(Boolean).join(' · ');
+        return `
+          <div class="customer-address">
+            <div class="customer-address-street">${escapeHtml(street)}</div>
+            ${cityLine ? `<div class="customer-address-line">${escapeHtml(cityLine)}</div>` : ''}
+            ${full ? `<a class="customer-address-maps" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}" target="_blank" rel="noopener">🗺 Open in Maps →</a>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    // Bookings — newest first (preferred_date desc, then created_at desc)
+    const sortedBookings = [...c.bookings].sort((a, b) => {
+      const da = a.preferred_date || '';
+      const db = b.preferred_date || '';
+      if (da !== db) return da < db ? 1 : -1;
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+
+    $('customer-bookings').innerHTML = sortedBookings.map(b => {
+      const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
+      const isPending = b.status === 'pending_review' || b.status === 'awaiting_quote';
+      let actions = '';
+      if (isPending) {
+        actions = `
+          <div class="booking-card-actions">
+            <button class="booking-card-btn" style="color:var(--rose)" onclick="event.stopPropagation(); HirayaAdmin.jumpToPending('${b.id}','decline')">Decline</button>
+            <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="event.stopPropagation(); HirayaAdmin.jumpToPending('${b.id}','confirm')">Confirm</button>
+          </div>`;
+      } else if (ownerCancellable) {
+        actions = `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="event.stopPropagation(); HirayaAdmin.jumpToAllAndCancel('${b.id}')">Cancel booking</button></div>`;
+      }
+      return bookingCardHtml(b, { actions, showInternal: true });
+    }).join('');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function closeCustomerDetail() {
+    $('customer-detail-view').style.display = 'none';
+    $('customers-list-view').style.display = 'block';
   }
 
   // ── CALENDAR ───────────────────────────────────────────────────────────
@@ -742,6 +974,10 @@
     closeDayDetail,
     jumpToPending,
     jumpToAllAndCancel,
+    // Customers
+    renderCustomers,
+    openCustomerDetail,
+    closeCustomerDetail,
   };
 
   if (document.readyState === 'loading') {

@@ -388,6 +388,138 @@
     font-size: 22px; font-weight: 400;
   }
 
+  /* ── CUSTOMERS ── */
+  .customers-count {
+    font-family: 'Jost', sans-serif; font-size: 13px;
+    color: var(--muted); font-weight: 500;
+    margin-left: 8px; vertical-align: middle;
+  }
+  #customers-search {
+    min-width: 240px;
+  }
+  .customers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+  .customer-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1.2rem;
+    cursor: pointer;
+    transition: border-color .15s, transform .1s, box-shadow .15s;
+  }
+  .customer-card:hover {
+    border-color: var(--sage);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(30,77,43,0.08);
+  }
+  .customer-card-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .customer-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--sage-light); color: var(--sage);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 15px;
+    flex-shrink: 0;
+  }
+  .customer-card-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 500;
+    line-height: 1.2; margin-bottom: 2px;
+  }
+  .customer-card-email {
+    font-size: 12px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .customer-card-body {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .customer-card-stat-label {
+    color: var(--muted); font-size: 10px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .customer-card-stat-value {
+    font-weight: 600; color: var(--text);
+    font-size: 14px; margin-top: 2px;
+  }
+  .customer-card-phone { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  /* Customer detail */
+  .customer-detail-head {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .customer-detail-head h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 400; line-height: 1.1;
+    margin-bottom: 6px;
+  }
+  .customer-detail-meta {
+    font-size: 13px; color: var(--muted);
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  .customer-detail-meta a { color: var(--sage); text-decoration: none; }
+  .customer-detail-meta a:hover { text-decoration: underline; }
+
+  .customer-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .customer-stat {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.2rem;
+  }
+  .customer-stat-label {
+    font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;
+    color: var(--muted); font-weight: 500;
+  }
+  .customer-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px; font-weight: 500; margin-top: 4px;
+    color: var(--text); line-height: 1.1;
+  }
+
+  .customer-section {
+    margin-bottom: 1.5rem;
+  }
+  .customer-section h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 400; margin-bottom: 0.75rem;
+  }
+  .customer-addresses {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+  .customer-address {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+  }
+  .customer-address-street { font-weight: 500; color: var(--text); }
+  .customer-address-line { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .customer-address-maps { font-size: 11px; color: var(--sage); text-decoration: none; margin-top: 4px; display: inline-block; }
+  .customer-address-maps:hover { text-decoration: underline; }
+  .customer-no-addresses {
+    color: var(--muted); font-size: 13px; font-style: italic;
+  }
+
   /* ── STUB PANELS (Phase 2-4) ── */
   .stub-block {
     background: white;
@@ -416,6 +548,9 @@
     .admin-greet { display: none; }
     .cal-grid-wrap { display: none; }
     .cal-agenda { display: block; }
+    .customers-grid { grid-template-columns: 1fr; }
+    .customer-stats { grid-template-columns: repeat(2, 1fr); }
+    #customers-search { min-width: 0; flex: 1; }
   }
 </style>
 </head>
@@ -629,15 +764,69 @@
       </div>
     </div>
 
-    <!-- ── CUSTOMERS PANEL (stub) ── -->
+    <!-- ── CUSTOMERS PANEL ── -->
     <div class="admin-panel" id="panel-customers">
-      <div class="panel-header">
-        <h2>Customers</h2>
+
+      <div id="customers-list-view">
+        <div class="panel-header">
+          <h2>Customers <span id="customers-count" class="customers-count"></span></h2>
+          <div class="panel-controls">
+            <input type="search" id="customers-search" placeholder="Search by name or email…" oninput="HirayaAdmin.renderCustomers()">
+            <select id="customers-sort" onchange="HirayaAdmin.renderCustomers()">
+              <option value="recent">Most recent</option>
+              <option value="value">Lifetime value</option>
+              <option value="count">Most bookings</option>
+              <option value="name">Name (A–Z)</option>
+            </select>
+            <button class="panel-refresh" onclick="HirayaAdmin.refreshAll()">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="customers-list" class="customers-grid"></div>
+        <div id="customers-empty" class="empty-state" style="display:none">
+          <span class="empty-icon">👤</span>
+          No customers match that search.
+        </div>
       </div>
-      <div class="stub-block">
-        <h3>Coming in Phase 4</h3>
-        <p>Search any customer by name or email to see their booking history, saved addresses, lifetime value, and notes.</p>
+
+      <!-- Customer detail drawer -->
+      <div id="customer-detail-view" style="display:none">
+        <button class="btn-ghost" onclick="HirayaAdmin.closeCustomerDetail()" style="margin-bottom:1rem">← Back to customers</button>
+
+        <div class="customer-detail-head">
+          <h2 id="customer-detail-name"></h2>
+          <div class="customer-detail-meta" id="customer-detail-meta"></div>
+        </div>
+
+        <div class="customer-stats">
+          <div class="customer-stat">
+            <div class="customer-stat-label">Total bookings</div>
+            <div class="customer-stat-value" id="customer-stat-bookings">0</div>
+          </div>
+          <div class="customer-stat">
+            <div class="customer-stat-label">Lifetime value (est.)</div>
+            <div class="customer-stat-value" id="customer-stat-ltv">$0</div>
+          </div>
+          <div class="customer-stat">
+            <div class="customer-stat-label">Member since</div>
+            <div class="customer-stat-value" id="customer-stat-since">—</div>
+          </div>
+          <div class="customer-stat">
+            <div class="customer-stat-label">Status mix</div>
+            <div class="customer-stat-value" id="customer-stat-mix">—</div>
+          </div>
+        </div>
+
+        <div class="customer-section">
+          <h3>Addresses</h3>
+          <div id="customer-addresses" class="customer-addresses"></div>
+        </div>
+
+        <div class="customer-section">
+          <h3>Booking history</h3>
+          <div id="customer-bookings" class="booking-grid"></div>
+        </div>
       </div>
+
     </div>
 
   </div>
