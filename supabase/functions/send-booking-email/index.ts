@@ -601,9 +601,10 @@ Deno.serve(async (req) => {
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
-          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">${isQuote ? "Quote request received" : "You're booked!"}</h1>
+          <div style="display:inline-block;background:#b08c4a;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">${isQuote ? "AWAITING QUOTE" : "PENDING REVIEW"}</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">${isQuote ? "Quote request received" : "We've got your request"}</h1>
           <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
-            Thanks, <strong style="color:#1a2e1e">${escapeHtml(customerName)}</strong> — we've received your request. Booking reference <strong style="color:#1e4d2b">${idShort}</strong>. ${isQuote ? "We'll be in touch with a tailored quote shortly." : "We'll be in touch shortly to confirm timing."}
+            Thanks, <strong style="color:#1a2e1e">${escapeHtml(customerName)}</strong> — your booking request <strong style="color:#1e4d2b">${idShort}</strong> has been logged. ${isQuote ? "We'll review and send a tailored quote shortly." : "We'll review and send a separate confirmation email once it's locked in. Your spot isn't held until then."}
           </p>
 
           <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:12px;margin-bottom:24px">
@@ -665,7 +666,7 @@ Deno.serve(async (req) => {
     await client.send({
       from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
       to: customerEmail,
-      subject: `${isQuote ? "Quote request" : "Booking confirmed"} - ${idShort}`,
+      subject: `${isQuote ? "Quote request" : "Booking received - pending review"} - ${idShort}`,
       html: tidyHtml(html),
     });
 
