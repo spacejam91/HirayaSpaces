@@ -1775,6 +1775,23 @@ updateSummary();
         </div>
       </div>
 
+      <!-- Owner-cancel confirmed booking view -->
+      <div id="admin-owner-cancel-view" style="display:none">
+        <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">⚠️</div>
+        <h3 class="modal-title" style="text-align:center;font-size:22px">Cancel this booking?</h3>
+        <p class="modal-sub" style="text-align:center" id="admin-owner-cancel-text"></p>
+        <div class="modal-field">
+          <label for="admin-owner-cancel-reason">Reason (optional — shared with the customer)</label>
+          <input type="text" id="admin-owner-cancel-reason" placeholder="Staff illness, equipment issue, scheduling conflict…">
+        </div>
+        <p class="modal-sub" style="text-align:center;font-size:12px">The customer will get a cancellation email and the calendar event will be removed.</p>
+        <div class="modal-err" id="admin-owner-cancel-err" role="alert"></div>
+        <div class="br-actions">
+          <button class="modal-btn-ghost" onclick="HirayaAccount.cancelOwnerCancel()">Back</button>
+          <button class="modal-btn" id="admin-owner-cancel-btn" style="background:var(--rose)" onclick="HirayaAccount.confirmOwnerCancel()">Yes, cancel booking</button>
+        </div>
+      </div>
+
       <!-- Decline-with-reason view -->
       <div id="admin-decline-view" style="display:none">
         <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">📝</div>

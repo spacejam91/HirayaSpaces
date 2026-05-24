@@ -162,28 +162,28 @@
   // sub-tab is active, then we restore the active one when the overlay closes.
   let adminSubtab = 'pending';
 
+  function hideAllAdminOverlays() {
+    $('admin-decline-view').style.display = 'none';
+    const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
+    const ocv = $('admin-owner-cancel-view'); if (ocv) ocv.style.display = 'none';
+  }
   function showAdminListView() {
     const pendingActive = adminSubtab === 'pending';
     $('admin-list-view').style.display = pendingActive ? 'block' : 'none';
     const av = $('admin-all-view'); if (av) av.style.display = pendingActive ? 'none' : 'block';
-    $('admin-decline-view').style.display = 'none';
-    const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
+    hideAllAdminOverlays();
     const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'flex';
   }
-  function showAdminDeclineView() {
+  function showAdminOverlay(viewId) {
     $('admin-list-view').style.display = 'none';
     const av = $('admin-all-view'); if (av) av.style.display = 'none';
-    $('admin-decline-view').style.display = 'block';
-    const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
+    hideAllAdminOverlays();
+    $(viewId).style.display = 'block';
     const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'none';
   }
-  function showAdminConfirmView() {
-    $('admin-list-view').style.display = 'none';
-    const av = $('admin-all-view'); if (av) av.style.display = 'none';
-    $('admin-decline-view').style.display = 'none';
-    $('admin-confirm-view').style.display = 'block';
-    const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'none';
-  }
+  function showAdminDeclineView() { showAdminOverlay('admin-decline-view'); }
+  function showAdminConfirmView() { showAdminOverlay('admin-confirm-view'); }
+  function showAdminOwnerCancelView() { showAdminOverlay('admin-owner-cancel-view'); }
 
   function switchAdminSubtab(which) {
     adminSubtab = which === 'all' ? 'all' : 'pending';
@@ -755,6 +755,13 @@
       const classes = ['booking-card'];
       if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
       if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
+      // Owner can pull a booking that's already confirmed or in progress
+      // (emergency, staff issue, etc.). Pending requests go through Decline
+      // from the Pending sub-tab.
+      const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
+      const actions = ownerCancellable
+        ? `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAccount.askOwnerCancel('${b.id}')">Cancel booking</button></div>`
+        : '';
       return `
         <div class="${classes.join(' ')}" data-id="${b.id}">
           <div class="booking-card-head">
@@ -773,8 +780,61 @@
             ${notes}
             ${internal}
           </div>
+          ${actions}
         </div>`;
     }).join('');
+  }
+
+  // ── ADMIN — owner-initiated cancel of a confirmed booking ──────────────
+  let ownerCancellingBookingId = null;
+
+  function askOwnerCancel(id) {
+    const b = allBookings.find(x => x.id === id);
+    if (!b) return;
+    ownerCancellingBookingId = id;
+    const label = `${b.service_name || 'this booking'} on ${formatBookingDate(b.preferred_date)} (${b.customer_name || 'Customer'})`;
+    $('admin-owner-cancel-text').textContent = label;
+    $('admin-owner-cancel-reason').value = '';
+    $('admin-owner-cancel-err').style.display = 'none';
+    showAdminOwnerCancelView();
+  }
+
+  function cancelOwnerCancel() {
+    ownerCancellingBookingId = null;
+    showAdminListView();
+  }
+
+  async function confirmOwnerCancel() {
+    if (!ownerCancellingBookingId || !sb()) return;
+    const reason = ($('admin-owner-cancel-reason').value || '').trim();
+    const idToCancel = ownerCancellingBookingId;
+    const btn = $('admin-owner-cancel-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cancelling…'; }
+    try {
+      const { data, error } = await sb().rpc('owner_cancel_booking', { booking_id: idToCancel, reason: reason || null });
+      if (error) throw error;
+      if (data === false) {
+        $('admin-owner-cancel-err').textContent = 'Booking can no longer be cancelled — refresh and try again.';
+        $('admin-owner-cancel-err').style.display = 'block';
+      } else {
+        showToast('Booking cancelled. Customer notified.', 'success');
+        // Reuse the existing 'cancelled' mode — its wording ("we've cancelled
+        // booking X, you haven't been charged") works for either side, and the
+        // edge function also tears down the linked Google Calendar event.
+        sb().functions.invoke('send-booking-email', { body: { booking_id: idToCancel, mode: 'cancelled' } })
+          .then(({ error: emailErr }) => { if (emailErr) console.warn('owner-cancel email failed:', emailErr.message || emailErr); })
+          .catch(err => console.warn('owner-cancel email failed:', err));
+        ownerCancellingBookingId = null;
+        await refreshAllBookings();
+        showAdminListView();
+      }
+    } catch (err) {
+      console.error('owner_cancel_booking failed:', err);
+      $('admin-owner-cancel-err').textContent = err.message || 'Could not cancel.';
+      $('admin-owner-cancel-err').style.display = 'block';
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Yes, cancel booking'; }
+    }
   }
 
   let confirmingBookingId = null;
@@ -933,6 +993,9 @@
     confirmDecline,
     refreshPending,
     refreshAllBookings,
+    askOwnerCancel,
+    cancelOwnerCancel,
+    confirmOwnerCancel,
     // For booking.js to read the saved list and react to changes
     fetchAddresses,
     getCachedAddresses,
