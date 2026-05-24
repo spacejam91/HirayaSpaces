@@ -235,8 +235,13 @@ Deno.serve(async (req) => {
       if (booking.status !== "cancelled" || !booking.cancelled_at) {
         return jsonResponse({ error: "Booking is not cancelled" }, 400);
       }
+      // Cancellations are legitimate at any time. The status='cancelled' check
+      // above is the real anti-abuse gate (a caller can't trigger this email
+      // for a booking they haven't actually cancelled via the RPC). Keep a
+      // generous 24h window mostly to dodge replay attacks long after the
+      // fact, but allow customers to retry shortly after an initial failure.
       const cancelAgeMs = Date.now() - new Date(booking.cancelled_at).getTime();
-      if (cancelAgeMs > 10 * 60 * 1000) {
+      if (cancelAgeMs > 24 * 60 * 60 * 1000) {
         return jsonResponse({ error: "Cancellation too old to email" }, 410);
       }
     } else {
@@ -394,12 +399,19 @@ Deno.serve(async (req) => {
         },
       });
 
-      await cancelClient.send({
-        from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
-        to: customerEmail,
-        subject: `Booking cancelled - ${idShort}`,
-        html: tidyHtml(cancelledHtml),
-      });
+      // Both customer and owner emails are best-effort so a single SMTP
+      // hiccup doesn't block the calendar delete (which the customer cares
+      // about most — they don't want to be charged for a clean they cancelled).
+      try {
+        await cancelClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Booking cancelled - ${idShort}`,
+          html: tidyHtml(cancelledHtml),
+        });
+      } catch (custCancelErr) {
+        console.warn("customer cancel notification failed:", custCancelErr);
+      }
 
       const ownerEmailCancel = Deno.env.get("OWNER_EMAIL") || Deno.env.get("SMTP_USER")!;
       try {
@@ -413,7 +425,7 @@ Deno.serve(async (req) => {
       } catch (ownerCancelErr) {
         console.warn("owner cancel notification failed:", ownerCancelErr);
       }
-      await cancelClient.close();
+      try { await cancelClient.close(); } catch (_) { /* close errors don't matter */ }
 
       // Delete the linked Google Calendar event (best-effort) + clear the FK.
       const refreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN");
