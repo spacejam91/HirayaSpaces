@@ -429,6 +429,33 @@
   .svc-name { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 500; margin-bottom: 0.5rem; }
   .svc-price { color: var(--sage); font-size: 14px; font-weight: 600; margin-bottom: 0.75rem; }
   .svc-desc { font-size: 13px; color: var(--muted); line-height: 1.65; font-weight: 300; }
+  /* Inline tier dropdown inside each service card. Sits at the bottom so
+     the price + description stay readable above it. */
+  .svc-tier-select {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 10px 12px;
+    font-family: 'Jost', sans-serif;
+    font-size: 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: white;
+    color: var(--text);
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%231e4d2b' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 10px 6px;
+    padding-right: 32px;
+  }
+  .svc-tier-select:focus { border-color: var(--sage); }
+  .svc-card.selected .svc-tier-select { border-color: var(--sage); }
+  .svc-quote-note {
+    margin-top: 1rem; font-size: 12px; font-style: italic;
+    color: var(--muted); line-height: 1.5;
+  }
   .svc-check { display: none; position: absolute; top: 16px; right: 16px; background: var(--sage); color: white; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center; font-size: 12px; z-index: 2; }
 
   /* ── FLEXIBLE HOURLY ── */
@@ -1565,29 +1592,48 @@ function renderHourlyState() {
 }
 
 // Services
-document.getElementById('svc-grid').innerHTML = SERVICES.map(s=>`
+document.getElementById('svc-grid').innerHTML = SERVICES.map(s=>{
+  // Inline tier picker per card. Quote-only services skip the dropdown
+  // (no fixed tiers to choose from — keep them as one-click select).
+  const tierableOptions = (s.tiers || []).filter(t => t.basePrice != null);
+  const tierSelect = tierableOptions.length
+    ? `<select class="svc-tier-select" id="svc-tier-${s.id}" onclick="event.stopPropagation()" onchange="selectTierInline('${s.id}', this.value)">
+         <option value="">Pick an option…</option>
+         ${tierableOptions.map(t => `<option value="${t.slug}">${t.name} — $${t.basePrice}</option>`).join('')}
+       </select>`
+    : `<div class="svc-quote-note">Custom quote — pick & we'll follow up.</div>`;
+  return `
   <div class="svc-card" id="svc-${s.id}" onclick="selectSvc('${s.id}')">
     <div class="svc-check">✓</div>
     <span class="svc-icon">${s.icon}</span>
     <div class="svc-name">${s.name}</div>
     <div class="svc-price">${s.price}</div>
     <div class="svc-desc">${s.desc}</div>
-  </div>`).join('');
+    ${tierSelect}
+  </div>`;
+}).join('');
 
 function selectSvc(id){
   // Picking a tiered service must clear the hourly choice — they're mutually
   // exclusive (the customer is on one path or the other, not both).
   if (selHourly) deselectHourly();
   const wasSelected = selSvcs.has(id);
+  const tierSel = document.getElementById('svc-tier-' + id);
   if (wasSelected) {
     selSvcs.delete(id);
     selTiers.delete(id);
+    if (tierSel) tierSel.value = '';
   } else {
     selSvcs.add(id);
-    // Auto-pick the first tier so newly-added services contribute to the
-    // total immediately and don't sit there with "pick an option" stuck.
+    // Auto-pick the first real-priced tier so newly-added services contribute
+    // to the total immediately. Sync the inline dropdown so the user sees
+    // what got picked without re-rendering the card.
     const svc = SERVICES.find(s => s.id === id);
-    if (svc?.tiers?.length) selTiers.set(id, svc.tiers[0]);
+    if (svc?.tiers?.length) {
+      const firstTier = svc.tiers.find(t => t.basePrice != null) || svc.tiers[0];
+      selTiers.set(id, firstTier);
+      if (tierSel && firstTier?.slug) tierSel.value = firstTier.slug;
+    }
   }
   const card = document.getElementById('svc-'+id);
   if (card) card.classList.toggle('selected', selSvcs.has(id));
@@ -1595,12 +1641,6 @@ function selectSvc(id){
   renderTierPicker();
   renderTimes();
   updateSummary();
-  // On narrow viewports, smooth-scroll to the picker so the customer doesn't
-  // have to hunt for it below the rest of the service cards.
-  if (!wasSelected && window.innerWidth < 900) {
-    const picker = document.getElementById('tier-picker');
-    if (picker) setTimeout(() => picker.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-  }
 }
 
 function selectTier(svcId, slug){
@@ -1611,6 +1651,30 @@ function selectTier(svcId, slug){
   if (!svc || !svc.tiers) return;
   const tier = svc.tiers.find(t => t.slug === slug) || null;
   selTiers.set(svcId, tier);
+  refreshPrimaryPointers();
+  renderTierPicker();
+  renderTimes();
+  updateSummary();
+}
+
+// Picking a tier from a card's inline dropdown. Auto-selects the card if
+// it isn't already, so the customer doesn't have to click twice.
+function selectTierInline(svcId, slug){
+  if (selHourly) deselectHourly();
+  const svc = SERVICES.find(s => s.id === svcId);
+  if (!svc) return;
+  if (!slug) {
+    // User cleared the dropdown back to placeholder — deselect the card.
+    selSvcs.delete(svcId);
+    selTiers.delete(svcId);
+  } else {
+    const tier = svc.tiers?.find(t => t.slug === slug) || null;
+    if (!tier) return;
+    selSvcs.add(svcId);
+    selTiers.set(svcId, tier);
+  }
+  const card = document.getElementById('svc-' + svcId);
+  if (card) card.classList.toggle('selected', selSvcs.has(svcId));
   refreshPrimaryPointers();
   renderTierPicker();
   renderTimes();
@@ -1638,52 +1702,12 @@ function positionTierPicker(){
 }
 window.addEventListener('resize', positionTierPicker);
 
+// Bottom tier picker is replaced by inline dropdowns inside each service
+// card (mobile-friendly: no more jumping the user down the page). Kept as
+// a no-op so existing callers don't break.
 function renderTierPicker(){
   const host = document.getElementById('tier-picker');
-  if (!host) return;
-  // Pull any selected services that have tiers. Quote-only services with no
-  // tiers contribute nothing to render.
-  const tiered = [...selSvcs]
-    .map(id => SERVICES.find(s => s.id === id))
-    .filter(s => s && Array.isArray(s.tiers) && s.tiers.length > 0);
-  if (!tiered.length) {
-    host.innerHTML = '';
-    host.style.display = 'none';
-    return;
-  }
-  // Multi-service: park the picker permanently below the grid (don't try
-  // to reposition under a specific row — there are multiple rows now).
-  const grid = document.getElementById('svc-grid');
-  if (grid && grid.parentElement && host.previousElementSibling !== grid) {
-    grid.parentElement.insertBefore(host, grid.nextSibling);
-  }
-  const formatDur = (min) => {
-    if (!min) return '';
-    if (min < 60) return min + ' min';
-    const h = Math.round(min / 60 * 10) / 10;
-    return h + (h === 1 ? ' hr' : ' hrs');
-  };
-  const sections = tiered.map(svc => {
-    const currentTier = selTiers.get(svc.id);
-    const tiersHtml = svc.tiers.map(t => {
-      const priceText = t.basePrice == null ? 'Custom quote' : '$' + t.basePrice;
-      const durText = formatDur(t.durationMin);
-      const selected = currentTier && currentTier.slug === t.slug;
-      return `<div class="tier-card${selected ? ' selected' : ''}" onclick="selectTier('${svc.id}', '${t.slug}')">
-        <div class="tier-name">${t.name}</div>
-        <div class="tier-meta">
-          <span class="tier-price">${priceText}</span>
-          ${durText ? `<span class="tier-dur">~${durText}</span>` : ''}
-        </div>
-      </div>`;
-    }).join('');
-    return `<div class="tier-picker-section" style="margin-bottom:1.5rem">
-      <div class="tier-picker-label">${svc.icon} Choose your ${svc.name.toLowerCase()} option</div>
-      <div class="tier-grid">${tiersHtml}</div>
-    </div>`;
-  });
-  host.innerHTML = sections.join('');
-  host.style.display = '';
+  if (host) { host.innerHTML = ''; host.style.display = 'none'; }
 }
 
 // Time-math helpers shared by slot rendering and booking submission.
