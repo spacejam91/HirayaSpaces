@@ -77,8 +77,6 @@
     transition: border-color .2s, color .2s;
   }
   .admin-nav-btn:hover { border-color: var(--sage); color: var(--sage); }
-  .admin-bell.is-on { background: var(--sage-light); border-color: var(--sage-mid); color: var(--sage); }
-  .admin-bell.is-on:hover { background: var(--sage); color: white; border-color: var(--sage); }
   .admin-new {
     background: var(--sage) !important;
     color: white !important;
@@ -748,10 +746,6 @@
     <div class="admin-nav-right">
       <span class="admin-greet" id="admin-greet"></span>
       <button class="admin-nav-btn admin-new" onclick="HirayaAdmin.openNewBooking()">+ New booking</button>
-      <button class="admin-nav-btn admin-bell" id="admin-bell-btn" onclick="HirayaAdmin.toggleNotifications()" aria-label="Toggle new-booking alerts">
-        <span id="admin-bell-icon">🔕</span>
-        <span id="admin-bell-label">Alerts off</span>
-      </button>
       <a href="/" class="admin-nav-btn">View site</a>
       <button class="admin-nav-btn" onclick="HirayaAdmin.doLogout()">Sign out</button>
     </div>
@@ -802,6 +796,12 @@
     <div class="admin-tabs">
       <button class="admin-tab active" data-panel="pending" onclick="HirayaAdmin.switchPanel('pending')">
         Pending <span class="admin-tab-count" id="tab-count-pending">0</span>
+      </button>
+      <button class="admin-tab" data-panel="confirmed" onclick="HirayaAdmin.switchPanel('confirmed')">
+        Confirmed <span class="admin-tab-count" id="tab-count-confirmed">0</span>
+      </button>
+      <button class="admin-tab" data-panel="completed" onclick="HirayaAdmin.switchPanel('completed')">
+        Completed <span class="admin-tab-count" id="tab-count-completed">0</span>
       </button>
       <button class="admin-tab" data-panel="all" onclick="HirayaAdmin.switchPanel('all')">All bookings</button>
       <button class="admin-tab" data-panel="calendar" onclick="HirayaAdmin.switchPanel('calendar')">Calendar</button>
@@ -868,6 +868,7 @@
               <option value="cancelled">Cancelled</option>
               <option value="no_show">No show</option>
             </select>
+            <button class="panel-refresh" onclick="HirayaAdmin.exportBookingsCsv()">⬇ Export CSV</button>
             <button class="panel-refresh" onclick="HirayaAdmin.refreshAll()">↻ Refresh</button>
           </div>
         </div>

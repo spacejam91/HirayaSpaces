@@ -214,11 +214,9 @@
     $('admin-greet').textContent = currentUser.email;
     $('admin-first-name').textContent = first || 'back';
 
-    // Restore the notification preference and start realtime if it was on.
-    updateBellState();
-    if (notificationsEnabled() && 'Notification' in window && Notification.permission === 'granted') {
-      startBookingsRealtime();
-    }
+    // Realtime subscription auto-refreshes the dashboard when new bookings
+    // land. Browser-notification toggle was removed — email is the alert.
+    startBookingsRealtime();
 
     // Load initial panel (pending) + services list for the new-booking form
     await refreshPending();
@@ -230,13 +228,17 @@
   // ── PANEL SWITCHING ────────────────────────────────────────────────────
   let activePanel = 'pending';
 
+  // Tabs that share the All-Bookings panel DOM but pre-apply a status filter.
+  const PANEL_ALIAS = { confirmed: 'all', completed: 'all' };
+
   function switchPanel(name) {
     activePanel = name;
     document.querySelectorAll('.admin-tab').forEach(b => {
       b.classList.toggle('active', b.dataset.panel === name);
     });
+    const panelId = PANEL_ALIAS[name] || name;
     document.querySelectorAll('.admin-panel').forEach(p => {
-      p.classList.toggle('active', p.id === 'panel-' + name);
+      p.classList.toggle('active', p.id === 'panel-' + panelId);
     });
     // Always return to list view on tab switch
     if (name === 'pending') {
@@ -244,13 +246,28 @@
       $('confirm-view').style.display = 'none';
       $('decline-view').style.display = 'none';
       refreshPending();
-    } else if (name === 'all') {
+    } else if (name === 'all' || name === 'confirmed' || name === 'completed') {
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
       const completeView = $('complete-view');
       if (completeView) completeView.style.display = 'none';
       const rescheduleView = $('reschedule-view');
       if (rescheduleView) rescheduleView.style.display = 'none';
+      // Pre-apply the status filter so each tab shows its slice. The All
+      // bookings tab resets to "no filter".
+      const filterSel = $('all-status-filter');
+      if (filterSel) {
+        if (name === 'confirmed') filterSel.value = 'confirmed';
+        else if (name === 'completed') filterSel.value = 'completed';
+        else filterSel.value = '';
+      }
+      // Update the panel heading so the customer knows which view they're on.
+      const titleEl = document.querySelector('#all-list-view .panel-header h2');
+      if (titleEl) {
+        titleEl.textContent = name === 'confirmed' ? 'Confirmed bookings'
+          : name === 'completed' ? 'Completed bookings'
+          : 'All bookings';
+      }
       refreshAll();
     } else if (name === 'calendar') {
       // Re-render off whatever data we already have, then refresh in the
@@ -435,6 +452,16 @@
           ? 'Nothing booked yet'
           : `${pipeline.length} booking${pipeline.length === 1 ? '' : 's'} to deliver`;
       }
+    }
+
+    // Tab count chips for the new Confirmed + Completed tabs.
+    const tabConfirmed = $('tab-count-confirmed');
+    if (tabConfirmed) {
+      tabConfirmed.textContent = allBookings.filter(b => b.status === 'confirmed' || b.status === 'in_progress').length;
+    }
+    const tabCompleted = $('tab-count-completed');
+    if (tabCompleted) {
+      tabCompleted.textContent = allBookings.filter(b => b.status === 'completed').length;
     }
   }
 
@@ -891,63 +918,7 @@ Hiraya Spaces`
   // page load because Chrome shows a scary banner if you do that aggressively.
   // Preference persists in localStorage so once turned on, it stays on across
   // /admin visits.
-  const NOTIF_STORAGE_KEY = 'hiraya:admin-notifications-enabled';
   let realtimeChannel = null;
-
-  function notificationsEnabled() {
-    try { return localStorage.getItem(NOTIF_STORAGE_KEY) === '1'; }
-    catch (_) { return false; }
-  }
-  function setNotificationsEnabled(on) {
-    try { localStorage.setItem(NOTIF_STORAGE_KEY, on ? '1' : '0'); }
-    catch (_) { /* private mode, no-op */ }
-    updateBellState();
-  }
-
-  function updateBellState() {
-    const btn = $('admin-bell-btn');
-    const icon = $('admin-bell-icon');
-    const label = $('admin-bell-label');
-    if (!btn) return;
-    const on = notificationsEnabled() && Notification.permission === 'granted';
-    btn.classList.toggle('is-on', on);
-    if (icon) icon.textContent = on ? '🔔' : '🔕';
-    if (label) label.textContent = on ? 'Alerts on' : 'Alerts off';
-  }
-
-  async function toggleNotifications() {
-    if (!('Notification' in window)) {
-      showToast('This browser does not support notifications.', 'error');
-      return;
-    }
-    if (notificationsEnabled() && Notification.permission === 'granted') {
-      setNotificationsEnabled(false);
-      stopBookingsRealtime();
-      showToast('Alerts turned off.', 'success');
-      return;
-    }
-    let perm = Notification.permission;
-    if (perm === 'default') perm = await Notification.requestPermission();
-    if (perm !== 'granted') {
-      showToast('Browser blocked notifications. Allow them in site settings to enable alerts.', 'error');
-      setNotificationsEnabled(false);
-      return;
-    }
-    setNotificationsEnabled(true);
-    startBookingsRealtime();
-    showToast("Alerts on — you'll be pinged when a new booking lands.", 'success');
-  }
-
-  function notifyNewBooking(booking) {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const who = booking?.customer_name ? ` from ${booking.customer_name}` : '';
-    const n = new Notification('New Hiraya booking', {
-      body: `Pending review${who}. Open /admin to confirm or decline.`,
-      icon: '/apple-touch-icon.png',
-      tag: 'hiraya-new-booking',
-    });
-    n.onclick = () => { window.focus(); switchPanel('pending'); n.close(); };
-  }
 
   function startBookingsRealtime() {
     if (realtimeChannel || !sb()) return;
@@ -955,16 +926,8 @@ Hiraya Spaces`
       .channel('admin-bookings')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, async () => {
         // Refetch via the authorized RPC — realtime payload may be partial.
-        const prevPending = pendingBookings.length;
         await refreshPending();
         refreshAll();
-        const fresh = pendingBookings[0];
-        // Only fire a notification when the pending list actually grew.
-        // Some inserts (e.g. an admin-created booking that's instantly
-        // confirmed) shouldn't trigger an alert.
-        if (pendingBookings.length > prevPending && fresh) {
-          notifyNewBooking(fresh);
-        }
       })
       .subscribe();
   }
@@ -1458,6 +1421,71 @@ Hiraya Spaces`
       console.error('sendInvoice failed:', err);
       showToast('Invoice failed: ' + (err?.message || err), 'error');
     }
+  }
+
+  // Download the current All-Bookings view as CSV. Respects the active
+  // status filter so each tab (Confirmed / Completed / All) exports its slice.
+  function exportBookingsCsv() {
+    const filter = ($('all-status-filter')?.value || '').trim();
+    const rows = filter ? allBookings.filter(b => b.status === filter) : allBookings;
+    if (!rows.length) {
+      showToast('Nothing to export.', 'error');
+      return;
+    }
+    const headers = [
+      'Ref', 'Status', 'Service', 'Date', 'Time',
+      'Customer', 'Email', 'Phone',
+      'Street', 'Unit', 'City', 'Postal code',
+      'Estimated price', 'Final price',
+      'Frequency', 'Entry method', 'Entry instructions',
+      'Check-in', 'Check-out', 'Created',
+      'Customer notes', 'Internal notes',
+    ];
+    const csvCell = (v) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const dollars = (c) => (c == null || c === '') ? '' : (c / 100).toFixed(2);
+    const lines = [headers.map(csvCell).join(',')];
+    for (const b of rows) {
+      const ref = String(b.id || '').slice(0, 8).toUpperCase();
+      lines.push([
+        ref,
+        b.status || '',
+        b.service_name || '',
+        b.preferred_date || '',
+        b.preferred_time_slot || '',
+        b.customer_name || '',
+        b.customer_email || '',
+        b.customer_phone || '',
+        b.street_address || '',
+        b.unit || '',
+        b.city || '',
+        b.postal_code || '',
+        dollars(b.estimated_price_cents),
+        dollars(b.final_price_cents),
+        b.frequency || '',
+        b.entry_method || '',
+        b.entry_instructions || '',
+        b.check_in_at || '',
+        b.check_out_at || '',
+        b.created_at || '',
+        b.customer_notes || '',
+        b.internal_notes || '',
+      ].map(csvCell).join(','));
+    }
+    // Prepend UTF-8 BOM so Excel opens it with proper accent rendering.
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const today = new Date().toISOString().slice(0, 10);
+    a.download = `hiraya-bookings-${filter || 'all'}-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
   }
 
   // ── BLOCKED DATES ──────────────────────────────────────────────────────
@@ -2059,7 +2087,6 @@ Hiraya Spaces`
   window.HirayaAdmin = {
     doLogin,
     doLogout,
-    toggleNotifications,
     switchPanel,
     refreshPending,
     refreshAll,
@@ -2077,6 +2104,7 @@ Hiraya Spaces`
     cancelComplete,
     submitComplete,
     sendInvoice,
+    exportBookingsCsv,
     askReschedule,
     cancelReschedule,
     submitReschedule,
