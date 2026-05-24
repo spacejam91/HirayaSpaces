@@ -1381,8 +1381,17 @@ Hiraya Spaces`
         // Surface email failures to admin instead of silent console.warn —
         // the customer not getting a thank-you is something Aaron needs to know.
         sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'completed' } })
-          .then(({ data, error: e }) => {
-            const debug = data?.debug || data?.error;
+          .then(async ({ data, error: e }) => {
+            let debug = data?.debug || data?.error || '';
+            if (e) {
+              try {
+                const resp = e.context?.response;
+                if (resp && typeof resp.json === 'function') {
+                  const body = await resp.json();
+                  debug = body?.debug || body?.error || debug;
+                }
+              } catch (_) {}
+            }
             if (e || debug) {
               console.warn('completed email failed:', e?.message || debug || e);
               showToast('Booking complete, but thank-you email failed: ' + (debug || e?.message || 'unknown'), 'error');
@@ -1423,10 +1432,24 @@ Hiraya Spaces`
       const { data, error } = await sb().functions.invoke('send-booking-email', {
         body: { booking_id: id, mode: 'invoice' },
       });
-      const debug = data?.debug || data?.error;
-      if (error || debug) {
-        const msg = error?.message || debug || 'Unknown error';
-        showToast('Invoice failed: ' + msg, 'error');
+      // Supabase's FunctionsHttpError swallows the response body and just says
+      // "non-2xx status code" — pull the real reason out of error.context.
+      if (error) {
+        let debug = '';
+        try {
+          const resp = error.context?.response;
+          if (resp && typeof resp.json === 'function') {
+            const body = await resp.json();
+            debug = body?.debug || body?.error || '';
+          }
+        } catch (_) { /* body wasn't JSON */ }
+        console.error('sendInvoice non-2xx:', error, 'debug:', debug);
+        showToast('Invoice failed: ' + (debug || error.message || 'Unknown'), 'error');
+        return;
+      }
+      const fallbackDebug = data?.debug || data?.error;
+      if (fallbackDebug) {
+        showToast('Invoice failed: ' + fallbackDebug, 'error');
         return;
       }
       const invNum = data?.invoice_number ? ` (${data.invoice_number})` : '';
