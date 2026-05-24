@@ -391,6 +391,16 @@
     letter-spacing: 2px; text-transform: uppercase;
     color: var(--sage); margin-bottom: 1rem;
   }
+  /* Small numbered badge — used next to a section label to echo the
+     corresponding step from "How it works" so users feel guided through. */
+  .step-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1.5px solid var(--sage); background: white;
+    color: var(--sage); font-family: 'Cormorant Garamond', serif;
+    font-size: 15px; font-weight: 500; line-height: 1;
+    margin-right: 12px; vertical-align: middle;
+  }
   .section-h2 {
     font-family: 'Cormorant Garamond', serif;
     font-size: clamp(36px, 3.5vw, 52px); font-weight: 400;
@@ -670,7 +680,7 @@
 
   /* ── HOW IT WORKS ── */
   #how { background: var(--cream); }
-  .steps-layout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin-top: 3.5rem; position: relative; }
+  .steps-layout { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2rem; margin-top: 3.5rem; position: relative; }
   .steps-layout::before {
     content: ''; position: absolute; top: 40px; left: 10%; right: 10%;
     height: 1px; background: linear-gradient(to right, transparent, var(--border), var(--border), transparent);
@@ -1020,20 +1030,25 @@
     <div class="step fade-up" style="transition-delay:.1s">
       <a href="#services" class="step-num step-num-link" aria-label="Jump to services">1</a>
       <div class="step-title">Choose your service</div>
-      <div class="step-desc">Pick from standard, deep, move-in/out, or recurring cleans. Add extras to customize.</div>
+      <div class="step-desc">Pick from standard, deep, move-in/out, or recurring cleans.</div>
+    </div>
+    <div class="step fade-up" style="transition-delay:.15s">
+      <a href="#addons" class="step-num step-num-link" aria-label="Jump to add-ons">2</a>
+      <div class="step-title">Add any extras</div>
+      <div class="step-desc">Inside oven, fridge, pet hair, eco products — customize your clean.</div>
     </div>
     <div class="step fade-up" style="transition-delay:.2s">
-      <a href="#booking" class="step-num step-num-link" aria-label="Jump to booking">2</a>
+      <a href="#booking" class="step-num step-num-link" aria-label="Jump to booking">3</a>
       <div class="step-title">Pick a date & time</div>
       <div class="step-desc">Select any available slot on our calendar. We'll confirm within the hour.</div>
     </div>
-    <div class="step fade-up" style="transition-delay:.3s">
-      <a href="#reviews" class="step-num step-num-link" aria-label="Jump to reviews">3</a>
+    <div class="step fade-up" style="transition-delay:.25s">
+      <a href="#reviews" class="step-num step-num-link" aria-label="Jump to reviews">4</a>
       <div class="step-title">We show up & clean</div>
       <div class="step-desc">Your dedicated cleaner arrives on time, fully equipped, and gets to work.</div>
     </div>
-    <div class="step fade-up" style="transition-delay:.4s">
-      <a href="#contact" class="step-num step-num-link" aria-label="Jump to contact">4</a>
+    <div class="step fade-up" style="transition-delay:.3s">
+      <a href="#contact" class="step-num step-num-link" aria-label="Jump to contact">5</a>
       <div class="step-title">Enjoy your space</div>
       <div class="step-desc">Come back to a spotless space. Not happy? We'll return and fix it — free.</div>
     </div>
@@ -1044,7 +1059,7 @@
 <section id="services">
   <div class="services-header">
     <div>
-      <span class="section-label fade-up">What we offer</span>
+      <span class="section-label fade-up"><span class="step-badge">1</span>What we offer</span>
       <h2 class="section-h2 fade-up" style="transition-delay:.1s">Choose your <em>service</em></h2>
     </div>
     <p class="section-sub fade-up" style="transition-delay:.15s;max-width:320px">Select the service that best fits your space. All prices start from the rates shown — final pricing based on home size & condition.</p>
@@ -1088,7 +1103,7 @@
 <section id="addons">
   <div class="addons-layout">
     <div>
-      <span class="section-label fade-up">Extras</span>
+      <span class="section-label fade-up"><span class="step-badge">2</span>Extras</span>
       <h2 class="section-h2 fade-up" style="transition-delay:.1s">Make it <em>perfect</em></h2>
       <p class="section-sub fade-up" style="transition-delay:.2s">Customize your booking with add-on services. Mix and match to get exactly what your space needs.</p>
       <div id="addon-selected-list" style="margin-top:2rem;font-size:13px;color:var(--muted);line-height:1.8"></div>
@@ -1100,7 +1115,7 @@
 <!-- BOOKING -->
 <section id="booking" style="background:var(--warm)">
   <div style="text-align:center;margin-bottom:3.5rem">
-    <span class="section-label fade-up">Reserve your spot</span>
+    <span class="section-label fade-up"><span class="step-badge">3</span>Reserve your spot</span>
     <h2 class="section-h2 fade-up" style="transition-delay:.1s;margin:0 auto">Book your <em>space</em></h2>
     <p class="section-sub fade-up" style="transition-delay:.2s;margin:0.75rem auto 0;text-align:center">Takes less than 2 minutes. Free cancellation up to 24 hours before.</p>
   </div>
@@ -1297,7 +1312,7 @@ document.addEventListener('click', function (e) {
 })();
 
 const SERVICES = [
-  {id:'standard',icon:'🧹',name:'Regular Residential',price:'From $120',
+  {id:'standard',icon:'🧹',name:'Regular Residential Cleaning',price:'From $120',
    desc:'Perfect for weekly, bi-weekly, or monthly maintenance. Dusting, vacuuming, mopping, kitchen & bathroom cleaning.',
    tiers: [
      {slug:'regular-1br', name:'1 BR / 1 BA', basePrice:120, durationMin:180},
@@ -1305,7 +1320,7 @@ const SERVICES = [
      {slug:'regular-3br', name:'3 BR / 2 BA', basePrice:220, durationMin:270},
      {slug:'regular-4br', name:'4+ Bedrooms',  basePrice:250, durationMin:360},
    ]},
-  {id:'deep',icon:'✨',name:'Deep Clean',price:'From $220',
+  {id:'deep',icon:'✨',name:'Deep Cleaning',price:'From $220',
    desc:'Recommended for first-time cleans. Everything in regular plus baseboards, doors, detailed scrubbing & more.',
    tiers: [
      {slug:'deep-small',  name:'Small home (<1000 sqft)',     basePrice:220, durationMin:300},
@@ -1326,7 +1341,7 @@ const SERVICES = [
      {slug:'senior-2br', name:'2 BR / 2 BA', basePrice:180, durationMin:240},
      {slug:'senior-3br', name:'3 BR / 2 BA', basePrice:220, durationMin:270},
    ]},
-  {id:'airbnb',icon:'🏘️',name:'AirBnB Turnover',price:'From $120',
+  {id:'airbnb',icon:'🏘️',name:'AirBnB Turnover Cleaning',price:'From $120',
    desc:'Between-guest cleans for short-term rental hosts. Linen change, restock check, trash out, photo-ready finish.',
    tiers: [
      {slug:'airbnb-1br', name:'1 BR', basePrice:120, durationMin:120},
