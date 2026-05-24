@@ -215,6 +215,8 @@
       $('owner-cancel-view').style.display = 'none';
       const completeView = $('complete-view');
       if (completeView) completeView.style.display = 'none';
+      const rescheduleView = $('reschedule-view');
+      if (rescheduleView) rescheduleView.style.display = 'none';
       refreshAll();
     } else if (name === 'calendar') {
       // Re-render off whatever data we already have, then refresh in the
@@ -276,7 +278,12 @@
 
   async function refreshAll() {
     if (!sb() || !isOwner) return;
-    const { data, error } = await sb().rpc('get_all_bookings');
+    // Bookings + blocked dates in parallel — calendar needs both to render.
+    const [bookingsRes] = await Promise.all([
+      sb().rpc('get_all_bookings'),
+      refreshBlockedDates(),
+    ]);
+    const { data, error } = bookingsRes;
     if (error) {
       console.warn('get_all_bookings failed:', error.message);
       allBookings = [];
@@ -418,13 +425,17 @@
     empty.style.display = 'none';
 
     list.innerHTML = rows.map(b => {
+      const reschedulable = ['pending_review', 'awaiting_quote', 'confirmed', 'in_progress'].includes(b.status);
       const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
       const completable = ['confirmed', 'in_progress'].includes(b.status);
       let actions = '';
-      if (completable || ownerCancellable) {
+      if (completable || ownerCancellable || reschedulable) {
         const parts = [];
         if (completable) {
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askComplete('${b.id}')">Mark complete</button>`);
+        }
+        if (reschedulable) {
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
         }
         if (ownerCancellable) {
           parts.push(`<button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
@@ -859,6 +870,90 @@ Hiraya Spaces`
     realtimeChannel = null;
   }
 
+  // ── RESCHEDULE (edit date/time without losing the booking) ─────────────
+  let reschedulingId = null;
+
+  function askReschedule(id) {
+    const b = allBookings.find(x => x.id === id);
+    if (!b) return;
+    reschedulingId = id;
+    $('reschedule-text').textContent =
+      `${b.service_name || 'this booking'} — currently ${formatBookingDate(b.preferred_date)}${b.preferred_time_slot ? ' at ' + b.preferred_time_slot : ''} (${b.customer_name || 'Customer'})`;
+    $('reschedule-date').value = b.preferred_date || '';
+    $('reschedule-time').value = ''; // default to "Keep current"
+    hideErr('reschedule-err');
+    $('all-list-view').style.display = 'none';
+    $('owner-cancel-view').style.display = 'none';
+    const completeView = $('complete-view'); if (completeView) completeView.style.display = 'none';
+    $('reschedule-view').style.display = 'block';
+  }
+
+  function cancelReschedule() {
+    reschedulingId = null;
+    $('reschedule-view').style.display = 'none';
+    $('all-list-view').style.display = 'block';
+  }
+
+  async function submitReschedule() {
+    if (!reschedulingId || !sb()) return;
+    const id = reschedulingId;
+    const newDate = $('reschedule-date').value;
+    const newTime = $('reschedule-time').value || null;
+    if (!newDate) {
+      showErr('reschedule-err', 'Pick a new date.');
+      return;
+    }
+    // Capture the original booking for the mailto body before refresh wipes it.
+    const original = allBookings.find(x => x.id === id);
+    const btn = $('reschedule-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { data, error } = await sb().rpc('reschedule_booking', {
+        booking_id: id, new_date: newDate, new_time_slot: newTime
+      });
+      if (error) throw error;
+      if (data === false) {
+        showErr('reschedule-err', 'Booking is no longer eligible — refresh and try again.');
+        return;
+      }
+      showToast('Booking rescheduled. Now let the customer know.', 'success');
+      // Open mailto with a pre-filled reschedule note so Aaron only has to
+      // tweak + send. We don't auto-fire the edge function because the
+      // existing email templates don't have a "rescheduled" mode yet.
+      if (original?.customer_email) {
+        const firstName = (original.customer_name || 'there').split(' ')[0];
+        const oldStr = `${formatBookingDate(original.preferred_date)}${original.preferred_time_slot ? ' at ' + original.preferred_time_slot : ''}`;
+        const newStr = `${formatBookingDate(newDate)}${newTime || original.preferred_time_slot ? ' at ' + (newTime || original.preferred_time_slot) : ''}`;
+        const subject = encodeURIComponent('Your Hiraya cleaning has been rescheduled');
+        const body = encodeURIComponent(
+`Hi ${firstName},
+
+Quick heads up — your cleaning that was scheduled for ${oldStr} has been moved to ${newStr}.
+
+If that new time doesn't work, just reply to this email and I'll find another slot for you.
+
+Thanks for your flexibility!
+Aaron
+Hiraya Spaces`
+        );
+        const link = document.createElement('a');
+        link.href = `mailto:${original.customer_email}?subject=${subject}&body=${body}`;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.click();
+      }
+      reschedulingId = null;
+      await refreshAll();
+      refreshPending();
+      cancelReschedule();
+    } catch (err) {
+      console.error('reschedule_booking failed:', err);
+      showErr('reschedule-err', err.message || 'Could not reschedule.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save new date';
+    }
+  }
+
   // ── MARK COMPLETE (confirmed/in_progress → completed + final price) ────
   let completingId = null;
 
@@ -920,6 +1015,48 @@ Hiraya Spaces`
       showErr('complete-err', err.message || 'Could not save.');
     } finally {
       btn.disabled = false; btn.textContent = 'Mark complete';
+    }
+  }
+
+  // ── BLOCKED DATES ──────────────────────────────────────────────────────
+  // Cached Map<YYYY-MM-DD, { reason }>. Refreshed alongside allBookings so
+  // the calendar grid and the day detail drawer stay in sync after a toggle.
+  let blockedDates = new Map();
+
+  async function refreshBlockedDates() {
+    if (!sb() || !isOwner) { blockedDates = new Map(); return; }
+    const { data, error } = await sb()
+      .from('blocked_dates')
+      .select('date, reason');
+    if (error) {
+      console.warn('blocked_dates fetch failed:', error.message);
+      blockedDates = new Map();
+      return;
+    }
+    blockedDates = new Map((data || []).map(r => [r.date, { reason: r.reason || '' }]));
+  }
+
+  async function toggleBlockedDate(dateStr) {
+    if (!sb() || !isOwner) return;
+    const already = blockedDates.has(dateStr);
+    try {
+      if (already) {
+        const { error } = await sb().from('blocked_dates').delete().eq('date', dateStr);
+        if (error) throw error;
+        blockedDates.delete(dateStr);
+        showToast('Day re-opened for bookings.', 'success');
+      } else {
+        const { error } = await sb().from('blocked_dates').insert({ date: dateStr, reason: null });
+        if (error) throw error;
+        blockedDates.set(dateStr, { reason: '' });
+        showToast('Day blocked. Customers can no longer book it.', 'success');
+      }
+      renderCalendar();
+      // Re-open the same day so the toggle button reflects the new state.
+      openDayDetail(dateStr);
+    } catch (err) {
+      console.error('toggleBlockedDate failed:', err);
+      showToast(err.message || 'Could not change availability.', 'error');
     }
   }
 
@@ -994,17 +1131,24 @@ Hiraya Spaces`
       ).join('');
       const overflow = events.length > 3 ? `<div class="cal-overflow">+ ${events.length - 3} more</div>` : '';
 
+      const isBlocked = blockedDates.has(key);
       const classes = ['cal-cell'];
       if (!inMonth) classes.push('is-outside');
       if (isToday) classes.push('is-today');
       if (isSelected) classes.push('is-selected');
       if (events.length) classes.push('has-events');
+      if (isBlocked) classes.push('is-blocked');
 
-      const click = events.length ? `onclick="HirayaAdmin.openDayDetail('${key}')"` : '';
+      // Any day in the current month is clickable (so Aaron can block empty
+      // days too). Out-of-month days stay non-interactive.
+      const click = inMonth ? `onclick="HirayaAdmin.openDayDetail('${key}')"` : '';
+      if (inMonth) classes.push('has-events'); // reuses the hover cursor style
 
+      const blockedBadge = isBlocked ? `<div class="cal-blocked-tag">Blocked</div>` : '';
       cells.push(`
         <div class="${classes.join(' ')}" ${click} data-date="${key}">
           <div class="cal-cell-date">${d.getDate()}</div>
+          ${blockedBadge}
           <div class="cal-events">${eventHtml}${overflow}</div>
         </div>
       `);
@@ -1044,25 +1188,40 @@ Hiraya Spaces`
     const d = new Date(dateStr + 'T12:00:00');
     title.textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-    if (!events.length) {
-      list.innerHTML = `<div class="empty-state">No bookings on this day.</div>`;
-    } else {
-      list.innerHTML = events.map(b => {
-        const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
-        const isPending = b.status === 'pending_review' || b.status === 'awaiting_quote';
-        let actions = '';
-        if (isPending) {
-          actions = `
-            <div class="booking-card-actions">
-              <button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.jumpToPending('${b.id}','decline')">Decline</button>
-              <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.jumpToPending('${b.id}','confirm')">Confirm</button>
-            </div>`;
-        } else if (ownerCancellable) {
-          actions = `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.jumpToAllAndCancel('${b.id}')">Cancel booking</button></div>`;
-        }
-        return bookingCardHtml(b, { actions, showInternal: true });
-      }).join('');
-    }
+    // Availability toggle — surfaces a block/unblock action that lives in
+    // the same drawer as the day's bookings (one place for everything
+    // related to "this day").
+    const isBlocked = blockedDates.has(dateStr);
+    const blockToggleHtml = `
+      <div class="cal-availability">
+        <div>
+          <div class="cal-availability-label">Availability</div>
+          <div class="cal-availability-state">${isBlocked ? '🚫 Blocked — no new bookings' : '✅ Open for bookings'}</div>
+        </div>
+        <button class="btn-ghost" onclick="HirayaAdmin.toggleBlockedDate('${dateStr}')">
+          ${isBlocked ? 'Re-open this day' : 'Block this day'}
+        </button>
+      </div>`;
+
+    const bookingsHtml = !events.length
+      ? `<div class="empty-state" style="margin-top:1rem">No bookings on this day.</div>`
+      : events.map(b => {
+          const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
+          const isPending = b.status === 'pending_review' || b.status === 'awaiting_quote';
+          let actions = '';
+          if (isPending) {
+            actions = `
+              <div class="booking-card-actions">
+                <button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.jumpToPending('${b.id}','decline')">Decline</button>
+                <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.jumpToPending('${b.id}','confirm')">Confirm</button>
+              </div>`;
+          } else if (ownerCancellable) {
+            actions = `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.jumpToAllAndCancel('${b.id}')">Cancel booking</button></div>`;
+          }
+          return bookingCardHtml(b, { actions, showInternal: true });
+        }).join('');
+
+    list.innerHTML = blockToggleHtml + (events.length ? '<div style="margin-top:1rem"></div>' : '') + bookingsHtml;
     drawer.style.display = 'block';
     drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -1072,6 +1231,127 @@ Hiraya Spaces`
     document.querySelectorAll('#cal-grid .cal-cell.is-selected').forEach(el => el.classList.remove('is-selected'));
     const drawer = $('cal-day-detail');
     if (drawer) drawer.style.display = 'none';
+  }
+
+  // Print a clean, paper-friendly schedule for one day. Defaults to the
+  // currently-selected day, or today if nothing is selected. Opens a new
+  // window with its own minimal stylesheet so it prints well without
+  // dragging in all of /admin's chrome.
+  function printDay() {
+    const dateStr = calSelected || ymd(new Date());
+    const d = new Date(dateStr + 'T12:00:00');
+    const dateLabel = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    const events = (bookingsByDate().get(dateStr) || [])
+      .filter(b => ACTIVE_STATUSES.includes(b.status));
+    const blocked = blockedDates.has(dateStr);
+
+    const rows = events.length === 0
+      ? `<tr><td colspan="5" class="empty">No active bookings on this day.</td></tr>`
+      : events.map(b => {
+          const time = b.preferred_time_slot || '—';
+          const addr = [
+            [b.street_address, b.unit].filter(Boolean).join(', '),
+            [b.city, b.postal_code].filter(Boolean).join(' '),
+          ].filter(Boolean).join(' · ');
+          const mapsHref = addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : '';
+          const phone = b.customer_phone || '';
+          const notes = b.customer_notes || '';
+          const internal = b.internal_notes || '';
+          const status = statusLabel(b.status);
+          return `
+            <tr>
+              <td class="time">${escapeHtml(time)}</td>
+              <td>
+                <div class="customer">${escapeHtml(b.customer_name || 'Customer')}</div>
+                ${phone ? `<div class="meta">${escapeHtml(phone)}</div>` : ''}
+                ${b.customer_email ? `<div class="meta">${escapeHtml(b.customer_email)}</div>` : ''}
+              </td>
+              <td>
+                <div class="service">${escapeHtml(b.service_name || 'Cleaning')}</div>
+                <div class="meta">${escapeHtml(status)}</div>
+              </td>
+              <td>
+                ${addr ? `<div>${escapeHtml(addr)}</div>` : '<div class="meta">No address on file</div>'}
+                ${mapsHref ? `<div class="meta"><a href="${mapsHref}">${escapeHtml(mapsHref)}</a></div>` : ''}
+              </td>
+              <td>
+                ${notes ? `<div>${escapeHtml(notes)}</div>` : ''}
+                ${internal ? `<div class="internal">🔒 ${escapeHtml(internal)}</div>` : ''}
+                ${!notes && !internal ? '<div class="meta">—</div>' : ''}
+              </td>
+            </tr>`;
+        }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Hiraya Schedule — ${escapeHtml(dateLabel)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; color: #1a2e1e; padding: 24px; max-width: 1000px; margin: 0 auto; }
+  header { border-bottom: 2px solid #1e4d2b; padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 22px; font-weight: 600; }
+  h1 span { color: #1e4d2b; }
+  .meta-top { font-size: 12px; color: #555; text-align: right; }
+  .blocked-banner { background: #f6e6e6; border: 1px solid #c97a7a; color: #7a3a3a; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; border-bottom: 1px solid #ccc; padding: 8px 6px; }
+  tbody td { border-bottom: 1px solid #e5e5e5; padding: 10px 6px; vertical-align: top; }
+  tbody td.time { font-weight: 600; white-space: nowrap; }
+  .customer { font-weight: 600; }
+  .service { font-weight: 500; }
+  .meta { font-size: 11px; color: #666; }
+  .internal { background: #fffbeb; border-left: 3px solid #b08c4a; padding: 4px 8px; margin-top: 4px; font-size: 11px; }
+  .empty { text-align: center; padding: 30px; color: #888; font-style: italic; }
+  footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 10px; color: #888; text-align: center; }
+  a { color: #1e4d2b; text-decoration: none; }
+  .print-btn { background: #1e4d2b; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  @media print {
+    body { padding: 0; }
+    .print-btn { display: none; }
+    a { color: #000; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Hiraya Spaces <span>· Schedule</span></h1>
+      <div style="font-size:15px;margin-top:4px;color:#1e4d2b;font-weight:500">${escapeHtml(dateLabel)}</div>
+    </div>
+    <div class="meta-top">
+      ${events.length} ${events.length === 1 ? 'booking' : 'bookings'}<br>
+      Generated ${new Date().toLocaleString()}<br>
+      <button class="print-btn" onclick="window.print()" style="margin-top:8px">🖨 Print</button>
+    </div>
+  </header>
+  ${blocked ? '<div class="blocked-banner">⚠️ This day is marked as blocked in the admin calendar.</div>' : ''}
+  <table>
+    <thead>
+      <tr>
+        <th style="width:90px">Time</th>
+        <th style="width:23%">Customer</th>
+        <th style="width:22%">Service</th>
+        <th>Address</th>
+        <th style="width:25%">Notes</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <footer>hirayaspaces.ca</footer>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      showToast('Pop-up blocked — allow pop-ups for /admin and try again.', 'error');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    // Give the new window a tick to render before auto-prompting print.
+    setTimeout(() => { try { win.focus(); win.print(); } catch (_) {} }, 250);
   }
 
   // Bridge from a calendar event card to the pending panel's confirm/decline
@@ -1298,6 +1578,9 @@ Hiraya Spaces`
     askComplete,
     cancelComplete,
     submitComplete,
+    askReschedule,
+    cancelReschedule,
+    submitReschedule,
     // Calendar
     calPrev,
     calNext,
@@ -1306,6 +1589,8 @@ Hiraya Spaces`
     closeDayDetail,
     jumpToPending,
     jumpToAllAndCancel,
+    toggleBlockedDate,
+    printDay,
     // Customers
     renderCustomers,
     openCustomerDetail,

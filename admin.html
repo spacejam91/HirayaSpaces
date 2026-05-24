@@ -344,6 +344,29 @@
   .cal-overflow {
     font-size: 10px; color: var(--muted); padding: 2px 6px;
   }
+  .cal-cell.is-blocked { background: repeating-linear-gradient(45deg, #f6e6e6, #f6e6e6 6px, #fbf0f0 6px, #fbf0f0 12px); }
+  .cal-cell.is-blocked .cal-cell-date { color: var(--rose); }
+  .cal-blocked-tag {
+    font-size: 9px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--rose);
+    background: white; padding: 1px 6px; border-radius: 8px;
+    border: 1px solid var(--rose); display: inline-block;
+    align-self: flex-start;
+  }
+  .cal-availability {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    background: white;
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 0.85rem 1rem;
+  }
+  .cal-availability-label {
+    font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;
+    color: var(--muted); font-weight: 500;
+  }
+  .cal-availability-state {
+    font-size: 14px; font-weight: 500; margin-top: 2px;
+  }
   .cal-legend {
     display: flex; gap: 16px; flex-wrap: wrap;
     margin-top: 1rem; font-size: 12px; color: var(--muted);
@@ -775,6 +798,36 @@
         </div>
       </div>
 
+      <!-- Reschedule overlay -->
+      <div id="reschedule-view" class="overlay-card" style="display:none">
+        <h3>Reschedule this booking</h3>
+        <p id="reschedule-text"></p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+          <div>
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">New date</label>
+            <input type="date" id="reschedule-date" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">New time slot</label>
+            <select id="reschedule-time" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;background:white">
+              <option value="">Keep current</option>
+              <option value="8:00 am">8:00 am</option>
+              <option value="9:30 am">9:30 am</option>
+              <option value="11:00 am">11:00 am</option>
+              <option value="1:00 pm">1:00 pm</option>
+              <option value="2:30 pm">2:30 pm</option>
+              <option value="4:00 pm">4:00 pm</option>
+            </select>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">After saving, you'll get a mailto link to tell the customer. The Google Calendar event is not auto-moved — update it in Calendar if you've already created it.</p>
+        <div id="reschedule-err" class="form-err"></div>
+        <div class="overlay-actions">
+          <button class="btn-ghost" onclick="HirayaAdmin.cancelReschedule()">Back</button>
+          <button class="btn-primary" id="reschedule-btn" onclick="HirayaAdmin.submitReschedule()">Save new date</button>
+        </div>
+      </div>
+
       <!-- Mark-complete overlay -->
       <div id="complete-view" class="overlay-card" style="display:none">
         <h3>Mark this booking complete?</h3>
@@ -799,6 +852,7 @@
       <div class="panel-header">
         <h2 id="cal-title">Calendar</h2>
         <div class="panel-controls">
+          <button class="panel-refresh" onclick="HirayaAdmin.printDay()" title="Print the selected day (today by default)">🖨 Print day</button>
           <button class="panel-refresh" onclick="HirayaAdmin.calPrev()" aria-label="Previous month">‹</button>
           <button class="panel-refresh" onclick="HirayaAdmin.calToday()">Today</button>
           <button class="panel-refresh" onclick="HirayaAdmin.calNext()" aria-label="Next month">›</button>

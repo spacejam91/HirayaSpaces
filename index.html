@@ -588,6 +588,10 @@
   .cal-day.selected { background: var(--sage); color: white; font-weight: 600; }
   .cal-day.today { font-weight: 700; color: var(--sage); }
   .cal-day.disabled { color: #d5ccc8; cursor: default; }
+  .cal-day.blocked {
+    background: repeating-linear-gradient(45deg, #f6e6e6, #f6e6e6 3px, #fbf0f0 3px, #fbf0f0 6px);
+    color: #b88;
+  }
   .cal-day.selected.today { color: white; }
 
   .time-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
@@ -1488,6 +1492,20 @@ function updateQuote(svc, addons) {
   lines.innerHTML = html;
 }
 
+// Public-facing record of admin-blocked dates (vacation/holidays). Fetched
+// once on page load; we don't refresh between renders since the customer
+// won't be on the page long enough to need real-time updates.
+let blockedDateSet = new Set();
+async function loadBlockedDates(){
+  if (!window.hirayaSupabase) return;
+  const { data, error } = await window.hirayaSupabase
+    .from('blocked_dates')
+    .select('date');
+  if (error) { console.warn('blocked_dates fetch failed:', error.message); return; }
+  blockedDateSet = new Set((data || []).map(r => r.date));
+  renderCalendar();
+}
+
 // Calendar
 function renderCalendar(){
   document.getElementById('cal-title').textContent = MONTHS[calM] + ' ' + calY;
@@ -1497,8 +1515,17 @@ function renderCalendar(){
   for(let i=0;i<first;i++) html+=`<div></div>`;
   for(let d=1;d<=total;d++){
     const past=(calY<tY)||(calY===tY&&calM<tM)||(calY===tY&&calM===tM&&d<tD);
-    const isSel=selDay===d&&!past, isToday=d===tD&&calM===tM&&calY===tY;
-    html+=`<div class="cal-day${past?' disabled':''}${isSel?' selected':''}${isToday?' today':''}" onclick="${past?'':'pickDay('+d+')'}">${d}</div>`;
+    const iso = `${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const blocked = blockedDateSet.has(iso);
+    const unavailable = past || blocked;
+    const isSel=selDay===d&&!unavailable, isToday=d===tD&&calM===tM&&calY===tY;
+    const classes = ['cal-day'];
+    if (unavailable) classes.push('disabled');
+    if (blocked && !past) classes.push('blocked');
+    if (isSel) classes.push('selected');
+    if (isToday) classes.push('today');
+    const title = blocked ? ' title="Unavailable — try another day"' : '';
+    html+=`<div class="${classes.join(' ')}"${title} onclick="${unavailable?'':'pickDay('+d+')'}">${d}</div>`;
   }
   document.getElementById('cal-grid').innerHTML=html;
 }
@@ -1688,6 +1715,8 @@ renderCalendar();
 renderTimes();
 updateSummary();
 renderHourlyState();
+// Kick off the blocked-dates fetch — re-renders the calendar when it lands.
+loadBlockedDates();
 </script>
 
 <!-- LOGIN / SIGNUP / FORGOT-PASSWORD MODAL -->
