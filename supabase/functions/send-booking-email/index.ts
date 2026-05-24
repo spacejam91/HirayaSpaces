@@ -182,9 +182,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const booking_id = body?.booking_id;
     const declineReason: string | null = typeof body?.reason === "string" ? body.reason : null;
-    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice";
+    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice" | "updated";
     const requestedMode = body?.mode;
-    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice")
+    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice" || requestedMode === "updated")
       ? requestedMode : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
@@ -269,6 +269,11 @@ Deno.serve(async (req) => {
       // weeks later. Booking just has to be completed.
       if (booking.status !== "completed") {
         return jsonResponse({ error: "Cannot invoice a booking that is not completed" }, 400);
+      }
+    } else if (mode === "updated") {
+      // Edit notifications: only meaningful for active/editable bookings.
+      if (!["pending_review","awaiting_quote","confirmed","in_progress"].includes(booking.status)) {
+        return jsonResponse({ error: "Cannot send update for a non-active booking" }, 400);
       }
     } else {
       const ageMs = Date.now() - new Date(booking.created_at).getTime();
@@ -641,6 +646,81 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Invoice email failed", debug: msg }, 502);
       }
       return jsonResponse({ ok: true, booking_id, mode: "invoice", invoice_number: invoiceNumber, status: invoiceStatus });
+    }
+
+    // ── UPDATED PATH (admin manually edited a booking) ────────────────────
+    if (mode === "updated") {
+      const updatedHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">BOOKING UPDATED</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">Heads up, ${escapeHtml(customerName.split(' ')[0])}</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            We've made a change to your upcoming booking <strong style="color:#1e4d2b">${idShort}</strong>. Here are the current details — please reply to this email if anything looks off.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:12px;margin-bottom:18px">
+            <tr><td style="padding:20px 22px">
+              <div style="font-size:11px;font-weight:600;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px">Current details</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e;margin-bottom:12px">
+                <tr><td style="padding:5px 0;color:#6a7d6e">Service</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(serviceName)}</td></tr>
+                <tr><td style="padding:5px 0;color:#6a7d6e">Date</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}</td></tr>
+                <tr><td style="padding:5px 0;color:#6a7d6e">Address</td><td style="padding:5px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+              </table>
+              <div style="border-top:1px solid #5a9470;padding-top:10px;font-size:13px;color:#1a2e1e">
+                <strong style="color:#6a7d6e;font-size:11px;text-transform:uppercase;letter-spacing:1.2px">Add-ons</strong>
+                ${addonsHtml}
+              </div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:14px;padding-top:12px;border-top:1px solid #5a9470">
+                <tr>
+                  <td style="font-size:15px;font-weight:700">Estimated total</td>
+                  <td style="font-size:17px;font-weight:700;color:#1e4d2b;text-align:right">${escapeHtml(totalDisplay)}</td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:0">
+            Questions or need to change something? Just reply to this email or call (226) 751-4566.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortUpd = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const updClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortUpd, tls: smtpPortUpd === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      let updErr: unknown = null;
+      try {
+        await updClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Booking updated - ${idShort}`,
+          html: tidyHtml(updatedHtml),
+        });
+      } catch (e) { console.warn("updated email failed:", e); updErr = e; }
+      try { await updClient.close(); } catch (_) {}
+      if (updErr) {
+        const msg = (updErr as Error)?.message || String(updErr);
+        return jsonResponse({ error: "Updated email failed", debug: msg }, 502);
+      }
+      return jsonResponse({ ok: true, booking_id, mode: "updated" });
     }
 
     // ── DECLINED PATH (owner declines a pending booking) ──────────────────

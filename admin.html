@@ -1211,7 +1211,10 @@
       <textarea id="edit-internal-notes" rows="2" class="nb-input" style="resize:vertical"></textarea>
     </div>
 
-    <p style="font-size:12px;color:var(--muted);margin:0 0 10px">Customer is not auto-notified. If price/date/service changed, send them a quick email or message.</p>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:4px 0 10px;cursor:pointer">
+      <input type="checkbox" id="edit-notify" checked>
+      <span>Email the customer about these changes</span>
+    </label>
     <div id="edit-err" class="form-err"></div>
 
     <div class="nb-actions">

@@ -1322,11 +1322,14 @@ Hiraya Spaces`
         const checked = currentAddonIds.has(a.id) ? 'checked' : '';
         const priceLabel = a.price_cents ? ` (+$${Math.round(a.price_cents / 100)})` : '';
         return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-          <input type="checkbox" class="edit-addon-cb" value="${a.id}" ${checked}>
+          <input type="checkbox" class="edit-addon-cb" value="${a.id}" data-price="${a.price_cents || 0}" ${checked} onchange="HirayaAdmin.recalcEditPrice()">
           <span>${escapeHtml(a.name)}${priceLabel}</span>
         </label>`;
       }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
     }
+
+    // Recalc price when service tier changes too.
+    if (svcSel) svcSel.onchange = recalcEditPrice;
 
     $('edit-date').value = b.preferred_date || '';
     $('edit-time').value = b.preferred_time_slot || '8:00 am';
@@ -1352,6 +1355,23 @@ Hiraya Spaces`
 
   function closeEditIfBackdrop(event) {
     if (event.target.id === 'edit-overlay') cancelEdit();
+  }
+
+  // Recompute the estimated price field whenever the tier or addons change.
+  // Catalog base + sum of checked addon prices. Admin can still override
+  // afterwards by typing a custom number — we only auto-fill, never lock.
+  function recalcEditPrice() {
+    const svcSel = $('edit-service');
+    if (!svcSel) return;
+    const selectedId = parseInt(svcSel.value, 10);
+    const svc = servicesCache.find(s => s.id === selectedId);
+    const baseCents = svc?.starting_price_cents || 0;
+    const addonsCents = Array.from(document.querySelectorAll('.edit-addon-cb'))
+      .filter(cb => cb.checked)
+      .reduce((sum, cb) => sum + (parseInt(cb.dataset.price, 10) || 0), 0);
+    const totalDollars = Math.round((baseCents + addonsCents) / 100);
+    const priceEl = $('edit-price');
+    if (priceEl) priceEl.value = totalDollars;
   }
 
   async function submitEdit() {
@@ -1394,18 +1414,55 @@ Hiraya Spaces`
         p_internal_notes: internalNotes,
       });
       if (error) throw error;
-      // Sync addons in a second call. Booking_addons get fully replaced with
-      // whatever was checked in the modal.
-      const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
-        p_booking_id: id,
-        p_addon_ids: addonIds,
-      });
-      if (addonErr) throw addonErr;
       if (data === false) {
         showErr('edit-err', 'Booking is not editable (only pending/confirmed/in-progress can be edited).');
         return;
       }
+      // Sync addons in a second call. Booking_addons get fully replaced with
+      // whatever was checked in the modal. If the function doesn't exist yet
+      // (SQL migration not run), show a clear hint instead of just dying.
+      const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
+        p_booking_id: id,
+        p_addon_ids: addonIds,
+      });
+      if (addonErr) {
+        const msg = addonErr.message || String(addonErr);
+        if (/does not exist|not found/i.test(msg)) {
+          showErr('edit-err', 'Booking saved, but add-ons could not sync — admin_set_booking_addons SQL function is missing. Paste the latest migration into Supabase SQL editor.');
+        } else {
+          showErr('edit-err', 'Booking saved, but add-ons failed: ' + msg);
+        }
+        await refreshAll();
+        refreshPending();
+        return;
+      }
       showToast('Booking updated.', 'success');
+
+      // Notify the customer if the checkbox is on (default). Fire-and-forget
+      // so a slow email send doesn't block the modal close.
+      const notify = $('edit-notify')?.checked;
+      if (notify) {
+        sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'updated' } })
+          .then(async ({ data: d, error: e }) => {
+            let debug = d?.debug || d?.error || '';
+            if (e) {
+              try {
+                const resp = e.context?.response;
+                if (resp && typeof resp.json === 'function') {
+                  const body = await resp.json();
+                  debug = body?.debug || body?.error || debug;
+                }
+              } catch (_) {}
+            }
+            if (e || debug) {
+              showToast('Edit saved, but update email failed: ' + (debug || e?.message || 'unknown'), 'error');
+            }
+          })
+          .catch(err => {
+            showToast('Edit saved, but update email failed: ' + (err?.message || err), 'error');
+          });
+      }
+
       editingId = null;
       await refreshAll();
       refreshPending();
@@ -2319,6 +2376,7 @@ Hiraya Spaces`
     cancelEdit,
     closeEditIfBackdrop,
     submitEdit,
+    recalcEditPrice,
     sendInvoice,
     exportBookingsCsv,
     askReschedule,
