@@ -69,9 +69,10 @@
   function getCachedAddresses() { return cachedAddresses.slice(); }
 
   // ── OWNER GATE ─────────────────────────────────────────────────────────
-  // The "owners" (Aaron, the business inbox, and Jewel) see the Admin tab.
-  // Keep this list in lockstep with the is_owner() function in
-  // hiraya-schema.sql — both check the same set of emails.
+  // The "owners" (Aaron, the business inbox, and Jewel) see the Admin link
+  // in the nav and have access to /admin. Keep this list in lockstep with
+  // OWNER_EMAILS in js/admin.js AND the is_owner() function in
+  // hiraya-schema.sql — all three check the same set of emails.
   const OWNER_EMAILS = [
     'aaron-thompson@outlook.com',
     'hirayaspaces@gmail.com',
@@ -96,7 +97,6 @@
   }
   function openAddresses() { openAccount('addresses'); }
   function openBookings() { openAccount('bookings'); }
-  function openAdmin() { openAccount('admin'); }
 
   async function refreshOwnerStatus() {
     if (!sb()) { isOwner = false; }
@@ -107,10 +107,10 @@
         isOwner = !!user && OWNER_EMAILS.some(e => e.toLowerCase() === email);
       } catch (_) { isOwner = false; }
     }
-    const btn = $('account-tab-btn-admin');
-    if (btn) btn.style.display = isOwner ? '' : 'none';
     const navAdminItem = $('nav-user-menu-admin');
     if (navAdminItem) navAdminItem.style.display = isOwner ? '' : 'none';
+    const navAdminLink = $('nav-admin-link');
+    if (navAdminLink) navAdminLink.style.display = isOwner ? 'inline-flex' : 'none';
   }
 
   function closeAddresses() {
@@ -124,9 +124,6 @@
   }
 
   function switchTab(tab) {
-    // Block the admin tab for non-owners (defence in depth — the button is
-    // hidden but a direct openAdmin call shouldn't slip through).
-    if (tab === 'admin' && !isOwner) tab = 'bookings';
     activeTab = tab;
     // Tab button highlight
     document.querySelectorAll('.account-tab').forEach(btn => {
@@ -135,10 +132,8 @@
     // Top-level tab content panels
     const bookingsTab = $('account-tab-bookings');
     const addressesTab = $('account-tab-addresses');
-    const adminTab = $('account-tab-admin');
     if (bookingsTab) bookingsTab.style.display = tab === 'bookings' ? 'block' : 'none';
     if (addressesTab) addressesTab.style.display = tab === 'addresses' ? 'block' : 'none';
-    if (adminTab) adminTab.style.display = tab === 'admin' ? 'block' : 'none';
     // Reset sub-views to their list state
     if (tab === 'addresses') {
       showListView();
@@ -146,53 +141,7 @@
     } else if (tab === 'bookings') {
       showBookingsListView();
       refreshBookings();
-    } else if (tab === 'admin') {
-      // Always land on the Pending sub-tab when entering Admin.
-      adminSubtab = 'pending';
-      document.querySelectorAll('[data-admin-subtab]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.adminSubtab === 'pending');
-      });
-      showAdminListView();
-      refreshPending();
     }
-  }
-
-  // Admin sub-tab state: 'pending' (default) vs 'all' (the full history view).
-  // The confirm/decline overlays hide both list views regardless of which
-  // sub-tab is active, then we restore the active one when the overlay closes.
-  let adminSubtab = 'pending';
-
-  function hideAllAdminOverlays() {
-    $('admin-decline-view').style.display = 'none';
-    const cv = $('admin-confirm-view'); if (cv) cv.style.display = 'none';
-    const ocv = $('admin-owner-cancel-view'); if (ocv) ocv.style.display = 'none';
-  }
-  function showAdminListView() {
-    const pendingActive = adminSubtab === 'pending';
-    $('admin-list-view').style.display = pendingActive ? 'block' : 'none';
-    const av = $('admin-all-view'); if (av) av.style.display = pendingActive ? 'none' : 'block';
-    hideAllAdminOverlays();
-    const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'flex';
-  }
-  function showAdminOverlay(viewId) {
-    $('admin-list-view').style.display = 'none';
-    const av = $('admin-all-view'); if (av) av.style.display = 'none';
-    hideAllAdminOverlays();
-    $(viewId).style.display = 'block';
-    const subtabs = $('admin-subtabs'); if (subtabs) subtabs.style.display = 'none';
-  }
-  function showAdminDeclineView() { showAdminOverlay('admin-decline-view'); }
-  function showAdminConfirmView() { showAdminOverlay('admin-confirm-view'); }
-  function showAdminOwnerCancelView() { showAdminOverlay('admin-owner-cancel-view'); }
-
-  function switchAdminSubtab(which) {
-    adminSubtab = which === 'all' ? 'all' : 'pending';
-    document.querySelectorAll('[data-admin-subtab]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.adminSubtab === adminSubtab);
-    });
-    showAdminListView();
-    if (adminSubtab === 'pending') refreshPending();
-    else refreshAllBookings();
   }
 
   function showListView() {
@@ -631,304 +580,6 @@
     }
   }
 
-  // ── ADMIN (owner) — pending bookings list + confirm/decline ────────────
-  let pendingBookings = [];
-
-  async function fetchPending() {
-    if (!sb() || !isOwner) { pendingBookings = []; return []; }
-    const { data, error } = await sb().rpc('get_pending_bookings');
-    if (error) {
-      console.warn('get_pending_bookings failed:', error.message);
-      pendingBookings = [];
-    } else {
-      pendingBookings = data || [];
-    }
-    return pendingBookings;
-  }
-
-  async function refreshPending() {
-    await fetchPending();
-    renderPending();
-  }
-
-  function renderPending() {
-    const list = $('admin-pending-list');
-    const empty = $('admin-pending-empty');
-    if (!list) return;
-    if (!pendingBookings.length) {
-      list.innerHTML = '';
-      empty.style.display = 'block';
-      return;
-    }
-    empty.style.display = 'none';
-    list.innerHTML = pendingBookings.map(b => {
-      const svc = b.service_name || 'Cleaning service';
-      const dateStr = formatBookingDate(b.preferred_date);
-      const timeStr = b.preferred_time_slot ? ` at ${escapeHtml(b.preferred_time_slot)}` : '';
-      const addr = [
-        [b.street_address, b.unit].filter(Boolean).join(', '),
-        [b.city, b.postal_code].filter(Boolean).join(' '),
-      ].filter(Boolean).join(' · ');
-      const total = b.estimated_price_cents != null
-        ? '$' + Math.round(b.estimated_price_cents / 100)
-        : 'Quote on request';
-      const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}" style="color:var(--sage)">${escapeHtml(b.customer_phone)}</a>` : '';
-      const emailLink = b.customer_email ? `<a href="mailto:${escapeHtml(b.customer_email)}" style="color:var(--sage)">${escapeHtml(b.customer_email)}</a>` : '';
-      const mapsLink = addr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="color:var(--sage);font-size:12px">🗺 Maps →</a>` : '';
-      const notes = b.customer_notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic">📝 ${escapeHtml(b.customer_notes)}</div>` : '';
-      return `
-        <div class="booking-card is-upcoming" data-id="${b.id}">
-          <div class="booking-card-head">
-            <div>
-              <div class="booking-card-svc">${escapeHtml(svc)}</div>
-              <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
-            </div>
-            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
-          </div>
-          <div class="booking-card-body">
-            <div>👤 <strong>${escapeHtml(b.customer_name || 'Customer')}</strong></div>
-            ${emailLink ? `<div>✉️ ${emailLink}</div>` : ''}
-            ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
-            ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
-            <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
-            ${notes}
-          </div>
-          <div class="booking-card-actions">
-            <button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAccount.askDecline('${b.id}')">Decline</button>
-            <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAccount.adminConfirm('${b.id}')">Confirm</button>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  // ── ADMIN — all bookings (every status, newest first) ─────────────────
-  let allBookings = [];
-
-  async function fetchAllBookings() {
-    if (!sb() || !isOwner) { allBookings = []; return []; }
-    const { data, error } = await sb().rpc('get_all_bookings');
-    if (error) {
-      console.warn('get_all_bookings failed:', error.message);
-      allBookings = [];
-    } else {
-      allBookings = data || [];
-    }
-    return allBookings;
-  }
-
-  async function refreshAllBookings() {
-    await fetchAllBookings();
-    renderAllBookings();
-  }
-
-  function renderAllBookings() {
-    const list = $('admin-all-list');
-    const empty = $('admin-all-empty');
-    if (!list) return;
-
-    const filter = ($('admin-all-status-filter')?.value || '').trim();
-    const rows = filter ? allBookings.filter(b => b.status === filter) : allBookings;
-
-    if (!rows.length) {
-      list.innerHTML = '';
-      empty.style.display = 'block';
-      return;
-    }
-    empty.style.display = 'none';
-
-    list.innerHTML = rows.map(b => {
-      const svc = b.service_name || 'Cleaning service';
-      const dateStr = formatBookingDate(b.preferred_date);
-      const timeStr = b.preferred_time_slot ? ` at ${escapeHtml(b.preferred_time_slot)}` : '';
-      const addr = [
-        [b.street_address, b.unit].filter(Boolean).join(', '),
-        [b.city, b.postal_code].filter(Boolean).join(' '),
-      ].filter(Boolean).join(' · ');
-      const total = b.estimated_price_cents != null
-        ? '$' + Math.round(b.estimated_price_cents / 100)
-        : 'Quote on request';
-      const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}" style="color:var(--sage)">${escapeHtml(b.customer_phone)}</a>` : '';
-      const emailLink = b.customer_email ? `<a href="mailto:${escapeHtml(b.customer_email)}" style="color:var(--sage)">${escapeHtml(b.customer_email)}</a>` : '';
-      const mapsLink = addr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="color:var(--sage);font-size:12px">🗺 Maps →</a>` : '';
-      const notes = b.customer_notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic">📝 ${escapeHtml(b.customer_notes)}</div>` : '';
-      const internal = b.internal_notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted)">🔒 ${escapeHtml(b.internal_notes)}</div>` : '';
-      const classes = ['booking-card'];
-      if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
-      if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
-      // Owner can pull a booking that's already confirmed or in progress
-      // (emergency, staff issue, etc.). Pending requests go through Decline
-      // from the Pending sub-tab.
-      const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
-      const actions = ownerCancellable
-        ? `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAccount.askOwnerCancel('${b.id}')">Cancel booking</button></div>`
-        : '';
-      return `
-        <div class="${classes.join(' ')}" data-id="${b.id}">
-          <div class="booking-card-head">
-            <div>
-              <div class="booking-card-svc">${escapeHtml(svc)}</div>
-              <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
-            </div>
-            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
-          </div>
-          <div class="booking-card-body">
-            <div>👤 <strong>${escapeHtml(b.customer_name || 'Customer')}</strong></div>
-            ${emailLink ? `<div>✉️ ${emailLink}</div>` : ''}
-            ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
-            ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
-            <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
-            ${notes}
-            ${internal}
-          </div>
-          ${actions}
-        </div>`;
-    }).join('');
-  }
-
-  // ── ADMIN — owner-initiated cancel of a confirmed booking ──────────────
-  let ownerCancellingBookingId = null;
-
-  function askOwnerCancel(id) {
-    const b = allBookings.find(x => x.id === id);
-    if (!b) return;
-    ownerCancellingBookingId = id;
-    const label = `${b.service_name || 'this booking'} on ${formatBookingDate(b.preferred_date)} (${b.customer_name || 'Customer'})`;
-    $('admin-owner-cancel-text').textContent = label;
-    $('admin-owner-cancel-reason').value = '';
-    $('admin-owner-cancel-err').style.display = 'none';
-    showAdminOwnerCancelView();
-  }
-
-  function cancelOwnerCancel() {
-    ownerCancellingBookingId = null;
-    showAdminListView();
-  }
-
-  async function confirmOwnerCancel() {
-    if (!ownerCancellingBookingId || !sb()) return;
-    const reason = ($('admin-owner-cancel-reason').value || '').trim();
-    const idToCancel = ownerCancellingBookingId;
-    const btn = $('admin-owner-cancel-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Cancelling…'; }
-    try {
-      const { data, error } = await sb().rpc('owner_cancel_booking', { booking_id: idToCancel, reason: reason || null });
-      if (error) throw error;
-      if (data === false) {
-        $('admin-owner-cancel-err').textContent = 'Booking can no longer be cancelled — refresh and try again.';
-        $('admin-owner-cancel-err').style.display = 'block';
-      } else {
-        showToast('Booking cancelled. Customer notified.', 'success');
-        // Reuse the existing 'cancelled' mode — its wording ("we've cancelled
-        // booking X, you haven't been charged") works for either side, and the
-        // edge function also tears down the linked Google Calendar event.
-        sb().functions.invoke('send-booking-email', { body: { booking_id: idToCancel, mode: 'cancelled' } })
-          .then(({ error: emailErr }) => { if (emailErr) console.warn('owner-cancel email failed:', emailErr.message || emailErr); })
-          .catch(err => console.warn('owner-cancel email failed:', err));
-        ownerCancellingBookingId = null;
-        await refreshAllBookings();
-        showAdminListView();
-      }
-    } catch (err) {
-      console.error('owner_cancel_booking failed:', err);
-      $('admin-owner-cancel-err').textContent = err.message || 'Could not cancel.';
-      $('admin-owner-cancel-err').style.display = 'block';
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Yes, cancel booking'; }
-    }
-  }
-
-  let confirmingBookingId = null;
-  let confirmingBookingLabel = '';
-
-  // Clicking the green Confirm button on a pending card just opens the
-  // are-you-sure view. The actual RPC + email don't fire until the owner
-  // explicitly clicks "Yes, confirm" — prevents accidental approvals.
-  function adminConfirm(id) {
-    const b = pendingBookings.find(x => x.id === id);
-    if (!b) return;
-    confirmingBookingId = id;
-    confirmingBookingLabel = `${b.service_name || 'this booking'} on ${formatBookingDate(b.preferred_date)} (${b.customer_name || 'Customer'})`;
-    $('admin-confirm-text').textContent = confirmingBookingLabel;
-    showAdminConfirmView();
-  }
-
-  function cancelAdminConfirm() {
-    confirmingBookingId = null;
-    showAdminListView();
-  }
-
-  async function confirmAdminConfirm() {
-    if (!confirmingBookingId || !sb()) return;
-    const idToConfirm = confirmingBookingId;
-    const btn = $('admin-confirm-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Confirming…'; }
-    try {
-      const { data, error } = await sb().rpc('confirm_booking', { booking_id: idToConfirm });
-      if (error) throw error;
-      if (data === false) {
-        showToast("Booking already confirmed or no longer pending.", 'error');
-      } else {
-        showToast('Booking confirmed. Customer notified.', 'success');
-        sb().functions.invoke('send-booking-email', { body: { booking_id: idToConfirm, mode: 'confirmed' } })
-          .then(({ error: emailErr }) => { if (emailErr) console.warn('confirmation email failed:', emailErr.message || emailErr); })
-          .catch(err => console.warn('confirmation email failed:', err));
-      }
-      confirmingBookingId = null;
-      await refreshPending();
-      showAdminListView();
-    } catch (err) {
-      console.error('confirm_booking failed:', err);
-      showToast(err.message || 'Could not confirm.', 'error');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Yes, confirm'; }
-    }
-  }
-
-  function askDecline(id) {
-    const b = pendingBookings.find(x => x.id === id);
-    if (!b) return;
-    decliningBookingId = id;
-    decliningBookingLabel = `${b.service_name || 'this booking'} on ${formatBookingDate(b.preferred_date)} (${b.customer_name || 'Customer'})`;
-    $('admin-decline-text').textContent = decliningBookingLabel;
-    $('admin-decline-reason').value = '';
-    $('admin-decline-err').style.display = 'none';
-    showAdminDeclineView();
-  }
-
-  function cancelDecline() {
-    decliningBookingId = null;
-    showAdminListView();
-  }
-
-  async function confirmDecline() {
-    if (!decliningBookingId || !sb()) return;
-    const reason = ($('admin-decline-reason').value || '').trim();
-    const idToDecline = decliningBookingId;
-    const btn = $('admin-decline-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-    try {
-      const { data, error } = await sb().rpc('decline_booking', { booking_id: idToDecline, reason: reason || null });
-      if (error) throw error;
-      if (data === false) {
-        $('admin-decline-err').textContent = 'Booking is no longer pending — refresh and try again.';
-        $('admin-decline-err').style.display = 'block';
-      } else {
-        showToast('Booking declined. Customer notified.', 'success');
-        sb().functions.invoke('send-booking-email', { body: { booking_id: idToDecline, mode: 'declined', reason: reason || null } })
-          .then(({ error: emailErr }) => { if (emailErr) console.warn('decline email failed:', emailErr.message || emailErr); })
-          .catch(err => console.warn('decline email failed:', err));
-        decliningBookingId = null;
-        await refreshPending();
-        showAdminListView();
-      }
-    } catch (err) {
-      console.error('decline_booking failed:', err);
-      $('admin-decline-err').textContent = err.message || 'Could not decline.';
-      $('admin-decline-err').style.display = 'block';
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Send decline'; }
-    }
-  }
 
   // ── INIT ────────────────────────────────────────────────────────────────
   function wire() {
@@ -953,8 +604,6 @@
         } else if (event === 'SIGNED_OUT') {
           cachedAddresses = [];
           cachedBookings = [];
-          pendingBookings = [];
-          allBookings = [];
           isOwner = false;
           notifyListeners();
         }
@@ -982,20 +631,6 @@
     cancelCancelBooking,
     confirmCancelBooking,
     refreshBookings,
-    // Admin tab (owner-only)
-    openAdmin,
-    switchAdminSubtab,
-    adminConfirm,
-    cancelAdminConfirm,
-    confirmAdminConfirm,
-    askDecline,
-    cancelDecline,
-    confirmDecline,
-    refreshPending,
-    refreshAllBookings,
-    askOwnerCancel,
-    cancelOwnerCancel,
-    confirmOwnerCancel,
     // For booking.js to read the saved list and react to changes
     fetchAddresses,
     getCachedAddresses,

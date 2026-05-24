@@ -106,6 +106,15 @@
     cursor: pointer; font-family: 'Jost', sans-serif;
   }
   .nav-user-btn:hover { background: var(--sage); color: white; }
+  .nav-admin {
+    display: none; align-items: center; gap: 6px;
+    background: var(--sage); color: white; border: 1.5px solid var(--sage);
+    padding: 8px 14px; border-radius: 30px; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.4px; text-decoration: none;
+    font-family: 'Jost', sans-serif; transition: background .2s, transform .15s;
+  }
+  .nav-admin:hover { background: #0f2e18; transform: translateY(-1px); }
+  .nav-admin::before { content: '⚡'; font-size: 12px; }
 
   /* ── MODAL OVERLAY ── */
   .modal-overlay {
@@ -713,6 +722,7 @@
     <li><a href="#contact">Contact</a></li>
   </ul>
   <div style="display:flex;gap:10px;align-items:center">
+    <a class="nav-admin" id="nav-admin-link" href="/admin">Admin</a>
     <button class="nav-login" id="nav-login-btn" onclick="HirayaAuth.openAuthModal('login')">Log in</button>
     <button class="nav-login" id="nav-signup-btn" onclick="HirayaAuth.openAuthModal('signup')" style="display:none">Sign up</button>
     <div class="nav-user-wrap" id="nav-user-wrap">
@@ -726,9 +736,9 @@
                 onclick="HirayaAccount.openBookings(); HirayaAuth.closeUserMenu()">My bookings</button>
         <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAccount.openAddresses(); HirayaAuth.closeUserMenu()">My addresses</button>
-        <button type="button" role="menuitem" class="nav-user-menu-item" id="nav-user-menu-admin"
-                style="display:none"
-                onclick="HirayaAccount.openAdmin(); HirayaAuth.closeUserMenu()">Admin</button>
+        <a role="menuitem" class="nav-user-menu-item" id="nav-user-menu-admin"
+                style="display:none;text-decoration:none"
+                href="/admin">Admin dashboard</a>
         <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
       </div>
@@ -1625,7 +1635,6 @@ updateSummary();
     <div class="account-tabs" id="account-tabs">
       <button type="button" class="account-tab" data-tab="bookings" onclick="HirayaAccount.switchTab('bookings')">Bookings</button>
       <button type="button" class="account-tab active" data-tab="addresses" onclick="HirayaAccount.switchTab('addresses')">Addresses</button>
-      <button type="button" class="account-tab" data-tab="admin" id="account-tab-btn-admin" onclick="HirayaAccount.switchTab('admin')" style="display:none">Admin</button>
     </div>
 
     <!-- ── BOOKINGS TAB ─────────────────────────────────────────────────── -->
@@ -1722,92 +1731,6 @@ updateSummary();
       </div>
     </div>
     </div><!-- /account-tab-addresses -->
-
-    <!-- ── ADMIN TAB (owner-only) ────────────────────────────────────────── -->
-    <div id="account-tab-admin" style="display:none">
-      <!-- Sub-tab toggle: Pending vs All bookings -->
-      <div class="account-tabs" id="admin-subtabs" style="margin-bottom:1rem">
-        <button type="button" class="account-tab active" data-admin-subtab="pending" onclick="HirayaAccount.switchAdminSubtab('pending')">Pending</button>
-        <button type="button" class="account-tab" data-admin-subtab="all" onclick="HirayaAccount.switchAdminSubtab('all')">All bookings</button>
-      </div>
-
-      <div id="admin-list-view">
-        <p class="modal-sub">Pending bookings waiting for your review. Confirm to lock them in, decline to free up the slot.</p>
-        <div id="admin-pending-list" class="bookings-list" aria-live="polite"></div>
-        <div id="admin-pending-empty" class="addr-empty" style="display:none">
-          <div class="addr-empty-icon" aria-hidden="true">✨</div>
-          <p>Nothing pending right now. You're all caught up.</p>
-        </div>
-      </div>
-
-      <!-- All-bookings sub-view -->
-      <div id="admin-all-view" style="display:none">
-        <p class="modal-sub">Every booking across every status, newest first. Use the filter to narrow it down.</p>
-        <div class="modal-field" style="margin-bottom:1rem">
-          <label for="admin-all-status-filter">Filter by status</label>
-          <select id="admin-all-status-filter" onchange="HirayaAccount.refreshAllBookings()">
-            <option value="">All statuses</option>
-            <option value="pending_review">Pending review</option>
-            <option value="awaiting_quote">Awaiting quote</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="in_progress">In progress</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="no_show">No show</option>
-          </select>
-        </div>
-        <div id="admin-all-list" class="bookings-list" aria-live="polite"></div>
-        <div id="admin-all-empty" class="addr-empty" style="display:none">
-          <div class="addr-empty-icon" aria-hidden="true">📭</div>
-          <p>No bookings match this filter.</p>
-        </div>
-      </div>
-
-      <!-- Confirm-before-confirm view -->
-      <div id="admin-confirm-view" style="display:none">
-        <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">✅</div>
-        <h3 class="modal-title" style="text-align:center;font-size:22px">Confirm this booking?</h3>
-        <p class="modal-sub" style="text-align:center" id="admin-confirm-text"></p>
-        <p class="modal-sub" style="text-align:center;font-size:12px">The customer will receive a "You're all set!" email immediately.</p>
-        <div class="br-actions">
-          <button class="modal-btn-ghost" onclick="HirayaAccount.cancelAdminConfirm()">Back</button>
-          <button class="modal-btn" id="admin-confirm-btn" onclick="HirayaAccount.confirmAdminConfirm()">Yes, confirm</button>
-        </div>
-      </div>
-
-      <!-- Owner-cancel confirmed booking view -->
-      <div id="admin-owner-cancel-view" style="display:none">
-        <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">⚠️</div>
-        <h3 class="modal-title" style="text-align:center;font-size:22px">Cancel this booking?</h3>
-        <p class="modal-sub" style="text-align:center" id="admin-owner-cancel-text"></p>
-        <div class="modal-field">
-          <label for="admin-owner-cancel-reason">Reason (optional — shared with the customer)</label>
-          <input type="text" id="admin-owner-cancel-reason" placeholder="Staff illness, equipment issue, scheduling conflict…">
-        </div>
-        <p class="modal-sub" style="text-align:center;font-size:12px">The customer will get a cancellation email and the calendar event will be removed.</p>
-        <div class="modal-err" id="admin-owner-cancel-err" role="alert"></div>
-        <div class="br-actions">
-          <button class="modal-btn-ghost" onclick="HirayaAccount.cancelOwnerCancel()">Back</button>
-          <button class="modal-btn" id="admin-owner-cancel-btn" style="background:var(--rose)" onclick="HirayaAccount.confirmOwnerCancel()">Yes, cancel booking</button>
-        </div>
-      </div>
-
-      <!-- Decline-with-reason view -->
-      <div id="admin-decline-view" style="display:none">
-        <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">📝</div>
-        <h3 class="modal-title" style="text-align:center;font-size:22px">Decline booking</h3>
-        <p class="modal-sub" style="text-align:center" id="admin-decline-text"></p>
-        <div class="modal-field">
-          <label for="admin-decline-reason">Reason (optional — shared with the customer)</label>
-          <input type="text" id="admin-decline-reason" placeholder="Schedule is full that day, out of service area, etc.">
-        </div>
-        <div class="modal-err" id="admin-decline-err" role="alert"></div>
-        <div class="br-actions">
-          <button class="modal-btn-ghost" onclick="HirayaAccount.cancelDecline()">Back</button>
-          <button class="modal-btn" id="admin-decline-btn" style="background:var(--rose)" onclick="HirayaAccount.confirmDecline()">Send decline</button>
-        </div>
-      </div>
-    </div><!-- /account-tab-admin -->
   </div>
 </div>
 

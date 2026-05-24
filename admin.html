@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#1e4d2b">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin Dashboard | Hiraya Spaces</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&family=Cinzel:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/auth.css">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --rose: #2d5a3d;
+    --rose-light: #eaf2ec;
+    --rose-mid: #7aaa8a;
+    --sage: #1e4d2b;
+    --sage-light: #e4f0e9;
+    --sage-mid: #5a9470;
+    --cream: #f8faf8;
+    --warm: #f0f5f1;
+    --text: #1a2e1e;
+    --muted: #6a7d6e;
+    --border: #d4e2d8;
+    --gold: #8faa6a;
+  }
+
+  body {
+    font-family: 'Jost', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── ADMIN NAV ── */
+  .admin-nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(250,247,242,0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 4vw;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 68px;
+  }
+  .admin-brand {
+    font-family: 'Cinzel', serif;
+    font-size: 17px; font-weight: 500; letter-spacing: 2.5px;
+    color: var(--sage); text-decoration: none;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .admin-brand .admin-tag {
+    font-family: 'Jost', sans-serif;
+    font-size: 11px; letter-spacing: 1.5px; font-weight: 500;
+    background: var(--sage); color: white;
+    padding: 4px 10px; border-radius: 30px;
+  }
+  .admin-nav-right {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .admin-greet {
+    font-size: 13px; color: var(--muted); margin-right: 4px;
+  }
+  .admin-nav-btn {
+    background: none; color: var(--text); border: 1.5px solid var(--border);
+    padding: 8px 14px; border-radius: 30px; font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: 'Jost', sans-serif; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: border-color .2s, color .2s;
+  }
+  .admin-nav-btn:hover { border-color: var(--sage); color: var(--sage); }
+
+  /* ── PAGE LAYOUT ── */
+  .admin-shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem 4vw 4rem;
+  }
+  .admin-hero {
+    margin-bottom: 1.5rem;
+  }
+  .admin-hero h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 38px; font-weight: 400; line-height: 1.1;
+  }
+  .admin-hero h1 em { font-style: italic; color: var(--sage); }
+  .admin-hero p {
+    margin-top: 6px; font-size: 14px; color: var(--muted);
+  }
+
+  /* ── STATS ROW (stub for phase 2) ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1.2rem;
+  }
+  .stat-card-label {
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); font-weight: 500;
+  }
+  .stat-card-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 500; margin-top: 6px;
+    color: var(--text);
+  }
+  .stat-card-sub {
+    font-size: 12px; color: var(--muted); margin-top: 2px;
+  }
+  .stub-pill {
+    display: inline-block; font-size: 10px; letter-spacing: 0.5px;
+    background: var(--warm); color: var(--muted);
+    padding: 2px 8px; border-radius: 10px; margin-top: 4px;
+  }
+
+  /* ── TAB BAR ── */
+  .admin-tabs {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .admin-tab {
+    background: none; border: none;
+    padding: 12px 18px; font-size: 13px; font-weight: 500;
+    color: var(--muted); cursor: pointer; font-family: 'Jost', sans-serif;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .2s, border-color .2s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .admin-tab:hover { color: var(--text); }
+  .admin-tab.active { color: var(--sage); border-bottom-color: var(--sage); }
+  .admin-tab-count {
+    background: var(--sage); color: white;
+    font-size: 11px; font-weight: 600;
+    padding: 1px 7px; border-radius: 10px; min-width: 18px; text-align: center;
+  }
+  .admin-tab:not(.active) .admin-tab-count {
+    background: var(--border); color: var(--muted);
+  }
+
+  /* ── PANELS ── */
+  .admin-panel { display: none; }
+  .admin-panel.active { display: block; }
+
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem; flex-wrap: wrap; gap: 12px;
+  }
+  .panel-header h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px; font-weight: 400;
+  }
+  .panel-controls {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .panel-controls select,
+  .panel-controls input {
+    font-family: 'Jost', sans-serif; font-size: 13px;
+    border: 1.5px solid var(--border); border-radius: 30px;
+    padding: 8px 14px; background: white; color: var(--text);
+    outline: none;
+  }
+  .panel-controls select:focus,
+  .panel-controls input:focus { border-color: var(--sage); }
+  .panel-refresh {
+    background: none; border: 1.5px solid var(--border);
+    padding: 8px 14px; border-radius: 30px; font-size: 12px;
+    cursor: pointer; font-family: 'Jost', sans-serif;
+    transition: border-color .2s, color .2s;
+  }
+  .panel-refresh:hover { border-color: var(--sage); color: var(--sage); }
+
+  .booking-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1rem;
+  }
+  .empty-state {
+    text-align: center; padding: 4rem 1rem;
+    color: var(--muted); font-size: 14px;
+    border: 1px dashed var(--border); border-radius: 14px;
+    background: white;
+  }
+  .empty-state .empty-icon {
+    font-size: 28px; display: block; margin-bottom: 8px;
+  }
+
+  /* ── OVERLAY FORMS (confirm/decline/owner-cancel) ── */
+  .overlay-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+  .overlay-card h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px; font-weight: 400; margin-bottom: 8px;
+  }
+  .overlay-card p { color: var(--muted); font-size: 14px; margin-bottom: 1rem; }
+  .overlay-card textarea {
+    width: 100%; min-height: 110px; resize: vertical;
+    font-family: 'Jost', sans-serif; font-size: 14px;
+    padding: 12px; border: 1.5px solid var(--border); border-radius: 12px;
+    outline: none;
+  }
+  .overlay-card textarea:focus { border-color: var(--sage); }
+  .overlay-actions {
+    display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap;
+  }
+  .btn-primary {
+    background: var(--sage); color: white; border: none;
+    padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'Jost', sans-serif;
+  }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-danger {
+    background: var(--rose); color: white; border: none;
+    padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'Jost', sans-serif;
+  }
+  .btn-ghost {
+    background: none; color: var(--muted); border: 1.5px solid var(--border);
+    padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: 'Jost', sans-serif;
+  }
+  .form-err {
+    background: #fbe7e7; color: #8a2a2a; padding: 10px 14px; border-radius: 10px;
+    font-size: 13px; margin-top: 12px; display: none;
+  }
+
+  /* ── LOGIN / DENIED VIEWS ── */
+  .gate-wrap {
+    min-height: 80vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .gate-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    max-width: 420px; width: 100%;
+    text-align: center;
+  }
+  .gate-card h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 30px; font-weight: 400;
+    margin-bottom: 6px;
+  }
+  .gate-card h1 em { font-style: italic; color: var(--sage); }
+  .gate-card p { color: var(--muted); font-size: 14px; margin-bottom: 1.5rem; }
+  .gate-card input {
+    width: 100%; font-family: 'Jost', sans-serif; font-size: 14px;
+    padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 12px;
+    margin-bottom: 10px; outline: none;
+  }
+  .gate-card input:focus { border-color: var(--sage); }
+  .gate-card .btn-primary { width: 100%; padding: 12px; margin-top: 6px; font-size: 14px; }
+  .gate-card .gate-foot {
+    margin-top: 1.25rem; font-size: 12px; color: var(--muted);
+  }
+  .gate-card .gate-foot a { color: var(--sage); text-decoration: none; }
+
+  /* ── CALENDAR ── */
+  .cal-dow-row {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 6px; margin-bottom: 6px;
+  }
+  .cal-dow {
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); font-weight: 500;
+    padding: 4px 8px;
+  }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    background: var(--border);
+    border-radius: 14px;
+    padding: 6px;
+    border: 1px solid var(--border);
+  }
+  .cal-cell {
+    background: white;
+    border-radius: 10px;
+    padding: 8px;
+    min-height: 110px;
+    display: flex; flex-direction: column; gap: 4px;
+    cursor: default;
+    transition: background .15s, transform .1s;
+  }
+  .cal-cell.is-outside { background: var(--cream); opacity: 0.55; }
+  .cal-cell.has-events { cursor: pointer; }
+  .cal-cell.has-events:hover { background: var(--sage-light); transform: translateY(-1px); }
+  .cal-cell.is-today { box-shadow: 0 0 0 2px var(--sage) inset; }
+  .cal-cell.is-selected { background: var(--sage-light); box-shadow: 0 0 0 2px var(--sage); }
+  .cal-cell-date {
+    font-size: 13px; font-weight: 500; color: var(--text);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cal-cell.is-today .cal-cell-date::after {
+    content: 'today'; font-size: 9px; letter-spacing: 0.5px;
+    color: var(--sage); font-weight: 600; text-transform: uppercase;
+  }
+  .cal-events {
+    display: flex; flex-direction: column; gap: 3px;
+    margin-top: 2px; min-height: 0;
+  }
+  .cal-event {
+    font-size: 11px; line-height: 1.2;
+    padding: 3px 6px; border-radius: 6px;
+    background: var(--sage-light); color: var(--sage);
+    border-left: 3px solid var(--sage);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cal-event.pending_review,
+  .cal-event.awaiting_quote { background: #fbf3df; color: #7a5a18; border-left-color: #b08c4a; }
+  .cal-event.in_progress { background: #e0eef7; color: #2b5a73; border-left-color: #3b82a8; }
+  .cal-event.completed { background: #eef0ee; color: #4a5d4e; border-left-color: #6a7d6e; }
+  .cal-event.cancelled,
+  .cal-event.no_show { background: #f6e6e6; color: #7a3a3a; border-left-color: var(--rose); text-decoration: line-through; }
+  .cal-overflow {
+    font-size: 10px; color: var(--muted); padding: 2px 6px;
+  }
+  .cal-legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-top: 1rem; font-size: 12px; color: var(--muted);
+  }
+  .cal-legend i.cal-dot {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; margin-right: 4px; vertical-align: middle;
+  }
+  .cal-legend i.cal-dot.confirmed { background: var(--sage); }
+  .cal-legend i.cal-dot.pending_review { background: #b08c4a; }
+  .cal-legend i.cal-dot.completed { background: #6a7d6e; }
+  .cal-legend i.cal-dot.cancelled { background: var(--rose); }
+
+  /* Mobile agenda */
+  .cal-agenda { display: none; }
+  .cal-agenda-day {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .cal-agenda-day.is-today { border-color: var(--sage); border-width: 2px; }
+  .cal-agenda-date {
+    font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px;
+  }
+  .cal-agenda-day.is-today .cal-agenda-date { color: var(--sage); font-weight: 600; }
+  .cal-agenda-empty {
+    text-align: center; color: var(--muted); font-size: 13px;
+    padding: 2rem 1rem;
+  }
+
+  /* Day detail drawer */
+  .cal-day-detail {
+    margin-top: 1.5rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem;
+  }
+  .cal-day-detail-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .cal-day-detail-head h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 400;
+  }
+
+  /* ── STUB PANELS (Phase 2-4) ── */
+  .stub-block {
+    background: white;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .stub-block h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px; font-weight: 400; margin-bottom: 8px;
+  }
+  .stub-block p { color: var(--muted); font-size: 14px; max-width: 480px; margin: 0 auto; }
+
+  /* ── MOBILE ── */
+  @media (max-width: 720px) {
+    .admin-shell { padding: 1.25rem 4vw 3rem; }
+    .admin-hero h1 { font-size: 30px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .booking-grid { grid-template-columns: 1fr; }
+    .admin-tab { padding: 10px 12px; font-size: 12px; }
+    .admin-nav { padding: 0 4vw; height: 60px; }
+    .admin-brand { font-size: 14px; letter-spacing: 1.5px; }
+    .admin-brand .admin-tag { font-size: 10px; padding: 3px 8px; }
+    .admin-nav-btn { padding: 7px 11px; font-size: 11px; }
+    .admin-greet { display: none; }
+    .cal-grid-wrap { display: none; }
+    .cal-agenda { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LOGGED-OUT / GATE ── -->
+<div id="gate-login" class="gate-wrap" style="display:none">
+  <div class="gate-card">
+    <h1>Hiraya <em>Admin</em></h1>
+    <p>Sign in with your manager account to continue.</p>
+    <input id="gate-email" type="email" placeholder="Email" autocomplete="username" />
+    <input id="gate-pass" type="password" placeholder="Password" autocomplete="current-password" />
+    <div id="gate-err" class="form-err"></div>
+    <button class="btn-primary" id="gate-submit" onclick="HirayaAdmin.doLogin()">Sign in</button>
+    <div class="gate-foot">
+      <a href="/">← Back to hirayaspaces.ca</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── NOT AN ADMIN ── -->
+<div id="gate-denied" class="gate-wrap" style="display:none">
+  <div class="gate-card">
+    <h1>No <em>access</em></h1>
+    <p>This account isn't authorized to use the admin dashboard. If you think that's a mistake, contact Aaron.</p>
+    <button class="btn-primary" onclick="HirayaAdmin.doLogout()">Sign out</button>
+    <div class="gate-foot">
+      <a href="/">← Back to hirayaspaces.ca</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="dashboard" style="display:none">
+
+  <nav class="admin-nav">
+    <a href="/admin" class="admin-brand">
+      Hiraya Spaces
+      <span class="admin-tag">Admin</span>
+    </a>
+    <div class="admin-nav-right">
+      <span class="admin-greet" id="admin-greet"></span>
+      <a href="/" class="admin-nav-btn">View site</a>
+      <button class="admin-nav-btn" onclick="HirayaAdmin.doLogout()">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="admin-shell">
+
+    <div class="admin-hero">
+      <h1>Welcome <em id="admin-first-name">back</em></h1>
+      <p id="admin-hero-sub">Review pending requests, manage active bookings, and keep an eye on the schedule.</p>
+    </div>
+
+    <!-- Stats stubs (Phase 2) -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-card-label">Pending</div>
+        <div class="stat-card-value" id="stat-pending">—</div>
+        <div class="stat-card-sub">Awaiting your review</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Confirmed</div>
+        <div class="stat-card-value" id="stat-confirmed">—</div>
+        <div class="stat-card-sub">Upcoming jobs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">This week</div>
+        <div class="stat-card-value" id="stat-week">—</div>
+        <div class="stat-card-sub" id="stat-week-sub">Cleans scheduled</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Revenue (est.)</div>
+        <div class="stat-card-value" id="stat-revenue">—</div>
+        <div class="stat-card-sub" id="stat-revenue-sub">This month</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-panel="pending" onclick="HirayaAdmin.switchPanel('pending')">
+        Pending <span class="admin-tab-count" id="tab-count-pending">0</span>
+      </button>
+      <button class="admin-tab" data-panel="all" onclick="HirayaAdmin.switchPanel('all')">All bookings</button>
+      <button class="admin-tab" data-panel="calendar" onclick="HirayaAdmin.switchPanel('calendar')">Calendar</button>
+      <button class="admin-tab" data-panel="customers" onclick="HirayaAdmin.switchPanel('customers')">Customers</button>
+    </div>
+
+    <!-- ── PENDING PANEL ── -->
+    <div class="admin-panel active" id="panel-pending">
+
+      <div id="pending-list-view">
+        <div class="panel-header">
+          <h2>Pending bookings</h2>
+          <div class="panel-controls">
+            <button class="panel-refresh" onclick="HirayaAdmin.refreshPending()">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="pending-list" class="booking-grid"></div>
+        <div id="pending-empty" class="empty-state" style="display:none">
+          <span class="empty-icon">✓</span>
+          No pending requests right now. Nice work.
+        </div>
+      </div>
+
+      <!-- Confirm overlay -->
+      <div id="confirm-view" class="overlay-card" style="display:none">
+        <h3>Confirm this booking?</h3>
+        <p id="confirm-text"></p>
+        <p style="font-size:13px">The customer will get a "You're all set!" email and the calendar event stays in place.</p>
+        <div class="overlay-actions">
+          <button class="btn-ghost" onclick="HirayaAdmin.cancelConfirm()">Back</button>
+          <button class="btn-primary" id="confirm-btn" onclick="HirayaAdmin.submitConfirm()">Yes, confirm</button>
+        </div>
+      </div>
+
+      <!-- Decline overlay -->
+      <div id="decline-view" class="overlay-card" style="display:none">
+        <h3>Decline this booking</h3>
+        <p id="decline-text"></p>
+        <p style="font-size:13px">Optional: tell the customer why (this goes in the email).</p>
+        <textarea id="decline-reason" placeholder="e.g. We're fully booked that day — happy to suggest another."></textarea>
+        <div id="decline-err" class="form-err"></div>
+        <div class="overlay-actions">
+          <button class="btn-ghost" onclick="HirayaAdmin.cancelDecline()">Back</button>
+          <button class="btn-danger" id="decline-btn" onclick="HirayaAdmin.submitDecline()">Send decline</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── ALL BOOKINGS PANEL ── -->
+    <div class="admin-panel" id="panel-all">
+
+      <div id="all-list-view">
+        <div class="panel-header">
+          <h2>All bookings</h2>
+          <div class="panel-controls">
+            <select id="all-status-filter" onchange="HirayaAdmin.renderAll()">
+              <option value="">All statuses</option>
+              <option value="pending_review">Pending review</option>
+              <option value="awaiting_quote">Awaiting quote</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="in_progress">In progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="no_show">No show</option>
+            </select>
+            <button class="panel-refresh" onclick="HirayaAdmin.refreshAll()">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="all-list" class="booking-grid"></div>
+        <div id="all-empty" class="empty-state" style="display:none">
+          <span class="empty-icon">∅</span>
+          No bookings match that filter.
+        </div>
+      </div>
+
+      <!-- Owner-cancel overlay -->
+      <div id="owner-cancel-view" class="overlay-card" style="display:none">
+        <h3>Cancel this booking?</h3>
+        <p id="owner-cancel-text"></p>
+        <p style="font-size:13px">The customer will get a cancellation email and the calendar event will be removed.</p>
+        <textarea id="owner-cancel-reason" placeholder="Reason (optional, included in the email)"></textarea>
+        <div id="owner-cancel-err" class="form-err"></div>
+        <div class="overlay-actions">
+          <button class="btn-ghost" onclick="HirayaAdmin.cancelOwnerCancel()">Back</button>
+          <button class="btn-danger" id="owner-cancel-btn" onclick="HirayaAdmin.submitOwnerCancel()">Yes, cancel booking</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── CALENDAR PANEL ── -->
+    <div class="admin-panel" id="panel-calendar">
+      <div class="panel-header">
+        <h2 id="cal-title">Calendar</h2>
+        <div class="panel-controls">
+          <button class="panel-refresh" onclick="HirayaAdmin.calPrev()" aria-label="Previous month">‹</button>
+          <button class="panel-refresh" onclick="HirayaAdmin.calToday()">Today</button>
+          <button class="panel-refresh" onclick="HirayaAdmin.calNext()" aria-label="Next month">›</button>
+        </div>
+      </div>
+
+      <!-- Desktop grid -->
+      <div class="cal-grid-wrap" id="cal-grid-wrap">
+        <div class="cal-dow-row">
+          <div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div>
+          <div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+          <div class="cal-dow">Sun</div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-legend">
+          <span><i class="cal-dot confirmed"></i> Confirmed</span>
+          <span><i class="cal-dot pending_review"></i> Pending</span>
+          <span><i class="cal-dot completed"></i> Completed</span>
+          <span><i class="cal-dot cancelled"></i> Cancelled</span>
+        </div>
+      </div>
+
+      <!-- Mobile agenda (alternative layout) -->
+      <div class="cal-agenda" id="cal-agenda"></div>
+
+      <!-- Day detail drawer -->
+      <div class="cal-day-detail" id="cal-day-detail" style="display:none">
+        <div class="cal-day-detail-head">
+          <h3 id="cal-day-detail-title">Selected day</h3>
+          <button class="btn-ghost" onclick="HirayaAdmin.closeDayDetail()">Close</button>
+        </div>
+        <div class="booking-grid" id="cal-day-detail-list"></div>
+      </div>
+    </div>
+
+    <!-- ── CUSTOMERS PANEL (stub) ── -->
+    <div class="admin-panel" id="panel-customers">
+      <div class="panel-header">
+        <h2>Customers</h2>
+      </div>
+      <div class="stub-block">
+        <h3>Coming in Phase 4</h3>
+        <p>Search any customer by name or email to see their booking history, saved addresses, lifetime value, and notes.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Supabase + admin scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script src="/js/supabase-client.js"></script>
+<script src="/js/admin.js"></script>
+
+</body>
+</html>
