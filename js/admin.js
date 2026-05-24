@@ -229,7 +229,7 @@
   let activePanel = 'pending';
 
   // Tabs that share the All-Bookings panel DOM but pre-apply a status filter.
-  const PANEL_ALIAS = { confirmed: 'all', completed: 'all' };
+  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all' };
 
   function switchPanel(name) {
     activePanel = name;
@@ -245,19 +245,22 @@
       $('pending-list-view').style.display = 'block';
       $('confirm-view').style.display = 'none';
       $('decline-view').style.display = 'none';
+      const editView = $('edit-view'); if (editView) editView.style.display = 'none';
       refreshPending();
-    } else if (name === 'all' || name === 'confirmed' || name === 'completed') {
+    } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed') {
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
       const completeView = $('complete-view');
       if (completeView) completeView.style.display = 'none';
       const rescheduleView = $('reschedule-view');
       if (rescheduleView) rescheduleView.style.display = 'none';
+      const editView = $('edit-view'); if (editView) editView.style.display = 'none';
       // Pre-apply the status filter so each tab shows its slice. The All
       // bookings tab resets to "no filter".
       const filterSel = $('all-status-filter');
       if (filterSel) {
         if (name === 'confirmed') filterSel.value = 'confirmed';
+        else if (name === 'in_progress') filterSel.value = 'in_progress';
         else if (name === 'completed') filterSel.value = 'completed';
         else filterSel.value = '';
       }
@@ -265,6 +268,7 @@
       const titleEl = document.querySelector('#all-list-view .panel-header h2');
       if (titleEl) {
         titleEl.textContent = name === 'confirmed' ? 'Confirmed bookings'
+          : name === 'in_progress' ? 'In-progress bookings'
           : name === 'completed' ? 'Completed bookings'
           : 'All bookings';
       }
@@ -318,6 +322,7 @@
     list.innerHTML = pendingBookings.map(b => bookingCardHtml(b, {
       actions: `
         <div class="booking-card-actions">
+          <button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>
           <button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.askDecline('${b.id}')">Decline</button>
           <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askConfirm('${b.id}')">Confirm</button>
         </div>`
@@ -455,10 +460,14 @@
       }
     }
 
-    // Tab count chips for the new Confirmed + Completed tabs.
+    // Tab count chips for Confirmed / In progress / Completed.
     const tabConfirmed = $('tab-count-confirmed');
     if (tabConfirmed) {
-      tabConfirmed.textContent = allBookings.filter(b => b.status === 'confirmed' || b.status === 'in_progress').length;
+      tabConfirmed.textContent = allBookings.filter(b => b.status === 'confirmed').length;
+    }
+    const tabInProgress = $('tab-count-in_progress');
+    if (tabInProgress) {
+      tabInProgress.textContent = allBookings.filter(b => b.status === 'in_progress').length;
     }
     const tabCompleted = $('tab-count-completed');
     if (tabCompleted) {
@@ -489,13 +498,14 @@
 
     list.innerHTML = rows.map(b => {
       const reschedulable = ['pending_review', 'awaiting_quote', 'confirmed', 'in_progress'].includes(b.status);
+      const editable = ['pending_review', 'awaiting_quote', 'confirmed', 'in_progress'].includes(b.status);
       const ownerCancellable = ['confirmed', 'in_progress'].includes(b.status);
       const completable = ['confirmed', 'in_progress'].includes(b.status);
       const canCheckIn = b.status === 'confirmed' && !b.check_in_at;
       const canCheckOut = b.status === 'in_progress' && b.check_in_at && !b.check_out_at;
       const canInvoice = b.status === 'completed';
       let actions = '';
-      if (canCheckIn || canCheckOut || completable || ownerCancellable || reschedulable || canInvoice) {
+      if (canCheckIn || canCheckOut || completable || ownerCancellable || reschedulable || canInvoice || editable) {
         const parts = [];
         if (canCheckIn) {
           parts.push(`<button class="booking-card-btn" style="background:#3b82a8;color:white" onclick="HirayaAdmin.checkInBooking('${b.id}')">▶ Check in</button>`);
@@ -508,6 +518,9 @@
         }
         if (canInvoice) {
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.sendInvoice('${b.id}')">Send invoice</button>`);
+        }
+        if (editable) {
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
         }
         if (reschedulable) {
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
@@ -1238,6 +1251,107 @@ Hiraya Spaces`
     if (!iso) return '';
     const d = new Date(iso);
     return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // ── MANUAL EDIT (admin can adjust any pending/active booking) ──────────
+  let editingId = null;
+
+  function askEdit(id) {
+    // Source of truth is allBookings (which has joined service_name etc).
+    // Pending bookings come from pendingBookings, so fall back if needed.
+    const b = allBookings.find(x => x.id === id) || pendingBookings.find(x => x.id === id);
+    if (!b) return;
+    editingId = id;
+
+    // Populate the service dropdown from the cached services list.
+    const svcSel = $('edit-service');
+    if (svcSel) {
+      svcSel.innerHTML = servicesCache.map(s => {
+        const price = s.requires_quote ? 'Quote' : '$' + Math.round((s.starting_price_cents || 0) / 100);
+        return `<option value="${s.id}" data-slug="${s.slug}">${s.name} — ${price}</option>`;
+      }).join('');
+      // Pre-select the current service by matching name (we don't store
+      // service_id in allBookings — only service_name).
+      const match = servicesCache.find(s => s.name === b.service_name);
+      if (match) svcSel.value = match.id;
+    }
+
+    $('edit-date').value = b.preferred_date || '';
+    $('edit-time').value = b.preferred_time_slot || '8:00 am';
+    $('edit-price').value = b.estimated_price_cents != null ? Math.round(b.estimated_price_cents / 100) : '';
+    $('edit-customer-notes').value = b.customer_notes || '';
+    $('edit-internal-notes').value = b.internal_notes || '';
+
+    $('edit-text').textContent =
+      `${b.service_name || 'Booking'} — ${b.customer_name || 'Customer'} (currently ${formatBookingDate(b.preferred_date)}${b.preferred_time_slot ? ' at ' + b.preferred_time_slot : ''})`;
+    hideErr('edit-err');
+
+    // Hide whatever panel we came from so the overlay has the stage.
+    $('pending-list-view').style.display = 'none';
+    $('all-list-view').style.display = 'none';
+    $('owner-cancel-view').style.display = 'none';
+    const completeView = $('complete-view'); if (completeView) completeView.style.display = 'none';
+    $('reschedule-view').style.display = 'none';
+    $('edit-view').style.display = 'block';
+  }
+
+  function cancelEdit() {
+    editingId = null;
+    $('edit-view').style.display = 'none';
+    // Return to whichever list the user was on.
+    if (activePanel === 'pending') $('pending-list-view').style.display = 'block';
+    else $('all-list-view').style.display = 'block';
+  }
+
+  async function submitEdit() {
+    if (!editingId || !sb()) return;
+    const id = editingId;
+
+    const svcSel = $('edit-service');
+    const serviceId = svcSel && svcSel.value ? parseInt(svcSel.value, 10) : null;
+    const newDate = $('edit-date').value || null;
+    const newTime = $('edit-time').value || null;
+    const priceRaw = $('edit-price').value.trim();
+    let priceCents = null;
+    if (priceRaw !== '') {
+      const num = Number(priceRaw);
+      if (!Number.isFinite(num) || num < 0) {
+        showErr('edit-err', 'Enter a valid price or leave blank.');
+        return;
+      }
+      priceCents = Math.round(num * 100);
+    }
+    const customerNotes = $('edit-customer-notes').value.trim() || null;
+    const internalNotes = $('edit-internal-notes').value.trim() || null;
+
+    const btn = $('edit-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { data, error } = await sb().rpc('admin_update_booking', {
+        p_booking_id: id,
+        p_service_id: serviceId,
+        p_preferred_date: newDate,
+        p_preferred_time_slot: newTime,
+        p_estimated_price_cents: priceCents,
+        p_customer_notes: customerNotes,
+        p_internal_notes: internalNotes,
+      });
+      if (error) throw error;
+      if (data === false) {
+        showErr('edit-err', 'Booking is not editable (only pending/confirmed/in-progress can be edited).');
+        return;
+      }
+      showToast('Booking updated.', 'success');
+      editingId = null;
+      await refreshAll();
+      refreshPending();
+      cancelEdit();
+    } catch (err) {
+      console.error('admin_update_booking failed:', err);
+      showErr('edit-err', err.message || 'Could not save.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save changes';
+    }
   }
 
   // ── RESCHEDULE (edit date/time without losing the booking) ─────────────
@@ -2137,6 +2251,9 @@ Hiraya Spaces`
     askComplete,
     cancelComplete,
     submitComplete,
+    askEdit,
+    cancelEdit,
+    submitEdit,
     sendInvoice,
     exportBookingsCsv,
     askReschedule,

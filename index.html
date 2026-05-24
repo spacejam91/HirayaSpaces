@@ -938,7 +938,7 @@
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
       </div>
     </div>
-    <button class="nav-cta" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Book now</button>
+    <button class="nav-cta" id="nav-cta-book" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book now</button>
     <a href="tel:+12267514566" class="nav-phone" style="font-size:13px;color:var(--muted);text-decoration:none;font-weight:500">(226) 751-4566</a>
   </div>
 </nav>
@@ -1278,6 +1278,22 @@ document.addEventListener('click', function (e) {
   void a.offsetWidth; // force reflow so the animation can restart
   a.style.animation = 'step-num-bounce .55s ease';
 });
+
+// Hide the nav "Book now" CTA the moment the user enters the booking form.
+// Mid-flow users were getting bounced back to the top when they tapped it.
+// IntersectionObserver fires on entry/exit so the button reappears if they
+// scroll back up.
+(function hideNavCtaInBooking() {
+  const cta = document.getElementById('nav-cta-book');
+  const section = document.getElementById('booking');
+  if (!cta || !section || !('IntersectionObserver' in window)) return;
+  const io = new IntersectionObserver(function (entries) {
+    for (const entry of entries) {
+      cta.style.display = entry.isIntersecting ? 'none' : '';
+    }
+  }, { threshold: 0.05 });
+  io.observe(section);
+})();
 
 const SERVICES = [
   {id:'standard',icon:'🧹',name:'Regular Residential',price:'From $120',

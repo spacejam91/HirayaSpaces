@@ -800,6 +800,9 @@
       <button class="admin-tab" data-panel="confirmed" onclick="HirayaAdmin.switchPanel('confirmed')">
         Confirmed <span class="admin-tab-count" id="tab-count-confirmed">0</span>
       </button>
+      <button class="admin-tab" data-panel="in_progress" onclick="HirayaAdmin.switchPanel('in_progress')">
+        In progress <span class="admin-tab-count" id="tab-count-in_progress">0</span>
+      </button>
       <button class="admin-tab" data-panel="completed" onclick="HirayaAdmin.switchPanel('completed')">
         Completed <span class="admin-tab-count" id="tab-count-completed">0</span>
       </button>
@@ -862,6 +865,7 @@
               <option value="">All statuses</option>
               <option value="pending_review">Pending</option>
               <option value="confirmed">Confirmed</option>
+              <option value="in_progress">In progress</option>
               <option value="completed">Completed</option>
             </select>
             <button class="panel-refresh" onclick="HirayaAdmin.exportBookingsCsv()">⬇ Export CSV</button>
@@ -885,6 +889,53 @@
         <div class="overlay-actions">
           <button class="btn-ghost" onclick="HirayaAdmin.cancelOwnerCancel()">Back</button>
           <button class="btn-danger" id="owner-cancel-btn" onclick="HirayaAdmin.submitOwnerCancel()">Yes, cancel booking</button>
+        </div>
+      </div>
+
+      <!-- Edit overlay (manual adjustment of a booking) -->
+      <div id="edit-view" class="overlay-card" style="display:none">
+        <h3>Edit this booking</h3>
+        <p id="edit-text"></p>
+        <div style="display:grid;grid-template-columns:1fr;gap:14px;margin-top:8px">
+          <div>
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Service</label>
+            <select id="edit-service" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;background:white"></select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Date</label>
+              <input type="date" id="edit-date" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px">
+            </div>
+            <div>
+              <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Time slot</label>
+              <select id="edit-time" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;background:white">
+                <option value="8:00 am">8:00 am</option>
+                <option value="9:30 am">9:30 am</option>
+                <option value="11:00 am">11:00 am</option>
+                <option value="1:00 pm">1:00 pm</option>
+                <option value="2:30 pm">2:30 pm</option>
+                <option value="4:00 pm">4:00 pm</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Estimated price (CAD)</label>
+            <input type="number" id="edit-price" min="0" step="1" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Customer notes (visible to cleaner)</label>
+            <textarea id="edit-customer-notes" rows="2" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;resize:vertical"></textarea>
+          </div>
+          <div>
+            <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">Internal notes (admin only)</label>
+            <textarea id="edit-internal-notes" rows="2" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:4px;resize:vertical"></textarea>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">Customer is not auto-notified. If price/date/service changed, send them a quick email or message.</p>
+        <div id="edit-err" class="form-err"></div>
+        <div class="overlay-actions">
+          <button class="btn-ghost" onclick="HirayaAdmin.cancelEdit()">Back</button>
+          <button class="btn-primary" id="edit-btn" onclick="HirayaAdmin.submitEdit()">Save changes</button>
         </div>
       </div>
 

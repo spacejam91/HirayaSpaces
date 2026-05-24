@@ -309,6 +309,30 @@ Deno.serve(async (req) => {
         }).join("")}</ul>`
       : `<div style="color:#6a7d6e;font-style:italic;margin-top:6px">No add-ons</div>`;
 
+    // Line-item rows for the booked summary: service base price first, then
+    // each addon priced (or "Included" for $0 like Eco Products). Cleaner
+    // than the old separate Service line + Add-ons bullet list, and shows
+    // the customer how the total was built.
+    const baseCents = booking.services?.starting_price_cents ?? 0;
+    const addonsCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+    // Use the saved total when it's there, otherwise reconstruct from parts.
+    const lineRows: string[] = [];
+    lineRows.push(
+      `<tr><td style="padding:6px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td>` +
+      `<td style="padding:6px 0;text-align:right;color:#1a2e1e;font-weight:600">${baseCents ? dollars(baseCents) : "—"}</td></tr>`
+    );
+    for (const ba of bookingAddons) {
+      const name = ba.addons?.name || "Add-on";
+      const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
+      const linePrice = (ba.price_cents || 0) * (ba.quantity || 1);
+      const priceLabel = linePrice > 0 ? dollars(linePrice) : `<span style="color:#6a7d6e;font-weight:400">Included</span>`;
+      lineRows.push(
+        `<tr><td style="padding:6px 0;color:#1a2e1e">${escapeHtml(name)}${qty}</td>` +
+        `<td style="padding:6px 0;text-align:right;color:#1a2e1e;font-weight:600">${priceLabel}</td></tr>`
+      );
+    }
+    const lineItemsHtml = lineRows.join("");
+
     const totalDisplay = dollars(booking.estimated_price_cents);
     const isQuote = booking.estimated_price_cents == null || booking.status === "awaiting_quote";
 
@@ -468,6 +492,20 @@ Deno.serve(async (req) => {
       let invoiceTotal = existingInv?.total_cents ?? finalCents;
       let invoiceStatus = existingInv?.status || "unpaid";
 
+      // If the invoice is still unpaid and the booking's final price has
+      // changed since the invoice was first issued, sync the row so the
+      // email reflects the current charge.
+      if (existingInv && existingInv.status === "unpaid" && finalCents !== existingInv.total_cents) {
+        const { error: updErr } = await sb.from("invoices")
+          .update({ amount_cents: finalCents, total_cents: finalCents })
+          .eq("id", existingInv.id);
+        if (updErr) {
+          console.warn("invoice total sync failed:", updErr.message);
+        } else {
+          invoiceTotal = finalCents;
+        }
+      }
+
       if (!existingInv) {
         const { data: seqRow, error: seqErr } = await sb
           .rpc("next_invoice_number");
@@ -493,10 +531,18 @@ Deno.serve(async (req) => {
 
       const issuedDisplay = new Date().toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" });
       const subtotalDisplay = dollars(invoiceTotal);
-      // Build line items: service + each addon, each with its own row.
-      const baseCents = (booking.services?.starting_price_cents) ?? 0;
+      // Build line items. Addons are always at their saved prices. The service
+      // line absorbs the gap so the line items add up to the actual invoice
+      // total — otherwise marking complete with a manual final price (e.g.
+      // $255 instead of the $155 estimate) would leave the invoice math wrong.
+      const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+      const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
+      // Never let the service line go below its catalog price — if the admin
+      // discounted the booking below the catalog (rare), we show the catalog
+      // base and let the negative diff manifest below. Otherwise reconcile up.
+      const reconciledServiceCents = Math.max(baseCatalogCents, invoiceTotal - addonsTotalCents);
       const lineRows: string[] = [];
-      lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(baseCents)}</td></tr>`);
+      lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(reconciledServiceCents)}</td></tr>`);
       for (const ba of bookingAddons) {
         const name = ba.addons?.name || "Add-on";
         const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
@@ -518,26 +564,26 @@ Deno.serve(async (req) => {
           <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 6px;color:#1a2e1e">${escapeHtml(invoiceNumber!)}</h1>
           <p style="font-size:13px;color:#6a7d6e;margin:0 0 22px">Issued ${escapeHtml(issuedDisplay)} · Booking <strong style="color:#1e4d2b">${idShort}</strong></p>
 
-          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:13px;color:#1a2e1e;margin-bottom:18px">
-            <tr>
-              <td style="vertical-align:top;padding-right:12px;width:50%">
-                <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px">Billed to</div>
-                <div>${escapeHtml(customerName)}</div>
-                <div style="color:#6a7d6e">${escapeHtml(customerEmail)}</div>
-                ${customerPhone ? `<div style="color:#6a7d6e">${escapeHtml(customerPhone)}</div>` : ""}
-              </td>
-              <td style="vertical-align:top;padding-left:12px;width:50%">
-                <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px">Service</div>
-                <div>${escapeHtml(dateDisplay)}${timeDisplay ? " · " + escapeHtml(timeDisplay) : ""}</div>
-                <div style="color:#6a7d6e">${escapeHtml(addressLine)}</div>
-              </td>
-            </tr>
+          <!-- Stacked single-column meta: customer block, then service block.
+               Side-by-side TDs were getting crushed on phones. -->
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e;margin-bottom:20px;background:#f6f9f6;border:1px solid #d4e2d8;border-radius:12px">
+            <tr><td style="padding:16px 18px;border-bottom:1px solid #d4e2d8">
+              <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Billed to</div>
+              <div style="font-weight:600">${escapeHtml(customerName)}</div>
+              <div style="color:#6a7d6e;font-size:13px">${escapeHtml(customerEmail)}</div>
+              ${customerPhone ? `<div style="color:#6a7d6e;font-size:13px">${escapeHtml(customerPhone)}</div>` : ""}
+            </td></tr>
+            <tr><td style="padding:16px 18px">
+              <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Service</div>
+              <div style="font-weight:600">${escapeHtml(dateDisplay)}${timeDisplay ? " · " + escapeHtml(timeDisplay) : ""}</div>
+              <div style="color:#6a7d6e;font-size:13px">${escapeHtml(addressLine)}</div>
+            </td></tr>
           </table>
 
-          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:18px">
-            <tr><td colspan="2" style="border-bottom:2px solid #1e4d2b;padding-bottom:6px;font-size:11px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px">Description</td></tr>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:20px;font-size:14px">
+            <tr><td colspan="2" style="border-bottom:2px solid #1e4d2b;padding-bottom:8px;font-size:11px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px">Description</td></tr>
             ${lineItemsHtml}
-            <tr><td style="padding:10px 0 6px;border-top:1px solid #d4e2d8;font-weight:700">Total due</td><td style="padding:10px 0 6px;border-top:1px solid #d4e2d8;text-align:right;font-weight:700;color:#1e4d2b;font-size:16px">${escapeHtml(subtotalDisplay)}</td></tr>
+            <tr><td style="padding:12px 0 6px;border-top:1px solid #d4e2d8;font-weight:700;font-size:15px">Total due</td><td style="padding:12px 0 6px;border-top:1px solid #d4e2d8;text-align:right;font-weight:700;color:#1e4d2b;font-size:18px">${escapeHtml(subtotalDisplay)}</td></tr>
           </table>
 
           <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fffbeb;border:1px solid #e5d3a0;border-radius:12px;margin-bottom:14px">
@@ -844,18 +890,16 @@ Deno.serve(async (req) => {
             <tr><td style="padding:20px 22px">
               <div style="font-size:11px;font-weight:600;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px">Booking summary</div>
 
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
-                <tr><td style="padding:5px 0;color:#6a7d6e">Service</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(serviceName)}</td></tr>
-                <tr><td style="padding:5px 0;color:#6a7d6e">Date</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}</td></tr>
-                <tr><td style="padding:5px 0;color:#6a7d6e">Address</td><td style="padding:5px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e;margin-bottom:14px">
+                <tr><td style="padding:5px 0;color:#6a7d6e;width:80px">Date</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}</td></tr>
+                <tr><td style="padding:5px 0;color:#6a7d6e;vertical-align:top">Address</td><td style="padding:5px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
               </table>
 
-              <div style="margin-top:14px;padding-top:12px;border-top:1px solid #5a9470">
-                <div style="font-size:13px;color:#6a7d6e;margin-bottom:4px">Add-ons</div>
-                ${addonsHtml}
-              </div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;border-top:1px solid #5a9470;padding-top:10px">
+                ${lineItemsHtml}
+              </table>
 
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;padding-top:14px;border-top:1px solid #5a9470">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:14px;padding-top:14px;border-top:1px solid #5a9470">
                 <tr>
                   <td style="font-size:16px;font-weight:700">${isQuote ? "Estimate" : "Estimated total"}</td>
                   <td style="font-size:18px;font-weight:700;color:#1e4d2b;text-align:right">${escapeHtml(totalDisplay)}</td>
