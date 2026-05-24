@@ -109,6 +109,8 @@
     }
     const btn = $('account-tab-btn-admin');
     if (btn) btn.style.display = isOwner ? '' : 'none';
+    const navAdminItem = $('nav-user-menu-admin');
+    if (navAdminItem) navAdminItem.style.display = isOwner ? '' : 'none';
   }
 
   function closeAddresses() {
@@ -777,6 +779,11 @@
     // Refresh cache whenever auth state changes so the booking form's
     // saved-address picker can react.
     if (sb()) {
+      // Page-load check — onAuthStateChange doesn't fire if the user was
+      // already signed in from a previous session, so we need to seed the
+      // owner flag (and the nav dropdown's Admin item) explicitly.
+      refreshOwnerStatus();
+
       sb().auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           fetchAddresses();

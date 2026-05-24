@@ -723,6 +723,9 @@
                 onclick="HirayaAccount.openBookings(); HirayaAuth.closeUserMenu()">My bookings</button>
         <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAccount.openAddresses(); HirayaAuth.closeUserMenu()">My addresses</button>
+        <button type="button" role="menuitem" class="nav-user-menu-item" id="nav-user-menu-admin"
+                style="display:none"
+                onclick="HirayaAccount.openAdmin(); HirayaAuth.closeUserMenu()">Admin</button>
         <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
       </div>
