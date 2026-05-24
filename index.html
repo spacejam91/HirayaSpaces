@@ -720,6 +720,8 @@
       </button>
       <div class="nav-user-menu" id="nav-user-menu" role="menu" aria-labelledby="nav-user-trigger">
         <button type="button" role="menuitem" class="nav-user-menu-item"
+                onclick="HirayaAccount.openBookings(); HirayaAuth.closeUserMenu()">My bookings</button>
+        <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAccount.openAddresses(); HirayaAuth.closeUserMenu()">My addresses</button>
         <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
@@ -1609,15 +1611,47 @@ updateSummary();
   </div>
 </div>
 
-<!-- MY ADDRESSES MODAL -->
+<!-- MY ACCOUNT MODAL (tabs: Bookings + Addresses) -->
 <div class="modal-overlay" id="addresses-modal" role="dialog" aria-modal="true" aria-labelledby="addr-modal-title">
   <div class="modal-box addresses-modal-box">
     <button class="modal-close" onclick="HirayaAccount.closeAddresses()" aria-label="Close">✕</button>
     <div class="modal-logo" style="font-family:'Cinzel',serif;letter-spacing:2px;font-size:16px;color:var(--sage);text-transform:uppercase">HIRAYA SPACES</div>
+    <h2 class="modal-title" id="addr-modal-title">My account</h2>
 
+    <!-- Tab strip -->
+    <div class="account-tabs" id="account-tabs">
+      <button type="button" class="account-tab" data-tab="bookings" onclick="HirayaAccount.switchTab('bookings')">Bookings</button>
+      <button type="button" class="account-tab active" data-tab="addresses" onclick="HirayaAccount.switchTab('addresses')">Addresses</button>
+    </div>
+
+    <!-- ── BOOKINGS TAB ─────────────────────────────────────────────────── -->
+    <div id="account-tab-bookings" style="display:none">
+      <div id="bookings-list-view">
+        <p class="modal-sub">Your upcoming and past cleans. You can cancel anything that hasn't already started.</p>
+        <div id="bookings-list" class="bookings-list" aria-live="polite"></div>
+        <div id="bookings-empty" class="addr-empty" style="display:none">
+          <div class="addr-empty-icon" aria-hidden="true">📅</div>
+          <p>You haven't booked any cleans yet.</p>
+        </div>
+      </div>
+
+      <!-- Cancel confirmation view -->
+      <div id="booking-cancel-confirm" style="display:none">
+        <div style="text-align:center;font-size:48px;line-height:1;margin-bottom:1rem">⚠️</div>
+        <h3 class="modal-title" style="text-align:center;font-size:22px">Cancel this booking?</h3>
+        <p class="modal-sub" style="text-align:center" id="booking-cancel-text"></p>
+        <p class="modal-sub" style="text-align:center;font-size:12px">Free cancellation up to 24 hours before. We'll be sad to miss you.</p>
+        <div class="br-actions">
+          <button class="modal-btn-ghost" onclick="HirayaAccount.cancelCancelBooking()">Keep booking</button>
+          <button class="modal-btn" id="booking-cancel-btn" style="background:var(--rose)" onclick="HirayaAccount.confirmCancelBooking()">Yes, cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ADDRESSES TAB ────────────────────────────────────────────────── -->
+    <div id="account-tab-addresses">
     <!-- List view -->
     <div id="addr-list-view">
-      <h2 class="modal-title" id="addr-modal-title">My addresses</h2>
       <p class="modal-sub">Save the places you'd like cleaned so you don't have to type them in every time.</p>
 
       <div id="addr-list" class="addr-list" aria-live="polite">
@@ -1683,6 +1717,7 @@ updateSummary();
         <button class="modal-btn" id="addr-confirm-delete-btn" style="background:var(--rose)" onclick="HirayaAccount.confirmDelete()">Yes, delete</button>
       </div>
     </div>
+    </div><!-- /account-tab-addresses -->
   </div>
 </div>
 

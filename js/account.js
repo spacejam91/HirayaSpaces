@@ -68,15 +68,21 @@
 
   function getCachedAddresses() { return cachedAddresses.slice(); }
 
-  // ── MODAL OPEN / CLOSE / VIEW SWITCH ───────────────────────────────────
-  function openAddresses() {
+  // ── MODAL OPEN / CLOSE / TAB SWITCH ────────────────────────────────────
+  let activeTab = 'addresses';
+  let cancellingBookingId = null;
+  let cancellingBookingLabel = '';
+
+  function openAccount(tab) {
     const modal = $('addresses-modal');
     if (!modal) return;
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
-    showListView();
-    refreshList();
+    switchTab(tab || 'bookings');
   }
+  function openAddresses() { openAccount('addresses'); }
+  function openBookings() { openAccount('bookings'); }
+
   function closeAddresses() {
     const modal = $('addresses-modal');
     if (!modal) return;
@@ -84,6 +90,28 @@
     document.body.style.overflow = '';
     editingId = null;
     deletingId = null;
+    cancellingBookingId = null;
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    // Tab button highlight
+    document.querySelectorAll('.account-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    // Top-level tab content panels
+    const bookingsTab = $('account-tab-bookings');
+    const addressesTab = $('account-tab-addresses');
+    if (bookingsTab) bookingsTab.style.display = tab === 'bookings' ? 'block' : 'none';
+    if (addressesTab) addressesTab.style.display = tab === 'addresses' ? 'block' : 'none';
+    // Reset sub-views to their list state
+    if (tab === 'addresses') {
+      showListView();
+      refreshList();
+    } else if (tab === 'bookings') {
+      showBookingsListView();
+      refreshBookings();
+    }
   }
 
   function showListView() {
@@ -100,6 +128,16 @@
     $('addr-list-view').style.display = 'none';
     $('addr-form-view').style.display = 'none';
     $('addr-confirm-delete').style.display = 'block';
+  }
+
+  // Bookings sub-view toggles
+  function showBookingsListView() {
+    $('bookings-list-view').style.display = 'block';
+    $('booking-cancel-confirm').style.display = 'none';
+  }
+  function showBookingCancelConfirm() {
+    $('bookings-list-view').style.display = 'none';
+    $('booking-cancel-confirm').style.display = 'block';
   }
 
   // ── RENDER LIST ────────────────────────────────────────────────────────
@@ -345,6 +383,164 @@
     }
   }
 
+  // ── BOOKINGS ───────────────────────────────────────────────────────────
+  let cachedBookings = [];
+
+  async function fetchBookings() {
+    if (!sb()) { cachedBookings = []; return []; }
+    const { data: { user } } = await sb().auth.getUser();
+    if (!user) { cachedBookings = []; return []; }
+
+    const { data, error } = await sb()
+      .from('bookings')
+      .select(`
+        id, preferred_date, preferred_time_slot, status, estimated_price_cents,
+        created_at, customer_notes,
+        services ( name, slug ),
+        addresses ( street_address, unit, city, postal_code ),
+        booking_addons ( quantity, price_cents, addons ( name, slug ) )
+      `)
+      .eq('user_id', user.id)
+      .order('preferred_date', { ascending: false, nullsFirst: false })
+      .limit(50);
+
+    if (error) {
+      console.warn('fetchBookings failed:', error.message);
+      cachedBookings = [];
+    } else {
+      cachedBookings = data || [];
+    }
+    return cachedBookings;
+  }
+
+  async function refreshBookings() {
+    await fetchBookings();
+    renderBookings();
+  }
+
+  function statusLabel(status) {
+    return ({
+      pending_review: 'Pending review',
+      awaiting_quote: 'Awaiting quote',
+      confirmed: 'Confirmed',
+      in_progress: 'In progress',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+      no_show: 'No show',
+    })[status] || status;
+  }
+
+  function isCancellable(b) {
+    return !['cancelled', 'completed', 'no_show', 'in_progress'].includes(b.status);
+  }
+
+  function isUpcoming(b) {
+    if (!b.preferred_date) return false;
+    if (['cancelled', 'completed', 'no_show'].includes(b.status)) return false;
+    // Compare dates ignoring time (preferred_date is a YYYY-MM-DD string)
+    const today = new Date().toISOString().slice(0, 10);
+    return b.preferred_date >= today;
+  }
+
+  function formatBookingDate(iso) {
+    if (!iso) return 'Date TBD';
+    // Render in user's locale; iso is YYYY-MM-DD so anchor to UTC noon to dodge TZ shifts
+    const d = new Date(iso + 'T12:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatBookingAddress(addr) {
+    if (!addr) return '';
+    return [
+      [addr.street_address, addr.unit].filter(Boolean).join(', '),
+      [addr.city, addr.postal_code].filter(Boolean).join(' '),
+    ].filter(Boolean).join(' · ');
+  }
+
+  function renderBookings() {
+    const list = $('bookings-list');
+    const empty = $('bookings-empty');
+    if (!list) return;
+
+    if (!cachedBookings.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    list.innerHTML = cachedBookings.map(b => {
+      const svcName = b.services?.name || 'Cleaning service';
+      const dateStr = formatBookingDate(b.preferred_date);
+      const timeStr = b.preferred_time_slot ? ` at ${escapeHtml(b.preferred_time_slot)}` : '';
+      const addrLine = formatBookingAddress(b.addresses);
+      const total = b.estimated_price_cents != null
+        ? '$' + Math.round(b.estimated_price_cents / 100)
+        : 'Quote on request';
+      const addonText = (b.booking_addons || []).map(ba => ba.addons?.name).filter(Boolean).join(', ');
+      const classes = ['booking-card'];
+      if (isUpcoming(b)) classes.push('is-upcoming');
+      if (b.status === 'cancelled') classes.push('is-cancelled');
+      const actions = isCancellable(b)
+        ? `<div class="booking-card-actions"><button class="booking-card-btn" onclick="HirayaAccount.askCancelBooking('${b.id}')">Cancel booking</button></div>`
+        : '';
+      return `
+        <div class="${classes.join(' ')}" data-id="${b.id}">
+          <div class="booking-card-head">
+            <div>
+              <div class="booking-card-svc">${escapeHtml(svcName)}</div>
+              <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
+            </div>
+            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
+          </div>
+          <div class="booking-card-body">
+            ${addrLine ? `<div>📍 ${escapeHtml(addrLine)}</div>` : ''}
+            ${addonText ? `<div>✨ Add-ons: ${escapeHtml(addonText)}</div>` : ''}
+            <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
+          </div>
+          ${actions}
+        </div>`;
+    }).join('');
+  }
+
+  function askCancelBooking(id) {
+    const b = cachedBookings.find(x => x.id === id);
+    if (!b) return;
+    cancellingBookingId = id;
+    const svcName = b.services?.name || 'this booking';
+    cancellingBookingLabel = `${svcName} on ${formatBookingDate(b.preferred_date)}`;
+    $('booking-cancel-text').textContent = cancellingBookingLabel;
+    showBookingCancelConfirm();
+  }
+
+  function cancelCancelBooking() {
+    cancellingBookingId = null;
+    showBookingsListView();
+  }
+
+  async function confirmCancelBooking() {
+    if (!cancellingBookingId || !sb()) return;
+    const btn = $('booking-cancel-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cancelling…'; }
+    try {
+      const { data, error } = await sb().rpc('cancel_booking', { booking_id: cancellingBookingId });
+      if (error) throw error;
+      if (data === false) {
+        showToast("Couldn't cancel — booking may already be completed.", 'error');
+      } else {
+        showToast('Booking cancelled.', 'success');
+      }
+      cancellingBookingId = null;
+      await refreshBookings();
+      showBookingsListView();
+    } catch (err) {
+      console.error('cancel_booking failed:', err);
+      showToast(err.message || 'Could not cancel the booking.', 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Yes, cancel'; }
+    }
+  }
+
   // ── INIT ────────────────────────────────────────────────────────────────
   function wire() {
     const modal = $('addresses-modal');
@@ -361,6 +557,7 @@
           fetchAddresses();
         } else if (event === 'SIGNED_OUT') {
           cachedAddresses = [];
+          cachedBookings = [];
           notifyListeners();
         }
       });
@@ -370,6 +567,9 @@
   // ── EXPORTS ────────────────────────────────────────────────────────────
   window.HirayaAccount = {
     openAddresses,
+    openBookings,
+    openAccount,
+    switchTab,
     closeAddresses,
     openAddressForm,
     cancelAddressForm,
@@ -379,6 +579,11 @@
     cancelDelete,
     confirmDelete,
     setDefault,
+    // Bookings tab
+    askCancelBooking,
+    cancelCancelBooking,
+    confirmCancelBooking,
+    refreshBookings,
     // For booking.js to read the saved list and react to changes
     fetchAddresses,
     getCachedAddresses,
