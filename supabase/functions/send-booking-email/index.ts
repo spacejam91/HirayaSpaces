@@ -531,23 +531,29 @@ Deno.serve(async (req) => {
 
       const issuedDisplay = new Date().toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" });
       const subtotalDisplay = dollars(invoiceTotal);
-      // Build line items. Addons are always at their saved prices. The service
-      // line absorbs the gap so the line items add up to the actual invoice
-      // total — otherwise marking complete with a manual final price (e.g.
-      // $255 instead of the $155 estimate) would leave the invoice math wrong.
-      const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+      // Build line items. Service + addons stay at their catalog prices so the
+      // customer sees exactly what they originally booked. If the final invoice
+      // is higher than that subtotal (e.g. admin marked complete with extra
+      // work), the gap shows as its own "Additional services provided" line so
+      // the upcharge is transparent.
       const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
-      // Never let the service line go below its catalog price — if the admin
-      // discounted the booking below the catalog (rare), we show the catalog
-      // base and let the negative diff manifest below. Otherwise reconcile up.
-      const reconciledServiceCents = Math.max(baseCatalogCents, invoiceTotal - addonsTotalCents);
+      const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+      const lineSubtotalCents = baseCatalogCents + addonsTotalCents;
+      const additionalCents = invoiceTotal - lineSubtotalCents;
       const lineRows: string[] = [];
-      lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(reconciledServiceCents)}</td></tr>`);
+      lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(baseCatalogCents)}</td></tr>`);
       for (const ba of bookingAddons) {
         const name = ba.addons?.name || "Add-on";
         const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
         const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
         lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(name)}${qty}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(lineTotal)}</td></tr>`);
+      }
+      if (additionalCents > 0) {
+        lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">Additional services provided</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(additionalCents)}</td></tr>`);
+      } else if (additionalCents < 0) {
+        // Final came in lower than the catalog total — show as a discount so
+        // the math still adds up cleanly.
+        lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">Discount</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">-${dollars(Math.abs(additionalCents))}</td></tr>`);
       }
       const lineItemsHtml = lineRows.join("");
 
