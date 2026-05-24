@@ -860,13 +860,9 @@
           <div class="panel-controls">
             <select id="all-status-filter" onchange="HirayaAdmin.renderAll()">
               <option value="">All statuses</option>
-              <option value="pending_review">Pending review</option>
-              <option value="awaiting_quote">Awaiting quote</option>
+              <option value="pending_review">Pending</option>
               <option value="confirmed">Confirmed</option>
-              <option value="in_progress">In progress</option>
               <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="no_show">No show</option>
             </select>
             <button class="panel-refresh" onclick="HirayaAdmin.exportBookingsCsv()">⬇ Export CSV</button>
             <button class="panel-refresh" onclick="HirayaAdmin.refreshAll()">↻ Refresh</button>
