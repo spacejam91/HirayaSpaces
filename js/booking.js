@@ -94,6 +94,9 @@
     if (typeof selSvc === 'undefined' || !selSvc) {
       return { error: 'Please choose a service before booking.' };
     }
+    if (typeof selTier === 'undefined' || !selTier) {
+      return { error: 'Please pick a specific option for your service (e.g. 1 BR / 1 BA).' };
+    }
     if (typeof selDay === 'undefined' || !selDay || !selTime) {
       return { error: 'Please pick a date and time on the calendar.' };
     }
@@ -109,7 +112,8 @@
       .map(id => ADDONS.find(a => a.id === id))
       .filter(Boolean);
 
-    const dbServiceSlug = SERVICE_SLUG_MAP[selSvc];
+    // The tier's slug is the authoritative DB service identifier now.
+    const dbServiceSlug = selTier.slug;
     const dbAddonSlugs = selAddons
       .map(id => ADDON_SLUG_MAP[id])
       .filter(Boolean);
@@ -118,7 +122,7 @@
       return { error: 'This service is not available in our catalog yet. Please pick another.' };
     }
 
-    const basePrice = svc?.basePrice || 0;
+    const basePrice = selTier.basePrice || 0;
     const addonTotal = addons.reduce((s, a) => s + (a.addonPrice || 0), 0);
     const total = basePrice + addonTotal;
 
@@ -142,7 +146,7 @@
         saved_address_id: savedAddressId,
         save_to_account: saveToAccount,
         service_id_page: selSvc,
-        service_name: svc?.name || 'General Clean',
+        service_name: svc?.name ? `${svc.name} — ${selTier.name}` : selTier.name,
         addon_ids_page: selAddons.slice(),
         preferred_date: isoDate,
         preferred_time_slot: selTime,

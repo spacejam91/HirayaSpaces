@@ -249,6 +249,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#1e4d2b;padding:28px 30px;text-align:center;color:white">
+          <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="64" height="64" style="display:block;margin:0 auto 14px;border-radius:14px;background:white;padding:6px;box-sizing:border-box">
           <div style="font-family:Georgia,'Cinzel',serif;font-size:22px;letter-spacing:3px;text-transform:uppercase">HIRAYA SPACES</div>
           <div style="font-size:10px;letter-spacing:2px;opacity:0.75;margin-top:6px">RESIDENTIAL CLEANING · WATERLOO REGION</div>
         </td></tr>
@@ -346,11 +347,18 @@ Deno.serve(async (req) => {
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:32px 16px">
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:14px;overflow:hidden;border:1px solid #d4e2d8">
-        <tr><td style="background:#1e4d2b;padding:20px 26px;color:white;display:flex;justify-content:space-between">
-          <div>
-            <div style="font-family:Georgia,serif;font-size:14px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
-            <div style="font-size:20px;font-weight:600;margin-top:4px">🌿 New booking</div>
-          </div>
+        <tr><td style="background:#1e4d2b;padding:20px 26px;color:white">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td valign="middle" width="56">
+                <img src="https://hirayaspaces.ca/android-chrome-512x512.png" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:10px;background:white;padding:4px;box-sizing:border-box">
+              </td>
+              <td valign="middle" style="padding-left:14px">
+                <div style="font-family:Georgia,serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
+                <div style="font-size:20px;font-weight:600;margin-top:2px">New booking</div>
+              </td>
+            </tr>
+          </table>
         </td></tr>
         <tr><td style="padding:22px 26px 8px">
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
