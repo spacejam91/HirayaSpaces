@@ -182,9 +182,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const booking_id = body?.booking_id;
     const declineReason: string | null = typeof body?.reason === "string" ? body.reason : null;
-    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed";
+    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice";
     const requestedMode = body?.mode;
-    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed")
+    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice")
       ? requestedMode : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
@@ -250,6 +250,25 @@ Deno.serve(async (req) => {
     } else if (mode === "declined") {
       if (booking.status !== "cancelled") {
         return jsonResponse({ error: "Booking is not declined" }, 400);
+      }
+    } else if (mode === "completed") {
+      // Completed emails get sent at job-completion time, often days/weeks
+      // after the booking was created — so don't gate on created_at age.
+      // Gate on status + completed_at recency instead.
+      if (booking.status !== "completed") {
+        return jsonResponse({ error: "Booking is not completed" }, 400);
+      }
+      if (booking.completed_at) {
+        const ageMs = Date.now() - new Date(booking.completed_at).getTime();
+        if (ageMs > 7 * 24 * 60 * 60 * 1000) {
+          return jsonResponse({ error: "Completion too old to email" }, 410);
+        }
+      }
+    } else if (mode === "invoice") {
+      // Invoices are sent on/after completion. No age cap — admin may re-send
+      // weeks later. Booking just has to be completed.
+      if (booking.status !== "completed") {
+        return jsonResponse({ error: "Cannot invoice a booking that is not completed" }, 400);
       }
     } else {
       const ageMs = Date.now() - new Date(booking.created_at).getTime();
@@ -416,16 +435,156 @@ Deno.serve(async (req) => {
           auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
         },
       });
+      let completedErr: unknown = null;
       try {
         await doneClient.send({
           from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
           to: customerEmail,
-          subject: `Clean complete — thanks! - ${idShort}`,
+          subject: `Clean complete - thanks - ${idShort}`,
           html: tidyHtml(completedHtml),
         });
-      } catch (e) { console.warn("completed email failed:", e); }
+      } catch (e) { console.warn("completed email failed:", e); completedErr = e; }
       try { await doneClient.close(); } catch (_) {}
+      if (completedErr) {
+        const msg = (completedErr as Error)?.message || String(completedErr);
+        return jsonResponse({ error: "Completed email failed", debug: msg }, 502);
+      }
       return jsonResponse({ ok: true, booking_id, mode: "completed" });
+    }
+
+    // ── INVOICE PATH (owner sends formal invoice after completion) ────────
+    if (mode === "invoice") {
+      // Look up or create the invoice row first so the email carries the
+      // canonical invoice_number. One invoice per booking — re-sends reuse
+      // the existing row.
+      const finalCents = (booking.final_price_cents ?? booking.estimated_price_cents) ?? 0;
+      const { data: existingInv } = await sb
+        .from("invoices")
+        .select("id, invoice_number, status, total_cents")
+        .eq("booking_id", booking_id)
+        .maybeSingle();
+
+      let invoiceNumber = existingInv?.invoice_number;
+      let invoiceTotal = existingInv?.total_cents ?? finalCents;
+      let invoiceStatus = existingInv?.status || "unpaid";
+
+      if (!existingInv) {
+        const { data: seqRow, error: seqErr } = await sb
+          .rpc("next_invoice_number");
+        if (seqErr) {
+          console.error("invoice number seq failed:", seqErr);
+          return jsonResponse({ error: "Invoice number sequence failed", debug: seqErr.message }, 500);
+        }
+        invoiceNumber = seqRow as unknown as string;
+        const { error: insErr } = await sb.from("invoices").insert({
+          booking_id,
+          user_id: booking.user_id,
+          invoice_number: invoiceNumber,
+          amount_cents: finalCents,
+          total_cents: finalCents,
+          status: "unpaid",
+        });
+        if (insErr) {
+          console.error("invoice insert failed:", insErr);
+          return jsonResponse({ error: "Invoice insert failed", debug: insErr.message }, 500);
+        }
+        invoiceTotal = finalCents;
+      }
+
+      const issuedDisplay = new Date().toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" });
+      const subtotalDisplay = dollars(invoiceTotal);
+      // Build line items: service + each addon, each with its own row.
+      const baseCents = (booking.services?.starting_price_cents) ?? 0;
+      const lineRows: string[] = [];
+      lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(baseCents)}</td></tr>`);
+      for (const ba of bookingAddons) {
+        const name = ba.addons?.name || "Add-on";
+        const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
+        const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
+        lineRows.push(`<tr><td style="padding:8px 0;color:#1a2e1e">${escapeHtml(name)}${qty}</td><td style="padding:8px 0;text-align:right;color:#1a2e1e">${dollars(lineTotal)}</td></tr>`);
+      }
+      const lineItemsHtml = lineRows.join("");
+
+      const invoiceHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">INVOICE</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 6px;color:#1a2e1e">${escapeHtml(invoiceNumber!)}</h1>
+          <p style="font-size:13px;color:#6a7d6e;margin:0 0 22px">Issued ${escapeHtml(issuedDisplay)} · Booking <strong style="color:#1e4d2b">${idShort}</strong></p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:13px;color:#1a2e1e;margin-bottom:18px">
+            <tr>
+              <td style="vertical-align:top;padding-right:12px;width:50%">
+                <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px">Billed to</div>
+                <div>${escapeHtml(customerName)}</div>
+                <div style="color:#6a7d6e">${escapeHtml(customerEmail)}</div>
+                ${customerPhone ? `<div style="color:#6a7d6e">${escapeHtml(customerPhone)}</div>` : ""}
+              </td>
+              <td style="vertical-align:top;padding-left:12px;width:50%">
+                <div style="font-size:11px;font-weight:700;color:#6a7d6e;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px">Service</div>
+                <div>${escapeHtml(dateDisplay)}${timeDisplay ? " · " + escapeHtml(timeDisplay) : ""}</div>
+                <div style="color:#6a7d6e">${escapeHtml(addressLine)}</div>
+              </td>
+            </tr>
+          </table>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:18px">
+            <tr><td colspan="2" style="border-bottom:2px solid #1e4d2b;padding-bottom:6px;font-size:11px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px">Description</td></tr>
+            ${lineItemsHtml}
+            <tr><td style="padding:10px 0 6px;border-top:1px solid #d4e2d8;font-weight:700">Total due</td><td style="padding:10px 0 6px;border-top:1px solid #d4e2d8;text-align:right;font-weight:700;color:#1e4d2b;font-size:16px">${escapeHtml(subtotalDisplay)}</td></tr>
+          </table>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fffbeb;border:1px solid #e5d3a0;border-radius:12px;margin-bottom:14px">
+            <tr><td style="padding:16px 20px">
+              <div style="font-size:11px;font-weight:700;color:#5a4318;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">How to pay</div>
+              <div style="font-size:13px;color:#3d2c0d;line-height:1.7">
+                <strong>Cash:</strong> hand to your cleaner on arrival.<br>
+                <strong>E-transfer:</strong> send to <a href="mailto:hirayaspaces@gmail.com" style="color:#1e4d2b;font-weight:600">hirayaspaces@gmail.com</a> — reference <strong>${escapeHtml(invoiceNumber!)}</strong>.
+              </div>
+            </td></tr>
+          </table>
+
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:0">
+            Questions? Reply to this email or call (226) 751-4566. Thanks for choosing Hiraya Spaces.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortInv = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const invClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortInv, tls: smtpPortInv === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      let invErr: unknown = null;
+      try {
+        await invClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Invoice ${invoiceNumber} - Hiraya Spaces`,
+          html: tidyHtml(invoiceHtml),
+        });
+      } catch (e) { console.warn("invoice email failed:", e); invErr = e; }
+      try { await invClient.close(); } catch (_) {}
+      if (invErr) {
+        const msg = (invErr as Error)?.message || String(invErr);
+        return jsonResponse({ error: "Invoice email failed", debug: msg }, 502);
+      }
+      return jsonResponse({ ok: true, booking_id, mode: "invoice", invoice_number: invoiceNumber, status: invoiceStatus });
     }
 
     // ── DECLINED PATH (owner declines a pending booking) ──────────────────

@@ -465,8 +465,9 @@
       const completable = ['confirmed', 'in_progress'].includes(b.status);
       const canCheckIn = b.status === 'confirmed' && !b.check_in_at;
       const canCheckOut = b.status === 'in_progress' && b.check_in_at && !b.check_out_at;
+      const canInvoice = b.status === 'completed';
       let actions = '';
-      if (canCheckIn || canCheckOut || completable || ownerCancellable || reschedulable) {
+      if (canCheckIn || canCheckOut || completable || ownerCancellable || reschedulable || canInvoice) {
         const parts = [];
         if (canCheckIn) {
           parts.push(`<button class="booking-card-btn" style="background:#3b82a8;color:white" onclick="HirayaAdmin.checkInBooking('${b.id}')">▶ Check in</button>`);
@@ -476,6 +477,9 @@
         }
         if (completable) {
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askComplete('${b.id}')">Mark complete</button>`);
+        }
+        if (canInvoice) {
+          parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.sendInvoice('${b.id}')">Send invoice</button>`);
         }
         if (reschedulable) {
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
@@ -1373,11 +1377,21 @@ Hiraya Spaces`
       if (data === false) {
         showErr('complete-err', 'Booking is no longer eligible — refresh and try again.');
       } else {
-        showToast('Booking marked complete. Thank-you email sent.', 'success');
-        // Fire the 'completed' email with tip + review CTAs (fire and forget).
+        showToast('Booking marked complete. Sending thank-you email…', 'success');
+        // Surface email failures to admin instead of silent console.warn —
+        // the customer not getting a thank-you is something Aaron needs to know.
         sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'completed' } })
-          .then(({ error: e }) => { if (e) console.warn('completed email failed:', e.message || e); })
-          .catch(err => console.warn('completed email failed:', err));
+          .then(({ data, error: e }) => {
+            const debug = data?.debug || data?.error;
+            if (e || debug) {
+              console.warn('completed email failed:', e?.message || debug || e);
+              showToast('Booking complete, but thank-you email failed: ' + (debug || e?.message || 'unknown'), 'error');
+            }
+          })
+          .catch(err => {
+            console.warn('completed email failed:', err);
+            showToast('Booking complete, but thank-you email failed: ' + (err?.message || err), 'error');
+          });
         completingId = null;
         await refreshAll();
         refreshPending();
@@ -1388,6 +1402,38 @@ Hiraya Spaces`
       showErr('complete-err', err.message || 'Could not save.');
     } finally {
       btn.disabled = false; btn.textContent = 'Mark complete';
+    }
+  }
+
+  // Send a formal invoice email to the customer for a completed booking.
+  // The edge function inserts an invoices row on first send and re-uses the
+  // same row + invoice_number on subsequent sends.
+  async function sendInvoice(id) {
+    if (!sb() || !isOwner) return;
+    const b = allBookings.find(x => x.id === id);
+    if (!b) return;
+    if (b.status !== 'completed') {
+      showToast('Only completed bookings can be invoiced.', 'error');
+      return;
+    }
+    const confirmed = window.confirm(`Send invoice to ${b.customer_name || 'customer'} (${b.customer_email || 'no email'})?`);
+    if (!confirmed) return;
+    showToast('Sending invoice…', 'success');
+    try {
+      const { data, error } = await sb().functions.invoke('send-booking-email', {
+        body: { booking_id: id, mode: 'invoice' },
+      });
+      const debug = data?.debug || data?.error;
+      if (error || debug) {
+        const msg = error?.message || debug || 'Unknown error';
+        showToast('Invoice failed: ' + msg, 'error');
+        return;
+      }
+      const invNum = data?.invoice_number ? ` (${data.invoice_number})` : '';
+      showToast('Invoice sent' + invNum + '.', 'success');
+    } catch (err) {
+      console.error('sendInvoice failed:', err);
+      showToast('Invoice failed: ' + (err?.message || err), 'error');
     }
   }
 
@@ -2007,6 +2053,7 @@ Hiraya Spaces`
     askComplete,
     cancelComplete,
     submitComplete,
+    sendInvoice,
     askReschedule,
     cancelReschedule,
     submitReschedule,
