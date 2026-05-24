@@ -685,6 +685,18 @@
     transition: all .3s;
   }
   .step:hover .step-num { background: var(--sage); color: white; border-color: var(--sage); }
+  /* Anchor variant — same circle, but clickable and bouncy on hover/click. */
+  a.step-num-link { text-decoration: none; color: inherit; cursor: pointer; }
+  a.step-num-link:hover { transform: translateY(-4px); box-shadow: 0 8px 18px rgba(46,80,57,.18); }
+  a.step-num-link:active { transform: translateY(0) scale(.94); transition: transform .08s; }
+  @keyframes step-num-bounce {
+    0%   { transform: translateY(0); }
+    30%  { transform: translateY(-8px); }
+    60%  { transform: translateY(0); }
+    80%  { transform: translateY(-3px); }
+    100% { transform: translateY(0); }
+  }
+  a.step-num-link:focus-visible { outline: 2px solid var(--sage); outline-offset: 3px; }
   .step-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 500; margin-bottom: 0.5rem; }
   .step-desc { font-size: 13px; color: var(--muted); line-height: 1.65; font-weight: 300; }
 
@@ -1006,22 +1018,22 @@
   </div>
   <div class="steps-layout">
     <div class="step fade-up" style="transition-delay:.1s">
-      <div class="step-num">1</div>
+      <a href="#services" class="step-num step-num-link" aria-label="Jump to services">1</a>
       <div class="step-title">Choose your service</div>
       <div class="step-desc">Pick from standard, deep, move-in/out, or recurring cleans. Add extras to customize.</div>
     </div>
     <div class="step fade-up" style="transition-delay:.2s">
-      <div class="step-num">2</div>
+      <a href="#booking" class="step-num step-num-link" aria-label="Jump to booking">2</a>
       <div class="step-title">Pick a date & time</div>
       <div class="step-desc">Select any available slot on our calendar. We'll confirm within the hour.</div>
     </div>
     <div class="step fade-up" style="transition-delay:.3s">
-      <div class="step-num">3</div>
+      <a href="#reviews" class="step-num step-num-link" aria-label="Jump to reviews">3</a>
       <div class="step-title">We show up & clean</div>
       <div class="step-desc">Your dedicated cleaner arrives on time, fully equipped, and gets to work.</div>
     </div>
     <div class="step fade-up" style="transition-delay:.4s">
-      <div class="step-num">4</div>
+      <a href="#contact" class="step-num step-num-link" aria-label="Jump to contact">4</a>
       <div class="step-title">Enjoy your space</div>
       <div class="step-desc">Come back to a spotless space. Not happy? We'll return and fix it — free.</div>
     </div>
@@ -1124,9 +1136,9 @@
       <div class="time-label">Select a time</div>
       <div class="time-grid" id="time-grid"></div>
       <div class="form-grid">
-        <div class="form-group"><label>Full name <span style="color:var(--rose)">*</span></label><input type="text" id="f-name" autocomplete="name" placeholder="Jane Smith"></div>
-        <div class="form-group"><label>Phone <span style="color:var(--rose)">*</span></label><input type="tel" id="f-phone" autocomplete="tel" placeholder="(519) 555-0100"></div>
-        <div class="form-group full"><label>Email <span style="color:var(--rose)">*</span></label><input type="email" id="f-email" autocomplete="email" placeholder="you@email.com"></div>
+        <div class="form-group"><label>Full name <span style="color:var(--rose)">*</span></label><input type="text" id="f-name" autocomplete="name"></div>
+        <div class="form-group"><label>Phone <span style="color:var(--rose)">*</span></label><input type="tel" id="f-phone" autocomplete="tel"></div>
+        <div class="form-group full"><label>Email <span style="color:var(--rose)">*</span></label><input type="email" id="f-email" autocomplete="email"></div>
 
         <!-- Saved address picker (shown only when logged-in user has saved addresses) -->
         <div class="form-group full" id="f-saved-addr-group" style="display:none">
@@ -1134,10 +1146,10 @@
           <select id="f-saved-addr"></select>
         </div>
 
-        <div class="form-group full"><label>Street address <span style="color:var(--rose)">*</span></label><input type="text" id="f-street" autocomplete="street-address" placeholder="123 King St"></div>
-        <div class="form-group"><label>Unit <span class="form-optional">(optional)</span></label><input type="text" id="f-unit" autocomplete="address-line2" placeholder="Apt 2B"></div>
-        <div class="form-group"><label>Postal code <span style="color:var(--rose)">*</span></label><input type="text" id="f-postal" autocomplete="postal-code" placeholder="N2L 3G1" maxlength="7"></div>
-        <div class="form-group full"><label>City <span style="color:var(--rose)">*</span></label><input type="text" id="f-city" autocomplete="address-level2" placeholder="Waterloo, Kitchener, Cambridge…"></div>
+        <div class="form-group full"><label>Street address <span style="color:var(--rose)">*</span></label><input type="text" id="f-street" autocomplete="street-address"></div>
+        <div class="form-group"><label>Unit <span class="form-optional">(optional)</span></label><input type="text" id="f-unit" autocomplete="address-line2"></div>
+        <div class="form-group"><label>Postal code <span style="color:var(--rose)">*</span></label><input type="text" id="f-postal" autocomplete="postal-code" maxlength="7"></div>
+        <div class="form-group full"><label>City <span style="color:var(--rose)">*</span></label><input type="text" id="f-city" autocomplete="address-level2"></div>
 
         <!-- Save-to-account checkbox (shown only when logged in and entering a new address) -->
         <div class="form-group full form-check-row" id="f-save-addr-group" style="display:none">
@@ -1161,7 +1173,7 @@
         </div>
         <div class="form-group full" id="f-entry-instructions-group" style="display:none">
           <label>Instructions for getting in <span class="form-optional">(only your cleaner sees this)</span></label>
-          <textarea id="f-entry-instructions" rows="2" placeholder="e.g. Lockbox on the gas meter, code 1234. Or: key is under the brown mat to the right."></textarea>
+          <textarea id="f-entry-instructions" rows="2"></textarea>
         </div>
 
         <!-- FREQUENCY — recurring discount -->
@@ -1257,6 +1269,16 @@
 </footer>
 
 <script>
+// Bounce the "How it works" step circles when clicked. Smooth scroll is
+// already handled by the anchor href + global html scroll-behavior.
+document.addEventListener('click', function (e) {
+  const a = e.target.closest('a.step-num-link');
+  if (!a) return;
+  a.style.animation = 'none';
+  void a.offsetWidth; // force reflow so the animation can restart
+  a.style.animation = 'step-num-bounce .55s ease';
+});
+
 const SERVICES = [
   {id:'standard',icon:'🧹',name:'Regular Residential',price:'From $120',
    desc:'Perfect for weekly, bi-weekly, or monthly maintenance. Dusting, vacuuming, mopping, kitchen & bathroom cleaning.',
@@ -2170,25 +2192,25 @@ loadBlockedDates();
 
       <div class="modal-field">
         <label for="addr-label">Label <span class="modal-field-optional">(optional)</span></label>
-        <input type="text" id="addr-label" placeholder="Home, Cottage, Mom's place…">
+        <input type="text" id="addr-label">
       </div>
       <div class="modal-field">
         <label for="addr-street">Street address</label>
-        <input type="text" id="addr-street" autocomplete="street-address" placeholder="123 King St">
+        <input type="text" id="addr-street" autocomplete="street-address">
       </div>
       <div class="modal-field-grid">
         <div class="modal-field">
           <label for="addr-unit">Unit <span class="modal-field-optional">(optional)</span></label>
-          <input type="text" id="addr-unit" autocomplete="address-line2" placeholder="Apt 2B">
+          <input type="text" id="addr-unit" autocomplete="address-line2">
         </div>
         <div class="modal-field">
           <label for="addr-postal">Postal code</label>
-          <input type="text" id="addr-postal" autocomplete="postal-code" placeholder="N2L 3G1" maxlength="7">
+          <input type="text" id="addr-postal" autocomplete="postal-code" maxlength="7">
         </div>
       </div>
       <div class="modal-field">
         <label for="addr-city">City</label>
-        <input type="text" id="addr-city" autocomplete="address-level2" placeholder="Waterloo, Kitchener, Cambridge…">
+        <input type="text" id="addr-city" autocomplete="address-level2">
       </div>
 
       <label class="form-check-label" style="margin:0.75rem 0 1.25rem">
