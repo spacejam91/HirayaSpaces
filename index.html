@@ -1083,9 +1083,8 @@ function selectTier(slug){
   renderTierPicker();
   renderTimes();
   updateSummary();
-  // Scroll the calendar/time area into view so the customer sees the next step.
-  const cal = document.querySelector('.booking-right');
-  if (cal && window.innerWidth < 900) cal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // No auto-scroll here — let customers flow naturally through add-ons before
+  // reaching the calendar. (Previous behaviour leaped over the add-ons section.)
 }
 
 // Move the tier picker to sit right after the last card in the selected
