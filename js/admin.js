@@ -1003,7 +1003,7 @@ Hiraya Spaces`
     sel.innerHTML = '<option value="">Pick a service…</option>'
       + items.map(s => {
           const price = s.slug === 'hourly-flexible'
-            ? '$40/hr'
+            ? '$50/hr'
             : (s.starting_price_cents != null ? '$' + Math.round(s.starting_price_cents / 100) : '');
           return `<option value="${escapeHtml(s.slug)}" data-price="${s.starting_price_cents ?? ''}">${escapeHtml(s.name)}${price ? ' — ' + price : ''}</option>`;
         }).join('');
@@ -1130,7 +1130,7 @@ Hiraya Spaces`
     if (!slug) { hint.textContent = ''; return; }
     if (slug === 'hourly-flexible') {
       const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
-      hint.textContent = `Estimated price: ${hrs} × $40 = $${hrs * 40}`;
+      hint.textContent = `Estimated price: ${hrs} × $50 = $${hrs * 50}`;
       return;
     }
     const svc = servicesCache.find(s => s.slug === slug);
@@ -1156,7 +1156,7 @@ Hiraya Spaces`
     let priceCents = null;
     if (slug === 'hourly-flexible') {
       const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
-      priceCents = hrs * 4000;
+      priceCents = hrs * 5000;
     } else {
       const svc = servicesCache.find(s => s.slug === slug);
       priceCents = svc?.starting_price_cents ?? null;

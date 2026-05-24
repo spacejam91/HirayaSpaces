@@ -875,7 +875,7 @@
     { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Move-In / Move-Out Cleaning" }, "priceCurrency": "CAD", "price": "250" },
     { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Carpet Cleaning" }, "priceCurrency": "CAD", "price": "25" },
     { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "AirBnB Turnover Cleaning" }, "priceCurrency": "CAD", "price": "120" },
-    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hourly Cleaning" }, "priceCurrency": "CAD", "price": "40" }
+    { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hourly Cleaning" }, "priceCurrency": "CAD", "price": "50" }
   ],
   "sameAs": [
     "https://www.google.com/maps/place/?q=hiraya+spaces+waterloo"
@@ -1049,7 +1049,7 @@
       <span class="flex-icon">⏱</span>
       <div>
         <h3>Flexible Cleaning</h3>
-        <p>Need help with something in between? Book a single cleaner by the hour — focus on whatever matters most to you. <strong>$40/hour, 3-hour minimum.</strong></p>
+        <p>Need help with something in between? Book a single cleaner by the hour — focus on whatever matters most to you. <strong>$50/hour, 3-hour minimum.</strong></p>
       </div>
     </div>
     <div class="flex-body">
@@ -1063,7 +1063,7 @@
       </div>
       <div class="flex-summary">
         <div class="flex-math">
-          <span id="flex-math-line">3 × $40/hr</span>
+          <span id="flex-math-line">3 × $50/hr</span>
           <strong id="flex-total">$120</strong>
         </div>
         <button type="button" class="flex-pick-btn" id="flex-pick-btn" onclick="selectHourly()">Choose Flexible</button>
@@ -1099,7 +1099,7 @@
       <ul class="trust-list">
         <li><span class="t-dot"></span>Free cancellation up to 24 hours</li>
         <li><span class="t-dot"></span>Same cleaner every visit</li>
-        <li><span class="t-dot"></span>Fully insured & background checked</li>
+        <li><span class="t-dot"></span>Background-checked cleaners</li>
         <li><span class="t-dot"></span>100% satisfaction guarantee</li>
         <li><span class="t-dot"></span>Eco-friendly products available</li>
       </ul>
@@ -1252,7 +1252,7 @@
     <li><a href="#">Contact</a></li>
     <li><a href="#">Privacy</a></li>
   </ul>
-  <p>© 2026 Hiraya Spaces · Serving Waterloo, Kitchener & Cambridge · Waterloo Region, ON · Licensed & Insured</p>
+  <p>© 2026 Hiraya Spaces · Serving Waterloo, Kitchener & Cambridge · Waterloo Region, ON</p>
   <p style="font-size:12px;color:rgba(255,255,255,0.3);margin-top:0.4rem">Call us: <a href="tel:+12267514566" style="color:rgba(255,255,255,0.5);text-decoration:none">(226) 751-4566</a></p>
 </footer>
 
@@ -1353,7 +1353,7 @@ let selSvc=null, selTier=null, selAddons=[], selDay=null, selTime=null, calM=4, 
 // fiddling with the stepper doesn't silently override a tier they already
 // picked). When selHourly is true, selSvc='hourly' and selTier is synthesized
 // from the hour count so the existing review/submit pipeline keeps working.
-const HOURLY_RATE = 40;
+const HOURLY_RATE = 50;
 const HOURLY_MIN = 3;
 const HOURLY_MAX = 8;
 let selHours = HOURLY_MIN;
