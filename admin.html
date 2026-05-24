@@ -1224,6 +1224,57 @@
   </div>
 </div>
 
+<!-- ── VIEW INVOICE MODAL ─────────────────────────────────────────────────
+     Top-level overlay. Shows the invoice attached to a completed booking,
+     lets the admin mark paid/unpaid and resend the email. -->
+<div class="nb-overlay" id="invoice-overlay" onclick="HirayaAdmin.closeInvoiceIfBackdrop(event)">
+  <div class="nb-modal" role="dialog" aria-labelledby="invoice-modal-title">
+    <button class="nb-close" onclick="HirayaAdmin.closeInvoiceView()" aria-label="Close">✕</button>
+    <h2 id="invoice-modal-title">Invoice</h2>
+    <p class="nb-sub" id="invoice-text">—</p>
+
+    <div id="invoice-empty" style="display:none;padding:1.25rem;background:#f6f9f6;border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:14px;line-height:1.6">
+      No invoice has been issued for this booking yet. Use the <strong>Send invoice</strong> button on the booking card to create and email one.
+    </div>
+
+    <div id="invoice-body" style="display:none">
+      <div class="nb-section" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <div class="nb-section-label">Invoice #</div>
+          <div id="invoice-num" style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--text)">—</div>
+        </div>
+        <div>
+          <div class="nb-section-label">Status</div>
+          <div id="invoice-status" style="font-weight:600">—</div>
+        </div>
+      </div>
+
+      <div class="nb-section" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <div class="nb-section-label">Total</div>
+          <div id="invoice-total" style="font-weight:700;color:var(--sage);font-size:18px">—</div>
+        </div>
+        <div>
+          <div class="nb-section-label">Issued</div>
+          <div id="invoice-issued" style="font-size:14px">—</div>
+        </div>
+      </div>
+
+      <div class="nb-section" id="invoice-paid-at-wrap" style="display:none">
+        <div class="nb-section-label">Paid on</div>
+        <div id="invoice-paid-at" style="font-size:14px">—</div>
+      </div>
+
+      <div id="invoice-err" class="form-err"></div>
+
+      <div class="nb-actions">
+        <button class="btn-ghost" id="invoice-resend-btn" onclick="HirayaAdmin.resendInvoice()">↻ Resend email</button>
+        <button class="btn-primary" id="invoice-paid-btn" onclick="HirayaAdmin.toggleInvoicePaid()">Mark as paid</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Supabase + admin scripts -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>

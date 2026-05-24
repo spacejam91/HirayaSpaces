@@ -521,6 +521,7 @@
         }
         if (canInvoice) {
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.sendInvoice('${b.id}')">Send invoice</button>`);
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
         }
         if (editable) {
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
@@ -1757,6 +1758,102 @@ Hiraya Spaces`
     showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
   }
 
+  // ── VIEW INVOICE ───────────────────────────────────────────────────────
+  let viewingInvoiceBookingId = null;
+  let viewingInvoice = null; // populated row from admin_get_invoice_for_booking
+
+  async function viewInvoice(id) {
+    if (!sb() || !isOwner) return;
+    const b = allBookings.find(x => x.id === id);
+    if (!b) return;
+    viewingInvoiceBookingId = id;
+    viewingInvoice = null;
+
+    $('invoice-text').textContent = `${b.service_name || 'Booking'} — ${b.customer_name || 'Customer'} · ${formatBookingDate(b.preferred_date)}`;
+    hideErr('invoice-err');
+    $('invoice-empty').style.display = 'none';
+    $('invoice-body').style.display = 'none';
+    $('invoice-overlay').classList.add('open');
+
+    try {
+      const { data, error } = await sb().rpc('admin_get_invoice_for_booking', { p_booking_id: id });
+      if (error) throw error;
+      const inv = Array.isArray(data) ? data[0] : data;
+      if (!inv) {
+        $('invoice-empty').style.display = 'block';
+        return;
+      }
+      viewingInvoice = inv;
+      $('invoice-num').textContent = inv.invoice_number || '—';
+      const statusColor = inv.status === 'paid' ? 'var(--sage)' : inv.status === 'unpaid' ? 'var(--text)' : 'var(--rose)';
+      $('invoice-status').textContent = inv.status.toUpperCase();
+      $('invoice-status').style.color = statusColor;
+      $('invoice-total').textContent = '$' + Math.round((inv.total_cents || 0) / 100);
+      $('invoice-issued').textContent = inv.created_at
+        ? new Date(inv.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '—';
+      if (inv.paid_at) {
+        $('invoice-paid-at-wrap').style.display = '';
+        $('invoice-paid-at').textContent = new Date(inv.paid_at).toLocaleString('en-CA', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      } else {
+        $('invoice-paid-at-wrap').style.display = 'none';
+      }
+      const paidBtn = $('invoice-paid-btn');
+      if (paidBtn) {
+        paidBtn.textContent = inv.status === 'paid' ? 'Mark as unpaid' : 'Mark as paid';
+      }
+      $('invoice-body').style.display = 'block';
+    } catch (err) {
+      console.error('admin_get_invoice_for_booking failed:', err);
+      const msg = err?.message || String(err);
+      if (/does not exist|not found/i.test(msg)) {
+        showErr('invoice-err', 'Missing admin_get_invoice_for_booking SQL function — paste the latest migration into Supabase.');
+      } else {
+        showErr('invoice-err', msg);
+      }
+      $('invoice-body').style.display = 'block';
+    }
+  }
+
+  function closeInvoiceView() {
+    viewingInvoiceBookingId = null;
+    viewingInvoice = null;
+    $('invoice-overlay').classList.remove('open');
+  }
+
+  function closeInvoiceIfBackdrop(event) {
+    if (event.target.id === 'invoice-overlay') closeInvoiceView();
+  }
+
+  async function toggleInvoicePaid() {
+    if (!viewingInvoice || !sb()) return;
+    const next = viewingInvoice.status === 'paid' ? 'unpaid' : 'paid';
+    const btn = $('invoice-paid-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { error } = await sb().rpc('admin_set_invoice_status', {
+        p_invoice_id: viewingInvoice.id,
+        p_status: next,
+      });
+      if (error) throw error;
+      showToast(`Marked ${next}.`, 'success');
+      // Reopen to refresh the displayed status.
+      const bookingId = viewingInvoiceBookingId;
+      closeInvoiceView();
+      viewInvoice(bookingId);
+    } catch (err) {
+      console.error('admin_set_invoice_status failed:', err);
+      showErr('invoice-err', err?.message || 'Could not update status.');
+      btn.disabled = false;
+      btn.textContent = viewingInvoice.status === 'paid' ? 'Mark as unpaid' : 'Mark as paid';
+    }
+  }
+
+  function resendInvoice() {
+    if (!viewingInvoiceBookingId) return;
+    sendInvoice(viewingInvoiceBookingId);
+  }
+
   // ── BLOCKED DATES ──────────────────────────────────────────────────────
   // Cached Map<YYYY-MM-DD, { reason }>. Refreshed alongside allBookings so
   // the calendar grid and the day detail drawer stay in sync after a toggle.
@@ -2378,6 +2475,11 @@ Hiraya Spaces`
     submitEdit,
     recalcEditPrice,
     sendInvoice,
+    viewInvoice,
+    closeInvoiceView,
+    closeInvoiceIfBackdrop,
+    toggleInvoicePaid,
+    resendInvoice,
     exportBookingsCsv,
     askReschedule,
     cancelReschedule,
