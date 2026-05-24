@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:32px 16px">
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:14px;overflow:hidden;border:1px solid #d4e2d8">
-        <tr><td style="background:#b04a3a;padding:20px 26px;color:white">
+        <tr><td style="background:#1e4d2b;padding:20px 26px;color:white">
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
               <td valign="middle" width="56">
@@ -350,7 +350,7 @@ Deno.serve(async (req) => {
         <tr><td style="padding:22px 26px 8px">
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
-              <td><span style="background:#b04a3a;color:white;font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:6px">CANCELLED BY CUSTOMER</span></td>
+              <td><span style="background:#b08c4a;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:5px 12px;border-radius:6px">CANCELLED</span> <span style="font-size:11px;color:#6a7d6e;margin-left:6px">by customer</span></td>
               <td style="text-align:right;font-size:12px;color:#6a7d6e">Ref <strong style="color:#1a2e1e">${idShort}</strong></td>
             </tr>
           </table>
