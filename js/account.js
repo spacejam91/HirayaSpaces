@@ -69,9 +69,14 @@
   function getCachedAddresses() { return cachedAddresses.slice(); }
 
   // ── OWNER GATE ─────────────────────────────────────────────────────────
-  // The "owner" sees the Admin tab. Keep this in lockstep with the
-  // is_owner() function in hiraya-schema.sql — both check the same email.
-  const OWNER_EMAIL = 'aaron-thompson@outlook.com';
+  // The "owners" (Aaron, the business inbox, and Jewel) see the Admin tab.
+  // Keep this list in lockstep with the is_owner() function in
+  // hiraya-schema.sql — both check the same set of emails.
+  const OWNER_EMAILS = [
+    'aaron-thompson@outlook.com',
+    'hirayaspaces@gmail.com',
+    'jaeannecm@gmail.com',
+  ];
   let isOwner = false;
 
   // ── MODAL OPEN / CLOSE / TAB SWITCH ────────────────────────────────────
@@ -98,7 +103,8 @@
     else {
       try {
         const { data: { user } } = await sb().auth.getUser();
-        isOwner = !!user && (user.email || '').toLowerCase() === OWNER_EMAIL.toLowerCase();
+        const email = (user?.email || '').toLowerCase();
+        isOwner = !!user && OWNER_EMAILS.some(e => e.toLowerCase() === email);
       } catch (_) { isOwner = false; }
     }
     const btn = $('account-tab-btn-admin');
