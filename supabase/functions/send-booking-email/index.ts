@@ -17,6 +17,28 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 
+// pdf-lib's standard fonts only encode WinAnsi (Latin-1). Stripping/
+// substituting any unicode the catalog uses (≤, ×, —, …) so we don't crash
+// on tier names like "Single room (≤200 sqft)" or "Inside Oven × 2".
+function sanitizePdfText(s: string): string {
+  if (s == null) return "";
+  return String(s)
+    .replace(/[‘’‚‛]/g, "'")    // smart single quotes
+    .replace(/[“”„‟]/g, '"')   // smart double quotes
+    .replace(/[–—]/g, "-")               // en/em dashes → hyphen
+    .replace(/…/g, "...")                     // ellipsis
+    .replace(/·/g, "-")                       // middle dot
+    .replace(/•/g, "*")                       // bullet
+    .replace(/×/g, "x")                       // multiplication sign
+    .replace(/≤/g, "<=")                      // less-than-or-equal
+    .replace(/≥/g, ">=")                      // greater-than-or-equal
+    .replace(/′/g, "'")                       // prime
+    .replace(/″/g, '"')                       // double prime
+    .replace(/ /g, " ")                       // non-breaking space
+    // Anything else outside WinAnsi gets stripped rather than crashing.
+    .replace(/[^\x00-\xff]/g, "");
+}
+
 // ─── INVOICE PDF BUILDER ─────────────────────────────────────────────────
 // Programmatic PDF rendering (no headless browser) using pdf-lib. Matches
 // the HTML invoice layout: header, billed-to + service date stacked, line
@@ -50,15 +72,19 @@ async function buildInvoicePdf(opts: {
   let y = 750;
 
   const drawRight = (str: string, yPos: number, f = font, size = 11, color = text) => {
-    const w = f.widthOfTextAtSize(str, size);
-    page.drawText(str, { x: right - w, y: yPos, font: f, size, color });
+    const s = sanitizePdfText(str);
+    const w = f.widthOfTextAtSize(s, size);
+    page.drawText(s, { x: right - w, y: yPos, font: f, size, color });
+  };
+  const drawAt = (str: string, x: number, yPos: number, f = font, size = 11, color = text) => {
+    page.drawText(sanitizePdfText(str), { x, y: yPos, font: f, size, color });
   };
 
   // Brand header
-  page.drawText("HIRAYA SPACES", { x: left, y, font: bold, size: 14, color: sage });
-  drawRight("Waterloo, ON · hirayaspaces.ca", y, font, 10, muted);
+  drawAt("HIRAYA SPACES", left, y, bold, 14, sage);
+  drawRight("Waterloo, ON - hirayaspaces.ca", y, font, 10, muted);
   y -= 14;
-  page.drawText("Turning homes into dream spaces", { x: left, y, font, size: 9, color: muted });
+  drawAt("Turning homes into dream spaces", left, y, font, 9, muted);
 
   // Divider
   y -= 16;
@@ -67,46 +93,46 @@ async function buildInvoicePdf(opts: {
   // INVOICE badge
   y -= 30;
   page.drawRectangle({ x: left, y: y - 4, width: 68, height: 20, color: sage });
-  page.drawText("INVOICE", { x: left + 9, y, font: bold, size: 10, color: rgb(1, 1, 1) });
+  drawAt("INVOICE", left + 9, y, bold, 10, rgb(1, 1, 1));
 
   // Invoice number
   y -= 32;
-  page.drawText(opts.invoiceNumber, { x: left, y, font: serif, size: 22, color: text });
+  drawAt(opts.invoiceNumber, left, y, serif, 22, text);
 
   y -= 16;
-  page.drawText(`Issued ${opts.issuedDisplay}  ·  Booking ${opts.idShort}`, { x: left, y, font, size: 10, color: muted });
+  drawAt(`Issued ${opts.issuedDisplay}  -  Booking ${opts.idShort}`, left, y, font, 10, muted);
 
   // Billed to
   y -= 32;
-  page.drawText("BILLED TO", { x: left, y, font: bold, size: 9, color: muted });
+  drawAt("BILLED TO", left, y, bold, 9, muted);
   y -= 14;
-  page.drawText(opts.customerName, { x: left, y, font: bold, size: 11, color: text });
+  drawAt(opts.customerName, left, y, bold, 11, text);
   y -= 13;
-  page.drawText(opts.customerEmail, { x: left, y, font, size: 10, color: muted });
+  drawAt(opts.customerEmail, left, y, font, 10, muted);
   if (opts.customerPhone) {
     y -= 13;
-    page.drawText(opts.customerPhone, { x: left, y, font, size: 10, color: muted });
+    drawAt(opts.customerPhone, left, y, font, 10, muted);
   }
 
   // Service date
   y -= 22;
-  page.drawText("SERVICE DATE", { x: left, y, font: bold, size: 9, color: muted });
+  drawAt("SERVICE DATE", left, y, bold, 9, muted);
   y -= 14;
-  const dateLine = opts.dateDisplay + (opts.timeDisplay ? "  ·  " + opts.timeDisplay : "");
-  page.drawText(dateLine, { x: left, y, font: bold, size: 11, color: text });
+  const dateLine = opts.dateDisplay + (opts.timeDisplay ? "  -  " + opts.timeDisplay : "");
+  drawAt(dateLine, left, y, bold, 11, text);
   y -= 13;
-  page.drawText(opts.addressLine, { x: left, y, font, size: 10, color: muted });
+  drawAt(opts.addressLine, left, y, font, 10, muted);
 
   // Description header
   y -= 30;
-  page.drawText("DESCRIPTION", { x: left, y, font: bold, size: 9, color: sage });
+  drawAt("DESCRIPTION", left, y, bold, 9, sage);
   y -= 6;
   page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.5, color: sage });
 
   // Line items
   y -= 18;
   for (const item of opts.lineItems) {
-    page.drawText(item.name, { x: left, y, font, size: 11, color: text });
+    drawAt(item.name, left, y, font, 11, text);
     drawRight(item.priceLabel, y, font, 11, text);
     y -= 18;
   }
@@ -115,21 +141,21 @@ async function buildInvoicePdf(opts: {
   y -= 4;
   page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.5, color: border });
   y -= 20;
-  page.drawText("Total due", { x: left, y, font: bold, size: 13, color: text });
+  drawAt("Total due", left, y, bold, 13, text);
   drawRight(opts.totalDisplay, y, bold, 14, sage);
 
   // How to pay
   y -= 50;
   page.drawRectangle({ x: left, y: y - 60, width: right - left, height: 76, color: rgb(255 / 255, 251 / 255, 235 / 255), borderColor: rgb(229 / 255, 211 / 255, 160 / 255), borderWidth: 1 });
-  page.drawText("HOW TO PAY", { x: left + 14, y, font: bold, size: 9, color: rgb(90 / 255, 67 / 255, 24 / 255) });
+  drawAt("HOW TO PAY", left + 14, y, bold, 9, rgb(90 / 255, 67 / 255, 24 / 255));
   y -= 18;
-  page.drawText("Cash: on arrival.", { x: left + 14, y, font, size: 10, color: rgb(61 / 255, 44 / 255, 13 / 255) });
+  drawAt("Cash: on arrival.", left + 14, y, font, 10, rgb(61 / 255, 44 / 255, 13 / 255));
   y -= 14;
-  page.drawText(`E-transfer: hirayaspaces@gmail.com  —  reference ${opts.invoiceNumber}.`, { x: left + 14, y, font, size: 10, color: rgb(61 / 255, 44 / 255, 13 / 255) });
+  drawAt(`E-transfer: hirayaspaces@gmail.com  -  reference ${opts.invoiceNumber}.`, left + 14, y, font, 10, rgb(61 / 255, 44 / 255, 13 / 255));
 
   // Footer
   y = 40;
-  page.drawText("Questions? Reply to the invoice email or call (226) 751-4566.", { x: left, y, font, size: 9, color: muted });
+  drawAt("Questions? Reply to the invoice email or call (226) 751-4566.", left, y, font, 9, muted);
 
   return await pdf.save();
 }
