@@ -3,23 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <script>
-  // Always land at the top on refresh / back-forward — without this, Safari
-  // and Chrome (mobile especially) remember the prior scroll position and
-  // the user reloads to a mid-page section instead of the hero.
+  // Always land at the top on refresh / back-forward. iOS Safari is the
+  // stubborn one: it captures the current scroll position on `beforeunload`
+  // and restores it after refresh regardless of `scrollRestoration`. The fix
+  // is to scroll to 0 BEFORE the page unloads, so the captured position is
+  // also 0.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  // Strip any hash fragment (e.g. #services left over from clicking a nav
+  // link before refresh) — otherwise the browser jumps to that anchor on
+  // load regardless of any scroll-reset code.
+  if (window.location.hash) {
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); }
+    catch (_) { window.location.hash = ''; }
+  }
   function __resetScroll() {
     window.scrollTo(0, 0);
     if (document.documentElement) document.documentElement.scrollTop = 0;
     if (document.body) document.body.scrollTop = 0;
   }
   __resetScroll();
+  window.addEventListener('beforeunload', __resetScroll);
+  window.addEventListener('pagehide', __resetScroll);
   window.addEventListener('DOMContentLoaded', __resetScroll);
   window.addEventListener('load', function () {
     __resetScroll();
     requestAnimationFrame(__resetScroll);
+    setTimeout(__resetScroll, 0);
+    setTimeout(__resetScroll, 100);
   });
-  // iOS Safari uses bfcache for back/forward navigation — `load` won't fire,
-  // but `pageshow` does with persisted=true.
   window.addEventListener('pageshow', __resetScroll);
 </script>
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -509,6 +520,7 @@
   @media (max-width: 720px) {
     .trust-strip { padding: 2rem 5vw; }
     .trust-inner { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .trust-inner .trust-item:nth-child(3) { grid-column: 1 / -1; max-width: 50%; margin: 0 auto; }
     .trust-icon { font-size: 26px; }
     .trust-title { font-size: 17px; }
   }
