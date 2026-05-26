@@ -318,6 +318,7 @@
     }
     .booking-grid > .booking-card .booking-card-body > div:last-child { border-bottom: 0; }
     .booking-grid > .booking-card .booking-card-actions {
+      align-self: center;
       margin-top: 0; padding-top: 0; border-top: none;
       flex-direction: column; align-items: stretch;
       gap: 8px; min-width: 180px;
@@ -861,6 +862,9 @@
       <button class="admin-tab" data-panel="completed" onclick="HirayaAdmin.switchPanel('completed')">
         Completed <span class="admin-tab-count" id="tab-count-completed">0</span>
       </button>
+      <button class="admin-tab" data-panel="cancelled" onclick="HirayaAdmin.switchPanel('cancelled')">
+        Cancelled <span class="admin-tab-count" id="tab-count-cancelled">0</span>
+      </button>
       <button class="admin-tab" data-panel="all" onclick="HirayaAdmin.switchPanel('all')">All bookings</button>
       <button class="admin-tab" data-panel="calendar" onclick="HirayaAdmin.switchPanel('calendar')">Calendar</button>
       <button class="admin-tab" data-panel="customers" onclick="HirayaAdmin.switchPanel('customers')">Customers</button>
@@ -922,6 +926,7 @@
               <option value="confirmed">Confirmed</option>
               <option value="in_progress">In progress</option>
               <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
             </select>
             <select id="all-sort" onchange="HirayaAdmin.renderAll()">
               <option value="newest">Newest first</option>

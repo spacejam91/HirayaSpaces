@@ -257,7 +257,7 @@
       $('decline-view').style.display = 'none';
       // Edit modal lives at top level now — closes on cancel, not on tab switch.
       refreshPending();
-    } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed') {
+    } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed' || name === 'cancelled') {
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
       const completeView = $('complete-view');
@@ -272,6 +272,7 @@
         if (name === 'confirmed') filterSel.value = 'confirmed';
         else if (name === 'in_progress') filterSel.value = 'in_progress';
         else if (name === 'completed') filterSel.value = 'completed';
+        else if (name === 'cancelled') filterSel.value = 'cancelled';
         else filterSel.value = '';
       }
       // Update the panel heading so the customer knows which view they're on.
@@ -280,6 +281,7 @@
         titleEl.textContent = name === 'confirmed' ? 'Confirmed bookings'
           : name === 'in_progress' ? 'In-progress bookings'
           : name === 'completed' ? 'Completed bookings'
+          : name === 'cancelled' ? 'Cancelled bookings'
           : 'All bookings';
       }
       refreshAll();
@@ -482,6 +484,10 @@
     const tabCompleted = $('tab-count-completed');
     if (tabCompleted) {
       tabCompleted.textContent = allBookings.filter(b => b.status === 'completed').length;
+    }
+    const tabCancelled = $('tab-count-cancelled');
+    if (tabCancelled) {
+      tabCancelled.textContent = allBookings.filter(b => b.status === 'cancelled').length;
     }
   }
 
