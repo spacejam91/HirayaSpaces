@@ -1135,6 +1135,8 @@ Deno.serve(async (req) => {
                 <tr><td style="padding:5px 0;color:#6a7d6e">Address</td><td style="padding:5px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
               </table>
               <div style="border-top:1px solid #5a9470;padding-top:10px;font-size:13px;color:#1a2e1e">
+                <strong style="color:#6a7d6e;font-size:11px;text-transform:uppercase;letter-spacing:1.2px">Main service</strong>
+                <div style="margin:6px 0 12px;font-weight:600">${escapeHtml(serviceName)}</div>
                 <strong style="color:#6a7d6e;font-size:11px;text-transform:uppercase;letter-spacing:1.2px">Add-ons</strong>
                 ${addonsHtml}
               </div>
@@ -1574,7 +1576,9 @@ Deno.serve(async (req) => {
         <tr><td style="padding:0 26px 14px">
           <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f9f6;border:1px solid #d4e2d8;border-radius:10px">
             <tr><td style="padding:14px 18px">
-              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Add-ons</div>
+              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Main service</div>
+              <div style="font-size:13px;color:#1a2e1e;line-height:1.5;font-weight:600;margin-bottom:12px">${escapeHtml(serviceName)}</div>
+              <div style="font-size:10px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;border-top:1px solid #d4e2d8;padding-top:10px">Add-ons</div>
               ${ownerAddonsHtml}
             </td></tr>
           </table>

@@ -116,6 +116,7 @@
     if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
     if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
 
+    const detailLink = `<button type="button" class="booking-card-detail-link" onclick="HirayaAdmin.openBookingDetail('${b.id}', event)">Tap for full details →</button>`;
     return `
       <div class="${classes.join(' ')}" data-id="${b.id}" onclick="HirayaAdmin.openBookingDetail('${b.id}', event)">
         <div class="booking-card-head">
@@ -137,6 +138,7 @@
           ${internal}
           <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
         </div>
+        ${detailLink}
         ${opts.actions || ''}
       </div>`;
   }

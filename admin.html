@@ -1420,6 +1420,22 @@
   /* Mobile: compact card. Tap to open the detail modal. Hide the lower-
      priority body rows so the card stays scannable at a glance — the
      modal shows everything when tapped. */
+  .booking-card-detail-link {
+    display: none;
+    background: none;
+    border: none;
+    border-top: 1px dashed var(--border);
+    width: 100%;
+    padding: 10px 0;
+    margin-top: 8px;
+    text-align: center;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: var(--sage);
+    font-weight: 600;
+    cursor: pointer;
+  }
   @media (max-width: 880px) {
     .booking-card { cursor: pointer; }
     .booking-card-body { font-size: 12px; line-height: 1.45; }
@@ -1428,18 +1444,7 @@
        any row past the customer name & address. The price stays (always
        last child) for at-a-glance reference. */
     .booking-card-body > div:nth-child(n+5):not(:last-child) { display: none; }
-    .booking-card::after {
-      content: 'Tap for full details';
-      display: block;
-      text-align: center;
-      font-size: 11px;
-      letter-spacing: 0.5px;
-      color: var(--sage);
-      font-weight: 600;
-      padding: 6px 0;
-      border-top: 1px dashed var(--border);
-      margin-top: 8px;
-    }
+    .booking-card-detail-link { display: block; }
   }
 </style>
 
