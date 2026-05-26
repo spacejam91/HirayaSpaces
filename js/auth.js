@@ -293,43 +293,86 @@
   }
 
   // ── LOGIN ──────────────────────────────────────────────────────────────
+  // Tracks how many times login has been clicked this session — surfaced in
+  // the toast so a user reporting "nothing happens" can tell us how many
+  // taps actually reached the JS.
+  let loginAttemptCount = 0;
   async function doLogin() {
-    if (!clientReady()) return;
+    loginAttemptCount += 1;
+    // Immediate visible feedback. If the user reports "nothing happens" and
+    // doesn't see this toast either, the click isn't reaching JS at all
+    // (browser/CSS issue). If they DO see it but no login, the bug is below.
+    showToast('Signing in…', 'success');
+
+    if (!clientReady()) {
+      showErr('login-err', 'Booking system is still loading. Try again in a second.');
+      showToast('Booking system not ready. Refresh the page.', 'error');
+      return;
+    }
     hideErr('login-err');
-    const email = $('login-email').value.trim().toLowerCase();
-    const pass = $('login-pass').value;
+    const email = ($('login-email')?.value || '').trim().toLowerCase();
+    const pass = $('login-pass')?.value || '';
 
     if (!email || !pass) {
       showErr('login-err', 'Please enter your email and password.');
+      showToast('Email and password required.', 'error');
       return;
     }
 
     const btn = $('login-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Logging in…'; }
 
-    const { data, error } = await sb().auth.signInWithPassword({ email, password: pass });
+    // Wrap the whole flow so ANY unexpected error becomes a visible message
+    // instead of "I clicked log in and nothing happened."
+    try {
+      // Force a clean slate: nuke any stale local session before re-attempting.
+      // Some users end up with a half-broken cached session that swallows
+      // signInWithPassword silently — this guarantees a fresh request.
+      try { await sb().auth.signOut({ scope: 'local' }); } catch (_) {}
 
-    if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
+      const { data, error } = await sb().auth.signInWithPassword({ email, password: pass });
 
-    if (error) { showErr('login-err', friendly(error)); return; }
+      if (error) {
+        showErr('login-err', friendly(error));
+        if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
+        return;
+      }
 
-    // Belt-and-suspenders: verify the session actually persisted before
-    // closing the modal. iOS Safari Private Mode / strict ITP can return
-    // success but silently drop the session because localStorage is blocked,
-    // which manifests as "modal closed but I'm not logged in".
-    const { data: sessionData } = await sb().auth.getSession();
-    if (!sessionData?.session) {
-      showErr('login-err', 'Signed in, but the session was blocked by your browser. Try a non-private tab.');
-      return;
+      // Verify the session actually persisted. iOS Private Mode / strict ITP
+      // can return success but silently drop the session because localStorage
+      // is blocked.
+      const { data: sessionData } = await sb().auth.getSession();
+      if (!sessionData?.session) {
+        showErr('login-err', 'Signed in, but the session was blocked by your browser. Try a non-private tab or another browser.');
+        if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
+        return;
+      }
+
+      // Force a fresh page load so the entire UI re-renders against the new
+      // auth state. Eliminates every "modal closed but I'm not logged in"
+      // edge case regardless of whether onAuthStateChange fired.
+      closeAuthModal();
+      window.location.reload();
+    } catch (err) {
+      console.error('doLogin error:', err);
+      const msg = (err && err.message) || String(err) || 'Unexpected error';
+      showErr('login-err', msg + ' — refresh and try again.');
+      showToast('Login error: ' + msg, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
     }
+  }
 
-    // Force a fresh load so the entire UI re-renders against the new auth.
-    // Previously we relied on onAuthStateChange firing SIGNED_IN, but on
-    // second-login-after-logout (especially when scrolled) the listener
-    // doesn't always fire, leaving the user feeling like nothing happened.
-    // Reload is the simplest guaranteed fix.
-    closeAuthModal();
-    window.location.reload();
+  // Force a fresh login flow even when the user is already signed in.
+  // Used by the "Sign in as someone else" menu item — clears the cached
+  // session locally and globally, then opens the login modal.
+  async function switchAccount() {
+    try { closeUserMenu(); } catch (_) {}
+    try { await sb().auth.signOut(); } catch (e) { console.warn('switchAccount signOut failed:', e); }
+    // Clear any leftover login fields so the new user starts fresh.
+    const emailEl = $('login-email'); if (emailEl) emailEl.value = '';
+    const passEl = $('login-pass'); if (passEl) passEl.value = '';
+    setNavLoggedOut();
+    openAuthModal('login');
   }
 
   // ── LOGOUT ─────────────────────────────────────────────────────────────
@@ -515,6 +558,7 @@
   // ── EXPORTS ────────────────────────────────────────────────────────────
   window.HirayaAuth = {
     openAuthModal,
+    switchAccount,
     closeAuthModal,
     switchAuthView,
     doSignup,

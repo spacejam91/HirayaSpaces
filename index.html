@@ -671,11 +671,11 @@
     margin: 0 auto;
   }
   .addons-grid > .addon-card {
-    /* 3 across at desktop (~360px each), 4 across at very wide,
-       2 on tablet, 1 on phones — handled by min-width + flex-basis. */
+    /* 3 across at desktop, 4 across at very wide, 2 on tablet, 1 on
+       phones — handled by min-width + flex-basis. No max-width: orphan
+       cards on the last row grow to fill instead of leaving empty space. */
     flex: 1 1 calc(33.333% - 0.667rem);
     min-width: 280px;
-    max-width: 400px;
   }
   @media (min-width: 1400px) {
     .addons-grid > .addon-card { flex: 1 1 calc(25% - 0.75rem); }
@@ -1079,6 +1079,8 @@
         <a role="menuitem" class="nav-user-menu-item" id="nav-user-menu-admin"
                 style="display:none;text-decoration:none"
                 href="/admin">Admin dashboard</a>
+        <button type="button" role="menuitem" class="nav-user-menu-item"
+                onclick="HirayaAuth.switchAccount()">Sign in as someone else</button>
         <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
       </div>
@@ -2326,7 +2328,7 @@ loadBlockedDates();
     <div id="form-login">
       <h2 class="modal-title" id="auth-modal-title">Welcome back</h2>
       <p class="modal-sub">Log in to view your bookings, past cleans, and invoices.</p>
-      <form onsubmit="event.preventDefault(); HirayaAuth.doLogin();">
+      <form onsubmit="event.preventDefault(); window.HirayaAuth && HirayaAuth.doLogin(); return false;">
         <div class="modal-field">
           <label for="login-email">Email</label>
           <input type="email" id="login-email" name="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" placeholder="you@email.com">
@@ -2339,7 +2341,12 @@ loadBlockedDates();
           <button type="button" class="modal-forgot-link" onclick="HirayaAuth.switchAuthView('forgot')">Forgot password?</button>
         </div>
         <div class="modal-err" id="login-err" role="alert"></div>
-        <button type="submit" class="modal-btn" id="login-submit">Log in</button>
+        <!-- Button uses BOTH type=submit (Enter key) AND explicit onclick
+             (direct tap) so the login fires no matter which path Safari
+             honours. Wrapped in try/catch + immediate toast so a stuck
+             button at least surfaces a visible error. -->
+        <button type="submit" class="modal-btn" id="login-submit"
+                onclick="try { window.HirayaAuth && HirayaAuth.doLogin(); } catch (e) { alert('Login error: ' + (e && e.message || e)); } return false;">Log in</button>
       </form>
       <div class="modal-switch">Don't have an account? <a onclick="HirayaAuth.switchAuthView('signup')">Sign up</a></div>
     </div>
