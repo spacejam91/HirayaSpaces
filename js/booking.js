@@ -267,7 +267,7 @@
 
     const addonsHtml = d.addons.length
       ? d.addons.map(a => `<div class="br-line"><span>${escapeHtml(a.name)}</span><span>${a.addonPrice ? '$' + a.addonPrice : 'On request'}</span></div>`).join('')
-      : '<div class="br-line br-muted"><span>No add-ons</span><span>—</span></div>';
+      : '';
     $('br-addons').innerHTML = addonsHtml;
 
     // One line per selected service in the total box. d.svcLines is the
@@ -286,7 +286,6 @@
         .join('');
     }
 
-    $('br-addon-total').textContent = d.addonTotal ? '$' + d.addonTotal : '$0';
     $('br-total').textContent = f.estimated_total_dollars ? '$' + f.estimated_total_dollars : 'Quote on request';
   }
 
