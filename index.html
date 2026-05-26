@@ -659,17 +659,26 @@
   /* ── ADDONS ── */
   #addons { background: var(--warm); }
   .addons-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 5rem; align-items: start; }
-  /* Full-width 3-col addon grid (4 on very wide). Drops to 2 cols on
-     tablet and 1 col on phones via the media queries below. */
+  /* Flex layout so the last (possibly partial) row centers instead of
+     leaving an awkward gap on the right. Cards naturally hold a max width,
+     and any orphans on the final row land in the middle. */
   .addons-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 1rem;
     max-width: 1280px;
     margin: 0 auto;
   }
+  .addons-grid > .addon-card {
+    /* 3 across at desktop (~360px each), 4 across at very wide,
+       2 on tablet, 1 on phones — handled by min-width + flex-basis. */
+    flex: 1 1 calc(33.333% - 0.667rem);
+    min-width: 280px;
+    max-width: 400px;
+  }
   @media (min-width: 1400px) {
-    .addons-grid { grid-template-columns: repeat(4, 1fr); }
+    .addons-grid > .addon-card { flex: 1 1 calc(25% - 0.75rem); }
   }
   .addon-card {
     background: white; border: 1.5px solid var(--border); border-radius: 16px;
@@ -922,7 +931,7 @@
     .hero-right { display: none; }
     .services-grid { grid-template-columns: repeat(2, 1fr); }
     .addons-layout { grid-template-columns: 1fr; gap: 2rem; }
-    .addons-grid { grid-template-columns: repeat(2, 1fr); }
+    .addons-grid > .addon-card { flex: 1 1 calc(50% - 0.5rem); }
     .booking-wrapper { grid-template-columns: 1fr; }
     .steps-layout { grid-template-columns: repeat(2, 1fr); }
     .steps-layout::before { display: none; }
@@ -934,7 +943,7 @@
     section { padding: 4rem 5vw; }
     .hero-left { padding: 3rem 5vw; }
     .services-grid { grid-template-columns: 1fr; }
-    .addons-grid { grid-template-columns: 1fr; }
+    .addons-grid > .addon-card { flex: 1 1 100%; max-width: 100%; }
     .steps-layout { grid-template-columns: 1fr; }
     .reviews-grid { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
