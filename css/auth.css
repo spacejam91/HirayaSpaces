@@ -1,5 +1,14 @@
 /* Auth additions — reuses brand tokens defined in index.html (:root vars). */
 
+/* Force Cormorant Garamond to render lining (modern) numerals instead of
+   its default old-style figures. Without this, "1" renders as a thin
+   vertical line that reads like a Roman numeral "I". Applies globally to
+   any element using the brand serif. */
+* { font-variant-numeric: lining-nums tabular-nums; }
+@supports (font-feature-settings: "lnum") {
+  * { font-feature-settings: "lnum" 1, "tnum" 1; }
+}
+
 /* Logged-in nav wrap: greeting trigger + dropdown menu */
 .nav-user-wrap {
   display: none;
