@@ -9,6 +9,14 @@
   * { font-feature-settings: "lnum" 1, "tnum" 1; }
 }
 
+/* iOS Safari auto-zooms when focusing any input with font-size < 16px and
+   never zooms back out — that's the "logged in and now everything looks
+   zoomed" symptom. Force 16px on all form fields, mobile only. Desktop
+   stays at its design font-size. */
+@media (max-width: 720px) {
+  input, textarea, select { font-size: 16px !important; }
+}
+
 /* Logged-in nav wrap: greeting trigger + dropdown menu */
 .nav-user-wrap {
   display: none;
