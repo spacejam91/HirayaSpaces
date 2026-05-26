@@ -2794,7 +2794,13 @@ Hiraya Spaces`
     const mapsLink = addr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="font-size:12px">🗺 Open in Maps →</a>` : '';
 
     $('detail-subtitle').textContent = `Ref ${b.id.slice(0, 8).toUpperCase()} · ${statusLabel(b.status)}`;
-    $('detail-service').innerHTML = escapeHtml(b.service_name || 'Cleaning service');
+    // Show the main service price inline (booking total minus add-ons) so the
+    // modal matches the card layout.
+    const detailAddonsSumCents = (b.addon_items || []).reduce((s, a) => s + (a.price_cents || 0), 0);
+    const detailTotalCents = b.final_price_cents ?? b.estimated_price_cents;
+    const detailSvcCents = (detailTotalCents != null) ? Math.max(0, detailTotalCents - detailAddonsSumCents) : null;
+    const detailSvcPriceStr = (detailSvcCents != null && detailSvcCents > 0) ? ` — <strong>$${Math.round(detailSvcCents / 100)}</strong>` : '';
+    $('detail-service').innerHTML = escapeHtml(b.service_name || 'Cleaning service') + detailSvcPriceStr;
     $('detail-when').innerHTML = `<strong>${escapeHtml(dateStr)}</strong>${escapeHtml(timeStr)}`;
 
     const addonItems = b.addon_items || [];
