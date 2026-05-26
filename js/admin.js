@@ -117,7 +117,7 @@
     if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
 
     return `
-      <div class="${classes.join(' ')}" data-id="${b.id}">
+      <div class="${classes.join(' ')}" data-id="${b.id}" onclick="HirayaAdmin.openBookingDetail('${b.id}', event)">
         <div class="booking-card-head">
           <div>
             <div class="booking-card-svc">${svc}${freqBadge}</div>
@@ -130,11 +130,12 @@
           ${emailLink ? `<div>✉️ ${emailLink}</div>` : ''}
           ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
           ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
-          <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
+          ${(b.addon_names && b.addon_names.length) ? `<div>✨ <strong>Add-ons:</strong> ${escapeHtml(b.addon_names.join(', '))}</div>` : ''}
           ${entryLine}
           ${timeLine}
           ${notes}
           ${internal}
+          <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
         </div>
         ${opts.actions || ''}
       </div>`;
@@ -352,6 +353,7 @@
       refreshBlockedDates(),
       refreshCustomerMeta(),
       refreshCustomerRoster(),
+      loadAddons(),
     ]);
     const { data, error } = bookingsRes;
     if (error) {
@@ -360,7 +362,31 @@
     } else {
       allBookings = data || [];
     }
+    // Attach add-on names to each booking so the card can list them inline.
+    await attachAddonsToBookings(allBookings);
     renderAll();
+  }
+
+  async function attachAddonsToBookings(bookings) {
+    if (!bookings || !bookings.length || !sb()) return;
+    const ids = bookings.map(b => b.id);
+    const { data, error } = await sb()
+      .from('booking_addons')
+      .select('booking_id, addon_id')
+      .in('booking_id', ids);
+    if (error) {
+      console.warn('booking_addons fetch failed:', error.message);
+      return;
+    }
+    const addonNameById = new Map(addonsCache.map(a => [a.id, a.name]));
+    const byBooking = new Map();
+    (data || []).forEach(row => {
+      const name = addonNameById.get(row.addon_id);
+      if (!name) return;
+      if (!byBooking.has(row.booking_id)) byBooking.set(row.booking_id, []);
+      byBooking.get(row.booking_id).push(name);
+    });
+    bookings.forEach(b => { b.addon_names = byBooking.get(b.id) || []; });
   }
 
   // ── STATS ──────────────────────────────────────────────────────────────
@@ -2699,6 +2725,94 @@ Hiraya Spaces`
     checkAuthAndRoute();
   }
 
+  // ── BOOKING DETAIL MODAL ───────────────────────────────────────────────
+  function openBookingDetail(id, event) {
+    // Bail if the click came from a button/link inside the card — those
+    // already have their own action handlers.
+    if (event && event.target && event.target.closest('button, a')) return;
+    const b = allBookings.find(x => x.id === id) || pendingBookings.find(x => x.id === id);
+    if (!b) return;
+    const overlay = $('detail-overlay');
+    if (!overlay) return;
+
+    const dateStr = formatBookingDate(b.preferred_date);
+    const timeStr = b.preferred_time_slot ? ` at ${b.preferred_time_slot}` : '';
+    const priceCents = b.final_price_cents ?? b.estimated_price_cents;
+    const total = priceCents != null ? '$' + Math.round(priceCents / 100) : 'Quote on request';
+    const addr = [
+      [b.street_address, b.unit].filter(Boolean).join(', '),
+      [b.city, b.postal_code].filter(Boolean).join(' '),
+    ].filter(Boolean).join(' · ');
+    const mapsLink = addr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="font-size:12px">🗺 Open in Maps →</a>` : '';
+
+    $('detail-subtitle').textContent = `Ref ${b.id.slice(0, 8).toUpperCase()} · ${statusLabel(b.status)}`;
+    $('detail-service').innerHTML = escapeHtml(b.service_name || 'Cleaning service');
+    $('detail-when').innerHTML = `<strong>${escapeHtml(dateStr)}</strong>${escapeHtml(timeStr)}`;
+
+    const addons = b.addon_names || [];
+    $('detail-addons').innerHTML = addons.length
+      ? addons.map(n => `<div>✨ ${escapeHtml(n)}</div>`).join('')
+      : '<span style="color:var(--muted)">No add-ons</span>';
+
+    const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}">${escapeHtml(b.customer_phone)}</a>` : '';
+    const emailLink = b.customer_email ? `<a href="mailto:${escapeHtml(b.customer_email)}">${escapeHtml(b.customer_email)}</a>` : '';
+    $('detail-customer').innerHTML = `
+      <div><strong>${escapeHtml(b.customer_name || 'Customer')}</strong></div>
+      ${emailLink ? `<div>✉️ ${emailLink}</div>` : ''}
+      ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
+    `;
+    $('detail-address').innerHTML = addr
+      ? `<div>📍 ${escapeHtml(addr)}</div><div style="margin-top:4px">${mapsLink}</div>`
+      : '<span style="color:var(--muted)">No address on file</span>';
+
+    const entryLabels = { home: '🏠 Customer will be home', lockbox: '🔐 Lockbox', hidden_key: '🗝 Hidden key', fob: '🏢 Building fob/code', concierge: '🛎 Concierge', other: '📋 Other' };
+    let entryHtml = entryLabels[b.entry_method] || '—';
+    if (b.entry_instructions) entryHtml += `<div style="margin-top:4px;color:var(--muted);font-size:13px">${escapeHtml(b.entry_instructions)}</div>`;
+    $('detail-entry').innerHTML = entryHtml;
+
+    const notesWrap = $('detail-notes-wrap');
+    if (b.customer_notes) {
+      $('detail-notes').textContent = b.customer_notes;
+      notesWrap.style.display = '';
+    } else {
+      notesWrap.style.display = 'none';
+    }
+    const internalWrap = $('detail-internal-wrap');
+    if (b.internal_notes) {
+      $('detail-internal').textContent = b.internal_notes;
+      internalWrap.style.display = '';
+    } else {
+      internalWrap.style.display = 'none';
+    }
+
+    $('detail-price').innerHTML = `<strong style="font-size:18px">${escapeHtml(total)}</strong>`;
+
+    // Mirror the card's action buttons inside the modal so the admin/cleaner
+    // can act without closing the modal first.
+    const card = document.querySelector(`.booking-card[data-id="${b.id}"] .booking-card-actions`);
+    const actionsEl = $('detail-actions');
+    if (actionsEl) {
+      actionsEl.innerHTML = card ? card.innerHTML : '';
+      // After tapping any action button, close the modal so the workflow
+      // (askEdit, askConfirm, etc.) can take focus cleanly.
+      actionsEl.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => setTimeout(closeBookingDetail, 50));
+      });
+    }
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeBookingDetail() {
+    const overlay = $('detail-overlay');
+    if (overlay) overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function closeDetailIfBackdrop(event) {
+    if (event.target.id === 'detail-overlay') closeBookingDetail();
+  }
+
   // ── EXPORTS ────────────────────────────────────────────────────────────
   window.HirayaAdmin = {
     doLogin,
@@ -2754,6 +2868,10 @@ Hiraya Spaces`
     openCustomerDetail,
     closeCustomerDetail,
     saveCustomerMetaFromForm,
+    // Booking detail modal
+    openBookingDetail,
+    closeBookingDetail,
+    closeDetailIfBackdrop,
     // New booking
     openNewBooking,
     closeNewBooking,

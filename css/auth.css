@@ -531,16 +531,22 @@
    one action fits per row. */
 @media (max-width: 640px) {
   .booking-card-actions {
+    flex-direction: column;
     gap: 8px;
     justify-content: stretch;
   }
   .booking-card-btn {
-    flex: 1 1 calc(50% - 4px);
+    flex: 1 1 100%;
+    width: 100%;
     min-width: 0;
     min-height: 48px;
     font-size: 14px;
     padding: 12px 10px;
   }
+  /* Mobile order: Edit on top, then Confirm, then Decline. */
+  .booking-card-actions .booking-card-btn[onclick*="askEdit"] { order: 1; }
+  .booking-card-actions .booking-card-btn[onclick*="askConfirm"] { order: 2; }
+  .booking-card-actions .booking-card-btn[onclick*="askDecline"] { order: 3; }
   /* Primary actions (Check in / Check out / Mark complete) take full
      width and read clearly at arm's length. */
   .booking-card-btn[style*="background:#3b82a8"],

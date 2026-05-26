@@ -1350,6 +1350,99 @@
   </div>
 </div>
 
+<!-- ── BOOKING DETAIL MODAL (tap-to-expand on mobile) ─────────────────── -->
+<div class="nb-overlay" id="detail-overlay" onclick="HirayaAdmin.closeDetailIfBackdrop(event)">
+  <div class="nb-modal" role="dialog" aria-labelledby="detail-title" style="max-width:520px">
+    <button class="nb-close" onclick="HirayaAdmin.closeBookingDetail()" aria-label="Close">✕</button>
+    <h2 id="detail-title">Booking details</h2>
+    <p class="nb-sub" id="detail-subtitle"></p>
+
+    <div class="bd-section">
+      <div class="bd-section-label">Service</div>
+      <div id="detail-service" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section">
+      <div class="bd-section-label">When</div>
+      <div id="detail-when" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section">
+      <div class="bd-section-label">Add-ons & extras</div>
+      <div id="detail-addons" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section">
+      <div class="bd-section-label">Customer</div>
+      <div id="detail-customer" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section">
+      <div class="bd-section-label">Address</div>
+      <div id="detail-address" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section">
+      <div class="bd-section-label">Entry method</div>
+      <div id="detail-entry" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section" id="detail-notes-wrap" style="display:none">
+      <div class="bd-section-label">Customer notes</div>
+      <div id="detail-notes" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section" id="detail-internal-wrap" style="display:none">
+      <div class="bd-section-label">Internal notes</div>
+      <div id="detail-internal" class="bd-value"></div>
+    </div>
+
+    <div class="bd-section">
+      <div class="bd-section-label">Price</div>
+      <div id="detail-price" class="bd-value"></div>
+    </div>
+
+    <div id="detail-actions" class="booking-card-actions" style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem"></div>
+  </div>
+</div>
+
+<style>
+  .bd-section { margin-bottom: 1rem; }
+  .bd-section-label {
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin-bottom: 4px;
+  }
+  .bd-value {
+    font-size: 14px; color: var(--text); line-height: 1.5;
+  }
+  .bd-value a { color: var(--sage); text-decoration: none; }
+  .bd-value strong { font-weight: 600; }
+  /* Mobile: compact card. Tap to open the detail modal. Hide the lower-
+     priority body rows so the card stays scannable at a glance — the
+     modal shows everything when tapped. */
+  @media (max-width: 880px) {
+    .booking-card { cursor: pointer; }
+    .booking-card-body { font-size: 12px; line-height: 1.45; }
+    .booking-card-body > div { padding: 3px 0; }
+    /* Hide email, phone, add-ons summary, entry, notes, internal, time —
+       any row past the customer name & address. The price stays (always
+       last child) for at-a-glance reference. */
+    .booking-card-body > div:nth-child(n+5):not(:last-child) { display: none; }
+    .booking-card::after {
+      content: 'Tap for full details';
+      display: block;
+      text-align: center;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      color: var(--sage);
+      font-weight: 600;
+      padding: 6px 0;
+      border-top: 1px dashed var(--border);
+      margin-top: 8px;
+    }
+  }
+</style>
+
 <!-- Supabase + admin scripts -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
