@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="canonical" href="https://hirayaspaces.ca/faq">
+<title>FAQ — Frequently Asked Questions | Hiraya Spaces Cleaning</title>
+<meta name="description" content="Answers to the most common questions about Hiraya Spaces residential cleaning in Waterloo, Kitchener, and Cambridge — supplies, pets, parking, cancellation, recurring discounts, and more.">
+<meta name="keywords" content="cleaning service FAQ Waterloo, Hiraya Spaces questions, do cleaners bring supplies, cleaning service cancellation policy, recurring cleaning discount, pet cleaning service, lockbox cleaning, senior cleaning questions">
+<meta property="og:title" content="FAQ | Hiraya Spaces Cleaning">
+<meta property="og:description" content="Answers to the most common questions about our cleaning service in Waterloo Region.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hirayaspaces.ca/faq">
+<meta property="og:image" content="https://hirayaspaces.ca/logo-horizontal.jpg">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500;600&family=Cinzel:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/landing.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Do you bring your own cleaning supplies?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes — we bring everything: vacuum, mop, microfibre cloths, eco-friendly products on request. You don't need to provide anything unless you have a specific product you'd prefer we use." } },
+    { "@type": "Question", "name": "What's your cancellation policy?",
+      "acceptedAnswer": { "@type": "Answer", "text": "You can cancel any time up to 24 hours before your booking, free of charge. Cancellations within 24 hours are not accepted through the website — call (226) 751-4566 if something urgent comes up." } },
+    { "@type": "Question", "name": "Do you clean homes with pets?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Absolutely. We work in homes with cats, dogs, birds, reptiles — you name it. Let us know in the booking notes so we can plan around them. Pet hair removal is available as an add-on for $25." } },
+    { "@type": "Question", "name": "How does the recurring discount work?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Pick a frequency at booking — weekly, bi-weekly, or monthly. Your first clean is at full price. Starting from your second visit, the discount applies: 20% off weekly, 15% off bi-weekly, 10% off monthly. Same cleaner every visit." } },
+    { "@type": "Question", "name": "Are you insured?",
+      "acceptedAnswer": { "@type": "Answer", "text": "We're working on getting full liability insurance in place. For now, our cleaners are background-checked and we treat every home with the care we'd give our own." } },
+    { "@type": "Question", "name": "How do I let you in if I'm not home?",
+      "acceptedAnswer": { "@type": "Answer", "text": "At booking, pick from: 'I'll be home', 'Lockbox', 'Hidden key', 'Building fob/code', 'Concierge', or 'Other'. Add the instructions so we can get in without disturbing you." } },
+    { "@type": "Question", "name": "Do you serve seniors?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes — we offer Senior Care Cleaning specifically tuned for older adults: gentler pace, careful with belongings, fragrance-free products on request, and same cleaner every visit. Adult children often book on a parent's behalf." } }
+  ]
+}
+</script>
+<style>
+  /* FAQ-specific. Accordion-style details/summary so it works without JS. */
+  body { font-family: 'Jost', 'Helvetica Neue', Arial, sans-serif; background: var(--cream); color: var(--text); margin: 0; }
+  .faq-shell { max-width: 760px; margin: 0 auto; padding: 5rem 1.25rem; }
+  .faq-eyebrow {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: var(--sage); margin-bottom: 1rem;
+  }
+  .faq-h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(36px, 5vw, 52px); font-weight: 400;
+    line-height: 1.15; margin: 0 0 1rem;
+  }
+  .faq-h1 em { font-style: italic; color: var(--sage-mid); }
+  .faq-lede { font-size: 16px; color: var(--muted); line-height: 1.7; margin-bottom: 2.5rem; }
+  .faq-group { margin-bottom: 2.5rem; }
+  .faq-group h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 500; color: var(--sage);
+    margin: 0 0 1rem; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  details.faq-item {
+    background: white; border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 18px;
+    margin-bottom: 10px; transition: border-color .15s;
+  }
+  details.faq-item[open] { border-color: var(--sage-mid); box-shadow: 0 4px 12px rgba(30,77,43,.06); }
+  details.faq-item summary {
+    cursor: pointer; list-style: none;
+    font-weight: 500; font-size: 15px; color: var(--text);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 6px 0;
+  }
+  details.faq-item summary::-webkit-details-marker { display: none; }
+  details.faq-item summary::after {
+    content: '+'; color: var(--sage); font-size: 22px; font-weight: 300;
+    transition: transform .15s;
+  }
+  details.faq-item[open] summary::after { content: '−'; }
+  details.faq-item .faq-body {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 14px; line-height: 1.7; color: var(--muted);
+  }
+  .faq-cta {
+    margin-top: 3rem; padding: 2rem; text-align: center;
+    background: white; border: 1px solid var(--sage-mid); border-radius: 18px;
+  }
+  .faq-cta h3 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 500;
+    font-size: 24px; margin: 0 0 0.5rem;
+  }
+  .faq-cta p { font-size: 14px; color: var(--muted); margin: 0 0 1.25rem; }
+  .faq-back {
+    display: inline-block; margin-bottom: 1.5rem;
+    font-size: 13px; color: var(--sage); text-decoration: none;
+  }
+</style>
+</head>
+<body>
+
+<nav class="lnd-nav">
+  <a class="lnd-brand" href="/">Hiraya Spaces</a>
+  <a class="lnd-nav-cta" href="/#booking">Book now</a>
+</nav>
+
+<main class="faq-shell">
+  <a href="/" class="faq-back">← Back to home</a>
+  <span class="faq-eyebrow">Help center</span>
+  <h1 class="faq-h1">Frequently asked <em>questions</em></h1>
+  <p class="faq-lede">The questions our customers ask most often. Can't find what you're looking for? Reply to any of our booking emails, or call <a href="tel:+12267514566" style="color:var(--sage);font-weight:600">(226) 751-4566</a>.</p>
+
+  <div class="faq-group">
+    <h2>Booking & scheduling</h2>
+
+    <details class="faq-item">
+      <summary>How far in advance should I book?</summary>
+      <div class="faq-body">A few days is usually fine. For move-in / move-out cleans during peak windows (May 1 and August/September), we recommend 2–3 weeks ahead — those dates fill fast in Waterloo Region's student-rental and turnover seasons.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>What's your cancellation policy?</summary>
+      <div class="faq-body">You can cancel any time up to 24 hours before your booking, free of charge. Cancellations within 24 hours are not accepted through the website — call <a href="tel:+12267514566">(226) 751-4566</a> if something urgent comes up and we'll work something out.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I reschedule?</summary>
+      <div class="faq-body">Yes — just reply to your booking confirmation email or call us. As long as it's more than 24 hours out, we'll move it to a new slot at no charge.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>How does the recurring discount work?</summary>
+      <div class="faq-body">Pick a frequency at booking — weekly, bi-weekly, or monthly. Your first clean is at full price. Starting from your second visit, the discount applies: <strong>20% off weekly</strong>, <strong>15% off bi-weekly</strong>, <strong>10% off monthly</strong>. Same cleaner every visit.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I switch frequency later?</summary>
+      <div class="faq-body">Absolutely. Just let us know — we'll update your schedule and the discount adjusts on the next clean.</div>
+    </details>
+  </div>
+
+  <div class="faq-group">
+    <h2>What's included</h2>
+
+    <details class="faq-item">
+      <summary>Do you bring your own supplies?</summary>
+      <div class="faq-body">Yes — we bring everything: vacuum, mop, microfibre cloths, products, and gloves. Eco-friendly, fragrance-free supplies available on request (+$10). If you'd like us to use a specific product of yours, just leave it out and let us know.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>What's the difference between Regular and Deep cleaning?</summary>
+      <div class="faq-body"><strong>Regular</strong> is maintenance: dusting, vacuuming, mopping, kitchen and bathroom surfaces, trash. <strong>Deep</strong> adds the layers a regular clean skips: baseboards, inside oven, inside fridge, calcium descaling, detailed scrubbing. Most customers start with a Deep, then maintain with Regulars.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Do you do windows?</summary>
+      <div class="faq-body">Interior windows, yes — pick Small ($8 each), Standard ($12), or Large/Bay ($20) at booking and tell us how many. Exterior windows on second floor and up aren't safe for our crew without proper equipment, so we leave those to the window specialists.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can you clean inside cupboards and drawers?</summary>
+      <div class="faq-body">Yes — we offer "Inside Cupboards / Cabinets / Drawers" as an add-on starting at $40. Especially popular for move-in/move-out cleans where you want the new space spotless before unpacking.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Do you wash dishes or do laundry?</summary>
+      <div class="faq-body">Laundry folding is a $25/load add-on (wash, dry, fold). Dishes aren't part of a standard clean — we'll load and run an empty dishwasher as part of a Move-Out clean, but for daily dishes, leave the sink ready and we'll work around them.</div>
+    </details>
+  </div>
+
+  <div class="faq-group">
+    <h2>Access, pets, and home logistics</h2>
+
+    <details class="faq-item">
+      <summary>How do you get in if I'm not home?</summary>
+      <div class="faq-body">At booking, pick from: <em>I'll be home</em>, <em>Lockbox</em>, <em>Hidden key</em>, <em>Building fob / code</em>, <em>Concierge</em>, or <em>Other</em>. Add the instructions and we'll handle it. Most of our recurring customers leave a lockbox.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Do you clean with pets in the house?</summary>
+      <div class="faq-body">Yes — cats, dogs, birds, reptiles, all welcome. Let us know in the booking notes (name, temperament, where they hang out) so we can plan around them. Pet Hair Removal is a $25 add-on if there's a lot of fur.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>What if I have a security system?</summary>
+      <div class="faq-body">Leave the alarm code in your booking notes (under "Entry instructions"). It's only visible to admin and your cleaner. We'll disarm on entry and re-arm when leaving.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Will the same cleaner come every visit?</summary>
+      <div class="faq-body">Yes. Recurring customers get the same cleaner every time. She learns your home, your preferences, and where you keep the vacuum. Continuity is one of the things our customers love most.</div>
+    </details>
+  </div>
+
+  <div class="faq-group">
+    <h2>Payment & invoicing</h2>
+
+    <details class="faq-item">
+      <summary>How do I pay?</summary>
+      <div class="faq-body"><strong>Cash</strong> on arrival or <strong>e-transfer</strong> to <a href="mailto:hirayaspaces@gmail.com">hirayaspaces@gmail.com</a> after the clean. Every invoice has the reference number to use in the e-transfer comment.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>When do I get the invoice?</summary>
+      <div class="faq-body">After your clean is marked complete, we send a formal invoice via email with a PDF attached. The invoice number is unique — use it as the e-transfer reference so we can match the payment to your account.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Is the price firm?</summary>
+      <div class="faq-body">The price you see at booking is an estimate based on home size. We confirm the final price after a quick walkthrough on the day of service — if the space is significantly larger or in worse condition than expected, we'll flag it before starting work.</div>
+    </details>
+  </div>
+
+  <div class="faq-group">
+    <h2>For specific situations</h2>
+
+    <details class="faq-item">
+      <summary>Do you clean for seniors?</summary>
+      <div class="faq-body">Yes — see our <a href="/senior-care-cleaning">Senior Care Cleaning</a> page. Gentler pace, careful with belongings, fragrance-free options, family-booking flow for adult children booking on a parent's behalf.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Do you do AirBnB turnovers?</summary>
+      <div class="faq-body">Yes — see <a href="/airbnb-cleaning">AirBnB turnover cleaning</a>. Linen change, restock, photo-ready finish, and damage-flag-with-photos before we leave.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>What about post-renovation?</summary>
+      <div class="faq-body">Drywall dust is a different beast — see <a href="/post-renovation-cleaning-waterloo">post-renovation cleaning</a>. Custom quote based on scope.</div>
+    </details>
+
+    <details class="faq-item">
+      <summary>What areas do you serve?</summary>
+      <div class="faq-body">Waterloo, Kitchener, and Cambridge are our core service area. Guelph is by request. If you're outside the region, call us and we'll see what we can do.</div>
+    </details>
+  </div>
+
+  <div class="faq-cta">
+    <h3>Didn't find your answer?</h3>
+    <p>Reply to any of our emails or call us directly. We answer fast.</p>
+    <a href="tel:+12267514566" class="btn-primary">(226) 751-4566</a>
+  </div>
+</main>
+
+<footer class="lnd-footer">
+  <p>Hiraya Spaces · Residential & senior care cleaning across Waterloo Region · <a href="tel:+12267514566">(226) 751-4566</a></p>
+</footer>
+
+</body>
+</html>

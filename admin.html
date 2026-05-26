@@ -281,10 +281,34 @@
   }
   .panel-refresh:hover { border-color: var(--sage); color: var(--sage); }
 
+  /* Full-width "rows" on desktop — easier to scan a list of bookings at a
+     glance than a wall of small cards. Drops to a 2-up grid on tablet and
+     1-up on mobile via the existing mobile media query. */
   .booking-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .booking-grid > .booking-card {
+    width: 100%;
+  }
+  /* Cards laid out horizontally inside themselves: head left, body center,
+     actions right. Stacks vertically on narrow viewports. */
+  @media (min-width: 880px) {
+    .booking-grid > .booking-card {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) 2fr auto;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .booking-grid > .booking-card .booking-card-actions {
+      margin-top: 0; padding-top: 0; border-top: none;
+      flex-direction: column; align-items: stretch;
+      gap: 6px; min-width: 160px;
+    }
+    .booking-grid > .booking-card .booking-card-actions .booking-card-btn {
+      width: 100%;
+    }
   }
   .empty-state {
     text-align: center; padding: 4rem 1rem;
