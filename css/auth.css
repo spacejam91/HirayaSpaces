@@ -482,26 +482,61 @@
 .booking-card-body strong { color: var(--text); font-weight: 600; }
 .booking-card-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 .booking-card.is-upcoming .booking-card-actions { border-top-color: var(--sage-mid); }
 .booking-card-btn {
-  background: none;
-  border: none;
+  background: white;
+  border: 1.5px solid var(--border);
   font-family: 'Jost', sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--rose);
+  color: var(--text);
   cursor: pointer;
-  padding: 4px 10px;
-  border-radius: 6px;
-  transition: background .15s;
+  padding: 10px 14px;
+  border-radius: 10px;
+  transition: background .15s, border-color .15s, transform .08s;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  -webkit-tap-highlight-color: rgba(30,77,43,0.1);
+  touch-action: manipulation;
 }
-.booking-card-btn:hover { background: #f6e6e6; }
+.booking-card-btn:hover { background: #f6f9f6; border-color: var(--sage-mid); }
+.booking-card-btn:active { transform: scale(.96); }
+
+/* Larger, more thumb-friendly action buttons on mobile so cleaners can
+   tap them on the job without misfiring. Stacks full-width when only
+   one action fits per row. */
+@media (max-width: 640px) {
+  .booking-card-actions {
+    gap: 8px;
+    justify-content: stretch;
+  }
+  .booking-card-btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    min-height: 48px;
+    font-size: 14px;
+    padding: 12px 10px;
+  }
+  /* Primary actions (Check in / Check out / Mark complete) take full
+     width and read clearly at arm's length. */
+  .booking-card-btn[style*="background:#3b82a8"],
+  .booking-card-btn[style*="background:var(--sage)"] {
+    flex: 1 1 100%;
+    font-size: 16px;
+    font-weight: 600;
+    min-height: 54px;
+  }
+}
 
 .addr-list {
   display: flex;

@@ -659,7 +659,18 @@
   /* ── ADDONS ── */
   #addons { background: var(--warm); }
   .addons-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 5rem; align-items: start; }
-  .addons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  /* Full-width 3-col addon grid (4 on very wide). Drops to 2 cols on
+     tablet and 1 col on phones via the media queries below. */
+  .addons-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  @media (min-width: 1400px) {
+    .addons-grid { grid-template-columns: repeat(4, 1fr); }
+  }
   .addon-card {
     background: white; border: 1.5px solid var(--border); border-radius: 16px;
     padding: 1.25rem; cursor: pointer; transition: all .2s;
@@ -911,6 +922,7 @@
     .hero-right { display: none; }
     .services-grid { grid-template-columns: repeat(2, 1fr); }
     .addons-layout { grid-template-columns: 1fr; gap: 2rem; }
+    .addons-grid { grid-template-columns: repeat(2, 1fr); }
     .booking-wrapper { grid-template-columns: 1fr; }
     .steps-layout { grid-template-columns: repeat(2, 1fr); }
     .steps-layout::before { display: none; }
@@ -922,6 +934,7 @@
     section { padding: 4rem 5vw; }
     .hero-left { padding: 3rem 5vw; }
     .services-grid { grid-template-columns: 1fr; }
+    .addons-grid { grid-template-columns: 1fr; }
     .steps-layout { grid-template-columns: 1fr; }
     .reviews-grid { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
@@ -1213,15 +1226,13 @@
 
 <!-- ADD-ONS -->
 <section id="addons">
-  <div class="addons-layout">
-    <div>
-      <span class="section-label fade-up"><span class="step-badge">2</span>Extras</span>
-      <h2 class="section-h2 fade-up" style="transition-delay:.1s">Make it <em>perfect</em></h2>
-      <p class="section-sub fade-up" style="transition-delay:.2s">Customize your booking with add-on services. Mix and match to get exactly what your space needs.</p>
-      <div id="addon-selected-list" style="margin-top:2rem;font-size:13px;color:var(--muted);line-height:1.8"></div>
-    </div>
-    <div class="addons-grid" id="addon-grid"></div>
+  <div style="text-align:center;max-width:680px;margin:0 auto 2.5rem">
+    <span class="section-label fade-up"><span class="step-badge">2</span>Extras</span>
+    <h2 class="section-h2 fade-up" style="transition-delay:.1s">Make it <em>perfect</em></h2>
+    <p class="section-sub fade-up" style="transition-delay:.2s;margin:0 auto">Customize your booking with add-on services. Mix and match to get exactly what your space needs.</p>
   </div>
+  <div class="addons-grid" id="addon-grid"></div>
+  <div id="addon-selected-list" style="max-width:680px;margin:2rem auto 0;font-size:13px;color:var(--muted);line-height:1.8;text-align:center"></div>
 </section>
 
 <!-- BOOKING -->
@@ -1329,92 +1340,49 @@
   </div>
 
   <div class="ba-grid">
+    <!-- Placeholder pairs. Swap each set of two images for real ones when ready. -->
     <figure class="ba-card fade-up" style="transition-delay:.1s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/1-marble-bathroom-after.png" alt="Marble bathroom after Hiraya cleaning">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/1-marble-bathroom-before.png" alt="Marble bathroom before cleaning">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Marble bathroom — Deep clean</figcaption>
+      <figcaption class="ba-caption">Bathroom — Deep clean</figcaption>
     </figure>
 
     <figure class="ba-card fade-up" style="transition-delay:.15s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/2-glass-tub-after.png" alt="Glass shower enclosure after cleaning">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/2-glass-tub-before.png" alt="Glass shower enclosure before cleaning">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Glass shower — Calcium descale</figcaption>
+      <figcaption class="ba-caption">Kitchen — Move-out clean</figcaption>
     </figure>
 
     <figure class="ba-card fade-up" style="transition-delay:.2s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/3-shower-base-after.png" alt="Shower base after deep clean">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/3-shower-base-before.png" alt="Shower base with mould before cleaning">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Shower base — Mould removal</figcaption>
+      <figcaption class="ba-caption">Living room — Carpet clean</figcaption>
     </figure>
 
     <figure class="ba-card fade-up" style="transition-delay:.25s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/4-small-bath-after.jpg" alt="Small bathroom after cleaning">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/4-small-bath-before.jpg" alt="Small bathroom before cleaning">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Compact bath — Regular clean</figcaption>
-    </figure>
-
-    <figure class="ba-card fade-up" style="transition-delay:.3s">
-      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/5-modern-bath-after.png" alt="Modern bathroom after cleaning">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/5-modern-bath-before.jpg" alt="Modern bathroom before cleaning">
-        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
-        <span class="ba-tag ba-tag-before">Before</span>
-        <span class="ba-tag ba-tag-after">After</span>
-      </div>
-      <figcaption class="ba-caption">Modern marble bath — Full reset</figcaption>
-    </figure>
-
-    <figure class="ba-card fade-up" style="transition-delay:.35s">
-      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/6-dark-counter-after.jpg" alt="Dark vanity counter after cleaning">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/6-dark-counter-before.jpg" alt="Dark vanity counter before cleaning">
-        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
-        <span class="ba-tag ba-tag-before">Before</span>
-        <span class="ba-tag ba-tag-after">After</span>
-      </div>
-      <figcaption class="ba-caption">Quartz vanity — Detail clean</figcaption>
-    </figure>
-
-    <figure class="ba-card fade-up" style="transition-delay:.4s">
-      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/7-grey-tile-shower-after.png" alt="Grey tile shower after cleaning">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/7-grey-tile-shower-before.jpg" alt="Grey tile shower before cleaning">
-        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
-        <span class="ba-tag ba-tag-before">Before</span>
-        <span class="ba-tag ba-tag-after">After</span>
-      </div>
-      <figcaption class="ba-caption">Walk-in shower — Move-out clean</figcaption>
-    </figure>
-
-    <figure class="ba-card fade-up" style="transition-delay:.45s">
-      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/8-bathtub-bathroom-after.jpg" alt="Bathtub bathroom after cleaning">
-        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/8-bathtub-bathroom-before.jpg" alt="Bathtub bathroom before cleaning">
-        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
-        <span class="ba-tag ba-tag-before">Before</span>
-        <span class="ba-tag ba-tag-after">After</span>
-      </div>
-      <figcaption class="ba-caption">Family bath with tub — Deep clean</figcaption>
+      <figcaption class="ba-caption">Upholstery — Sectional</figcaption>
     </figure>
   </div>
 
