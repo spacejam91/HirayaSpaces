@@ -921,14 +921,6 @@
         <div class="panel-header">
           <h2>All bookings</h2>
           <div class="panel-controls">
-            <select id="all-status-filter" onchange="HirayaAdmin.renderAll()">
-              <option value="">All statuses</option>
-              <option value="pending_review">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="in_progress">In progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
             <select id="all-sort" onchange="HirayaAdmin.renderAll()">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
@@ -940,7 +932,7 @@
         <div id="all-list" class="booking-grid"></div>
         <div id="all-empty" class="empty-state" style="display:none">
           <span class="empty-icon">∅</span>
-          No bookings match that filter.
+          No bookings to show here yet.
         </div>
       </div>
 

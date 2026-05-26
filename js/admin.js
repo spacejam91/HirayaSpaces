@@ -278,16 +278,8 @@
       const rescheduleView = $('reschedule-view');
       if (rescheduleView) rescheduleView.style.display = 'none';
       // Edit modal lives at top level now — closes on cancel, not on tab switch.
-      // Pre-apply the status filter so each tab shows its slice. The All
-      // bookings tab resets to "no filter".
-      const filterSel = $('all-status-filter');
-      if (filterSel) {
-        if (name === 'confirmed') filterSel.value = 'confirmed';
-        else if (name === 'in_progress') filterSel.value = 'in_progress';
-        else if (name === 'completed') filterSel.value = 'completed';
-        else if (name === 'cancelled') filterSel.value = 'cancelled';
-        else filterSel.value = '';
-      }
+      // Each status tab filters by its own status (see currentStatusFilter);
+      // the All bookings tab shows everything. No separate filter control.
       // Update the panel heading so the customer knows which view they're on.
       const titleEl = document.querySelector('#all-list-view .panel-header h2');
       if (titleEl) {
@@ -539,6 +531,14 @@
     }
   }
 
+  // The status tabs (Confirmed/In progress/Completed/Cancelled) each map to a
+  // status; "All bookings" shows everything. Derived from the active tab so we
+  // don't need a separate status filter dropdown.
+  function currentStatusFilter() {
+    const byPanel = { confirmed: 'confirmed', in_progress: 'in_progress', completed: 'completed', cancelled: 'cancelled' };
+    return byPanel[activePanel] || '';
+  }
+
   function renderAll() {
     const list = $('all-list');
     const empty = $('all-empty');
@@ -550,7 +550,7 @@
     // a flicker when refreshAll runs from other tabs.
     if (activePanel === 'customers') renderCustomers();
 
-    const filter = ($('all-status-filter')?.value || '').trim();
+    const filter = currentStatusFilter();
     const sortDir = ($('all-sort')?.value || 'newest');
     const filtered = filter ? allBookings.filter(b => b.status === filter) : allBookings.slice();
     const rows = filtered.sort((a, b) => {
@@ -1942,7 +1942,7 @@ Hiraya Spaces`
   // Download the current All-Bookings view as CSV. Respects the active
   // status filter so each tab (Confirmed / Completed / All) exports its slice.
   function exportBookingsCsv() {
-    const filter = ($('all-status-filter')?.value || '').trim();
+    const filter = currentStatusFilter();
     const rows = filter ? allBookings.filter(b => b.status === filter) : allBookings;
     if (!rows.length) {
       showToast('Nothing to export.', 'error');
