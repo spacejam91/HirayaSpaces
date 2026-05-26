@@ -332,7 +332,7 @@
 /* Mobile spacing */
 @media (max-width: 720px) {
   .nav-user-greet { font-size: 12px; }
-  .nav-user-trigger { padding: 8px 12px; }
+  .nav-user-trigger { padding: 10px 22px; min-width: 110px; justify-content: center; }
   .nav-account-link { padding: 8px 14px; font-size: 12px; }
   .hiraya-toast { bottom: 16px; font-size: 13px; padding: 12px 18px; }
 }
