@@ -510,6 +510,9 @@
       const addonItems = (b.booking_addons || [])
         .map(ba => ba.addons ? { name: ba.addons.name, price_cents: ba.addons.price_cents } : null)
         .filter(Boolean);
+      const addonsSumCents = addonItems.reduce((s, a) => s + (a.price_cents || 0), 0);
+      const svcPriceCents = (b.estimated_price_cents != null) ? Math.max(0, b.estimated_price_cents - addonsSumCents) : null;
+      const svcPriceStr = (svcPriceCents != null && svcPriceCents > 0) ? `$${Math.round(svcPriceCents / 100)}` : '';
       const classes = ['booking-card'];
       if (isUpcoming(b)) classes.push('is-upcoming');
       if (b.status === 'cancelled') classes.push('is-cancelled');
@@ -521,7 +524,7 @@
           <div class="booking-card-head">
             <div>
               <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
-              <div class="booking-card-svc">${escapeHtml(svcName)}</div>
+              <div class="booking-card-svc">${escapeHtml(svcName)}${svcPriceStr ? ` — <strong>${svcPriceStr}</strong>` : ''}</div>
               ${addonItems.length ? `<div class="booking-card-addons">${addonItems.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
               <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
             </div>

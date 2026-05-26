@@ -63,6 +63,12 @@
     // "Regular Cleaning — 2BR/2BA · Carpet — Living room". Split it so
     // multi-service bookings show one line per service for readability.
     const rawSvc = b.service_name || 'Cleaning service';
+    // Derive the service price by subtracting add-on totals from the
+    // booking total. Shown inline next to the service name.
+    const addonsSumCents = (b.addon_items || []).reduce((s, a) => s + (a.price_cents || 0), 0);
+    const totalForSvcCents = b.final_price_cents ?? b.estimated_price_cents;
+    const svcPriceCents = (totalForSvcCents != null) ? Math.max(0, totalForSvcCents - addonsSumCents) : null;
+    const svcPriceStr = (svcPriceCents != null && svcPriceCents > 0) ? `$${Math.round(svcPriceCents / 100)}` : '';
     const svcParts = rawSvc.split(' · ');
     const svc = svcParts.length > 1
       ? svcParts.map(s => `<div>${escapeHtml(s)}</div>`).join('')
@@ -126,8 +132,9 @@
         <div class="booking-card-head">
           <div>
             <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
-            <div class="booking-card-svc">${svc}${freqBadge}</div>
+            <div class="booking-card-svc">${svc}${svcPriceStr ? ` — <strong>${svcPriceStr}</strong>` : ''}${freqBadge}</div>
             ${(b.addon_items && b.addon_items.length) ? `<div class="booking-card-addons">${b.addon_items.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
+            <div class="booking-card-total"><strong>Total: ${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
             <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
           </div>
         </div>
@@ -140,7 +147,6 @@
           ${timeLine}
           ${notes}
           ${internal}
-          <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
         </div>
         ${detailLink}
         ${opts.actions || ''}

@@ -480,6 +480,14 @@
   margin-top: 4px;
   line-height: 1.4;
 }
+.booking-card-total {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  line-height: 1.4;
+}
 .booking-card-head .booking-status {
   display: inline-block;
   margin-top: 8px;
