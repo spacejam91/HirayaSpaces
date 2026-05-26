@@ -4,10 +4,23 @@
 <meta charset="UTF-8">
 <script>
   // Always land at the top on refresh / back-forward — without this, Safari
-  // and Chrome remember the prior scroll position and the user reloads to a
-  // mid-page section instead of the hero.
+  // and Chrome (mobile especially) remember the prior scroll position and
+  // the user reloads to a mid-page section instead of the hero.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  window.addEventListener('load', function () { window.scrollTo(0, 0); });
+  function __resetScroll() {
+    window.scrollTo(0, 0);
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }
+  __resetScroll();
+  window.addEventListener('DOMContentLoaded', __resetScroll);
+  window.addEventListener('load', function () {
+    __resetScroll();
+    requestAnimationFrame(__resetScroll);
+  });
+  // iOS Safari uses bfcache for back/forward navigation — `load` won't fire,
+  // but `pageshow` does with persisted=true.
+  window.addEventListener('pageshow', __resetScroll);
 </script>
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -1298,7 +1311,7 @@
       <a href="#how" onclick="closeMobileMenu()">How it works</a>
       <a href="#services" onclick="closeMobileMenu()">Services</a>
       <a href="#addons" onclick="closeMobileMenu()">Add-ons</a>
-      <a href="#booking" onclick="closeMobileMenu()">Book a clean</a>
+      <a href="#how" onclick="closeMobileMenu()">Book a clean</a>
       <a href="#reviews" onclick="closeMobileMenu()">Reviews</a>
       <a href="#contact" onclick="closeMobileMenu()">Contact</a>
       <a href="/faq" onclick="closeMobileMenu()">FAQ</a>
