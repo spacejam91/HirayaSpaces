@@ -453,18 +453,18 @@
 }
 .booking-card-date {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 .booking-card-svc {
   font-family: 'Jost', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--muted);
-  margin-top: 6px;
-  line-height: 1.4;
+  margin-top: 4px;
+  line-height: 1.35;
 }
 .booking-card-addons {
   font-size: 12px;
@@ -472,7 +472,11 @@
   margin-top: 4px;
   line-height: 1.4;
 }
-.booking-card-head .booking-status { margin-top: 10px; align-self: flex-start; }
+.booking-card-head .booking-status {
+  display: inline-block;
+  margin-top: 8px;
+  align-self: flex-start;
+}
 .booking-status {
   font-family: 'Jost', sans-serif;
   font-size: 10px;

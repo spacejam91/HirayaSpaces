@@ -817,16 +817,16 @@
 
     <!-- Stats stubs (Phase 2) -->
     <div class="stats-row">
-      <div class="stat-card">
+      <button type="button" class="stat-card stat-card-clickable" onclick="HirayaAdmin.switchPanel('pending')">
         <div class="stat-card-label">Pending</div>
         <div class="stat-card-value" id="stat-pending">—</div>
         <div class="stat-card-sub">Awaiting your review</div>
-      </div>
-      <div class="stat-card">
+      </button>
+      <button type="button" class="stat-card stat-card-clickable" onclick="HirayaAdmin.switchPanel('confirmed')">
         <div class="stat-card-label">Confirmed</div>
         <div class="stat-card-value" id="stat-confirmed">—</div>
         <div class="stat-card-sub">Upcoming jobs</div>
-      </div>
+      </button>
       <div class="stat-card">
         <div class="stat-card-label">This week</div>
         <div class="stat-card-value" id="stat-week">—</div>

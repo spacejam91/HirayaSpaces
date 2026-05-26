@@ -507,7 +507,7 @@
       const total = b.estimated_price_cents != null
         ? '$' + Math.round(b.estimated_price_cents / 100)
         : 'Quote on request';
-      const addonText = (b.booking_addons || []).map(ba => ba.addons?.name).filter(Boolean).join(', ');
+      const addonNames = (b.booking_addons || []).map(ba => ba.addons?.name).filter(Boolean);
       const classes = ['booking-card'];
       if (isUpcoming(b)) classes.push('is-upcoming');
       if (b.status === 'cancelled') classes.push('is-cancelled');
@@ -518,14 +518,14 @@
         <div class="${classes.join(' ')}" data-id="${b.id}">
           <div class="booking-card-head">
             <div>
-              <div class="booking-card-svc">${escapeHtml(svcName)}</div>
               <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
+              <div class="booking-card-svc">${escapeHtml(svcName)}</div>
+              ${addonNames.length ? `<div class="booking-card-addons">${addonNames.map(n => `<div>✨ ${escapeHtml(n)}</div>`).join('')}</div>` : ''}
+              <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
             </div>
-            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
           </div>
           <div class="booking-card-body">
             ${addrLine ? `<div>📍 ${escapeHtml(addrLine)}</div>` : ''}
-            ${addonText ? `<div>✨ Add-ons: ${escapeHtml(addonText)}</div>` : ''}
             <div><strong>${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
           </div>
           ${actions}

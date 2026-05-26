@@ -50,7 +50,11 @@
     if (!iso) return 'Date TBD';
     // preferred_date is YYYY-MM-DD — anchor to noon UTC so timezone doesn't shift the day
     const d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+    // Shorter month on mobile so the line fits without wrapping.
+    const opts = (window.innerWidth <= 640)
+      ? { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }
+      : { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' };
+    return d.toLocaleDateString(undefined, opts);
   }
 
   function bookingCardHtml(b, opts) {
@@ -123,7 +127,7 @@
           <div>
             <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
             <div class="booking-card-svc">${svc}${freqBadge}</div>
-            ${(b.addon_names && b.addon_names.length) ? `<div class="booking-card-addons">✨ ${escapeHtml(b.addon_names.join(' · '))}</div>` : ''}
+            ${(b.addon_names && b.addon_names.length) ? `<div class="booking-card-addons">${b.addon_names.map(n => `<div>✨ ${escapeHtml(n)}</div>`).join('')}</div>` : ''}
             <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
           </div>
         </div>
@@ -2731,13 +2735,22 @@ Hiraya Spaces`
 
   // ── BOOKING DETAIL MODAL ───────────────────────────────────────────────
   function openBookingDetail(id, event) {
-    // Bail if the click came from a button/link inside the card — those
-    // already have their own action handlers.
-    if (event && event.target && event.target.closest('button, a')) return;
-    const b = allBookings.find(x => x.id === id) || pendingBookings.find(x => x.id === id);
-    if (!b) return;
-    const overlay = $('detail-overlay');
-    if (!overlay) return;
+    try {
+      // Bail if the click came from an ACTION button (Confirm/Edit/Decline/etc)
+      // or a tel/mailto link. The "Tap for full details" button intentionally
+      // calls this with no event so it always proceeds.
+      if (event && event.target) {
+        const t = event.target;
+        const closestBtn = t.closest('button');
+        const closestLink = t.closest('a');
+        // Whitelist the detail-link button so it falls through to open.
+        if (closestBtn && !closestBtn.classList.contains('booking-card-detail-link')) return;
+        if (closestLink) return;
+      }
+      const b = allBookings.find(x => x.id === id) || pendingBookings.find(x => x.id === id);
+      if (!b) { console.warn('openBookingDetail: booking not found', id); return; }
+      const overlay = $('detail-overlay');
+      if (!overlay) { console.warn('openBookingDetail: overlay element missing'); return; }
 
     const dateStr = formatBookingDate(b.preferred_date);
     const timeStr = b.preferred_time_slot ? ` at ${b.preferred_time_slot}` : '';
