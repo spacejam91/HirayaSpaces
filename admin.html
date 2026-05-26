@@ -291,6 +291,10 @@
   }
   .booking-grid > .booking-card {
     width: 100%;
+    max-width: 67%;
+  }
+  @media (max-width: 880px) {
+    .booking-grid > .booking-card { max-width: 100%; }
   }
   /* Cards laid out horizontally inside themselves: head left, body center,
      actions right. Stacks vertically on narrow viewports. */
