@@ -116,22 +116,22 @@
     if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
     if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
 
-    const detailLink = `<button type="button" class="booking-card-detail-link" onclick="HirayaAdmin.openBookingDetail('${b.id}', event)">Tap for full details →</button>`;
+    const detailLink = `<button type="button" class="booking-card-detail-link" onclick="event.stopPropagation(); HirayaAdmin.openBookingDetail('${b.id}')">Tap for full details →</button>`;
     return `
       <div class="${classes.join(' ')}" data-id="${b.id}" onclick="HirayaAdmin.openBookingDetail('${b.id}', event)">
         <div class="booking-card-head">
           <div>
-            <div class="booking-card-svc">${svc}${freqBadge}</div>
             <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
+            <div class="booking-card-svc">${svc}${freqBadge}</div>
+            ${(b.addon_names && b.addon_names.length) ? `<div class="booking-card-addons">✨ ${escapeHtml(b.addon_names.join(' · '))}</div>` : ''}
+            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
           </div>
-          <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
         </div>
         <div class="booking-card-body">
           <div>👤 <strong>${escapeHtml(b.customer_name || 'Customer')}</strong></div>
           ${emailLink ? `<div>✉️ ${emailLink}</div>` : ''}
           ${phoneLink ? `<div>📞 ${phoneLink}</div>` : ''}
           ${addr ? `<div>📍 ${escapeHtml(addr)} &nbsp;${mapsLink}</div>` : ''}
-          ${(b.addon_names && b.addon_names.length) ? `<div>✨ <strong>Add-ons:</strong> ${escapeHtml(b.addon_names.join(', '))}</div>` : ''}
           ${entryLine}
           ${timeLine}
           ${notes}
@@ -308,6 +308,7 @@
 
   async function refreshPending() {
     if (!sb() || !isOwner) return;
+    await loadAddonsCache();
     const { data, error } = await sb().rpc('get_pending_bookings');
     if (error) {
       console.warn('get_pending_bookings failed:', error.message);
@@ -315,6 +316,7 @@
     } else {
       pendingBookings = data || [];
     }
+    await attachAddonsToBookings(pendingBookings);
     renderPending();
   }
 
@@ -337,9 +339,9 @@
     list.innerHTML = pendingBookings.map(b => bookingCardHtml(b, {
       actions: `
         <div class="booking-card-actions">
-          <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askConfirm('${b.id}')">Confirm</button>
-          <button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>
-          <button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askDecline('${b.id}')">Decline</button>
+          <button class="booking-card-btn" onclick="event.stopPropagation(); HirayaAdmin.askEdit('${b.id}')">Edit</button>
+          <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="event.stopPropagation(); HirayaAdmin.askConfirm('${b.id}')">Confirm</button>
+          <button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="event.stopPropagation(); HirayaAdmin.askDecline('${b.id}')">Decline</button>
         </div>`
     })).join('');
   }
@@ -355,7 +357,7 @@
       refreshBlockedDates(),
       refreshCustomerMeta(),
       refreshCustomerRoster(),
-      loadAddons(),
+      loadAddonsCache(),
     ]);
     const { data, error } = bookingsRes;
     if (error) {
