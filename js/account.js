@@ -108,7 +108,13 @@
       } catch (_) { isOwner = false; }
     }
     const navAdminItem = $('nav-user-menu-admin');
-    if (navAdminItem) navAdminItem.style.display = isOwner ? '' : 'none';
+    if (navAdminItem) {
+      navAdminItem.style.display = isOwner ? '' : 'none';
+      // Inject the href only for confirmed owners so /admin never appears in
+      // the static HTML source that Googlebot crawls.
+      if (isOwner) navAdminItem.setAttribute('href', '/admin');
+      else navAdminItem.removeAttribute('href');
+    }
     const navAdminLink = $('nav-admin-link');
     if (navAdminLink) navAdminLink.style.display = isOwner ? 'inline-flex' : 'none';
   }
