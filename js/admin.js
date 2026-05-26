@@ -332,9 +332,9 @@
     list.innerHTML = pendingBookings.map(b => bookingCardHtml(b, {
       actions: `
         <div class="booking-card-actions">
-          <button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>
-          <button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.askDecline('${b.id}')">Decline</button>
           <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askConfirm('${b.id}')">Confirm</button>
+          <button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>
+          <button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askDecline('${b.id}')">Decline</button>
         </div>`
     })).join('');
   }
