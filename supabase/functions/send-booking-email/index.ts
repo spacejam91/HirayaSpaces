@@ -184,23 +184,22 @@ async function buildInvoicePdf(opts: {
   drawAt("Questions? Reply to the invoice email or call (226) 751-4566.", left, y, font, 9, muted);
 
   // PAID watermark — drawn LAST so it sits on top of everything underneath.
-  // Big diagonal sage-tinted text across the page center.
+  // Big sage-tinted text across the page center. Horizontal (no rotation)
+  // to keep the pdf-lib API surface minimal and avoid Rotation-instance bugs.
   if (opts.paid) {
     const stampText = "PAID";
-    const stampSize = 140;
+    const stampSize = 120;
     const stampW = bold.widthOfTextAtSize(stampText, stampSize);
     const cx = 306; // page center x (612 / 2)
-    const cy = 420; // roughly mid-page
-    const rad = Math.PI / 6; // 30° tilt
+    const cy = 400;
     page.drawText(stampText, {
-      x: cx - (stampW / 2) * Math.cos(rad),
-      y: cy - (stampW / 2) * Math.sin(rad),
+      x: cx - stampW / 2,
+      y: cy,
       font: bold,
       size: stampSize,
       color: sage,
-      opacity: 0.18,
-      rotate: { type: "radians", angle: rad },
-    } as any);
+      opacity: 0.15,
+    });
   }
 
   return await pdf.save();
