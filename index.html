@@ -964,7 +964,9 @@
 
   /* ── REVIEWS ── */
   #reviews { background: white; }
-  .reviews-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3rem; flex-wrap: wrap; gap: 1rem; }
+  .reviews-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 3rem; gap: 1rem; }
+  .reviews-header > div { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .reviews-header .section-sub { max-width: 560px !important; margin: 0 auto; }
   .reviews-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
   .review-card {
     background: var(--cream); border-radius: 20px; padding: 2rem;
@@ -1615,7 +1617,7 @@
       <span class="section-label fade-up">Client stories</span>
       <h2 class="section-h2 fade-up" style="transition-delay:.1s">What they say</h2>
     </div>
-    <p class="section-sub fade-up" style="transition-delay:.15s;max-width:300px">Don't take our word for it — here's what our clients say.</p>
+    <p class="section-sub fade-up" style="transition-delay:.15s;font-weight:300;font-size:14px;color:var(--muted);letter-spacing:0.01em;line-height:1.7">Don't take our word for it — here's what our clients say.</p>
   </div>
   <div class="reviews-grid" id="reviews-grid"></div>
 </section>
