@@ -104,6 +104,14 @@
   }
   .nav-cta-book:hover { background: #0f2e18; }
   .nav-cta-book:active { transform: scale(.97); }
+  .nav-login-btn {
+    background: transparent; color: var(--sage); border: none;
+    padding: 10px 14px; border-radius: 999px;
+    font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.3px; cursor: pointer;
+    transition: color .15s;
+  }
+  .nav-login-btn:hover { color: #0f2e18; }
 
   /* Mobile-only tap-to-call icon. */
   .nav-call-icon {
@@ -1128,9 +1136,10 @@
     .stats-strip { grid-template-columns: repeat(2, 1fr); }
     .nav-links { display: none; }
     .nav-hamburger { display: flex; }
-    .nav-call-icon { display: inline-flex; }
+    .nav-call-icon { display: none !important; }
     .nav-phone { display: none; }
     .nav-cta-book { display: none; }
+    .nav-login-btn { display: none; }
     .booking-left { padding: 2rem; }
     .booking-right { padding: 2rem; }
     nav { height: auto; padding: 10px 4vw; }
@@ -1254,7 +1263,8 @@
     <!-- Mobile-only tap-to-call icon. Hidden on desktop where the phone
          number lives in the nav text. -->
     <a href="tel:+12267514566" class="nav-call-icon" aria-label="Call Hiraya Spaces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
-    <button class="nav-cta-book" id="nav-login-btn" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Book now</button>
+    <button class="nav-login-btn" id="nav-login-btn" onclick="HirayaAuth.openAuthModal('login')">Log in</button>
+    <button class="nav-cta-book" id="nav-signup-btn" onclick="HirayaAuth.openAuthModal('signup')">Sign up</button>
     <!-- Logged-in user menu — only shows after a customer signs in. The
          pre-login Log in / Sign up buttons were removed; customers hit
          "Book now" and the booking flow prompts auth when needed. -->
