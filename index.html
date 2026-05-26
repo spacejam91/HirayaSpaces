@@ -221,6 +221,24 @@
   }
   .mobile-menu-links a:last-child { border-bottom: none; }
   .mobile-menu-links a:active { color: var(--sage); padding-left: 18px; }
+  .mobile-menu-auth {
+    margin-top: 1.25rem; padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .mobile-menu-greet {
+    font-size: 13px; color: var(--muted); text-align: center;
+    margin-bottom: 4px;
+  }
+  .mobile-menu-auth-btn {
+    width: 100%; padding: 14px 18px;
+    border-radius: 999px; cursor: pointer;
+    font-family: 'Jost', sans-serif; font-size: 14px;
+    font-weight: 600; letter-spacing: 0.3px;
+    border: 1.5px solid var(--sage);
+  }
+  .mobile-menu-auth-btn.ghost { background: white; color: var(--sage); }
+  .mobile-menu-auth-btn.primary { background: var(--sage); color: white; }
   .mobile-menu-footer {
     margin-top: 1.5rem; padding-top: 1.5rem;
     border-top: 1px solid var(--border);
@@ -1334,6 +1352,15 @@
       <a href="#contact" onclick="closeMobileMenu()">Contact</a>
       <a href="/faq" onclick="closeMobileMenu()">FAQ</a>
     </nav>
+    <div class="mobile-menu-auth" id="mobile-menu-auth-out">
+      <button type="button" class="mobile-menu-auth-btn ghost" onclick="closeMobileMenu(); HirayaAuth.openAuthModal('login')">Log in</button>
+      <button type="button" class="mobile-menu-auth-btn primary" onclick="closeMobileMenu(); HirayaAuth.openAuthModal('signup')">Sign up</button>
+    </div>
+    <div class="mobile-menu-auth" id="mobile-menu-auth-in" style="display:none">
+      <div class="mobile-menu-greet" id="mobile-menu-greet"></div>
+      <button type="button" class="mobile-menu-auth-btn ghost" onclick="closeMobileMenu(); HirayaAccount.openBookings()">My bookings</button>
+      <button type="button" class="mobile-menu-auth-btn ghost" onclick="closeMobileMenu(); HirayaAuth.doLogout()">Log out</button>
+    </div>
     <div class="mobile-menu-footer">
       <a href="tel:+12267514566" class="mobile-menu-phone">📞 (226) 751-4566</a>
     </div>

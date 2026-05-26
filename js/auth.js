@@ -435,10 +435,14 @@
     const signupBtn = $('nav-signup-btn');
     const userWrap = $('nav-user-wrap');
     const accountLink = $('nav-account-link');
+    const mAuthOut = $('mobile-menu-auth-out');
+    const mAuthIn = $('mobile-menu-auth-in');
     if (loginBtn) loginBtn.style.display = '';
     if (signupBtn) signupBtn.style.display = '';
     if (userWrap) userWrap.style.display = 'none';
     if (accountLink) accountLink.style.display = 'none';
+    if (mAuthOut) mAuthOut.style.display = '';
+    if (mAuthIn) mAuthIn.style.display = 'none';
     closeUserMenu();
   }
   function setNavLoggedIn(user) {
@@ -447,16 +451,20 @@
     const userWrap = $('nav-user-wrap');
     const accountLink = $('nav-account-link');
     const greet = $('nav-user-greet');
+    const mAuthOut = $('mobile-menu-auth-out');
+    const mAuthIn = $('mobile-menu-auth-in');
+    const mGreet = $('mobile-menu-greet');
     if (loginBtn) loginBtn.style.display = 'none';
     if (signupBtn) signupBtn.style.display = 'none';
     if (userWrap) userWrap.style.display = 'flex';
     if (accountLink) accountLink.style.display = '';
-    if (greet) {
-      const meta = user.user_metadata || {};
-      const fullName = meta.full_name || user.email || '';
-      const first = fullName.split(' ')[0] || fullName;
-      greet.textContent = 'Welcome, ' + first;
-    }
+    if (mAuthOut) mAuthOut.style.display = 'none';
+    if (mAuthIn) mAuthIn.style.display = '';
+    const meta = user.user_metadata || {};
+    const fullName = meta.full_name || user.email || '';
+    const first = fullName.split(' ')[0] || fullName;
+    if (greet) greet.textContent = 'Welcome, ' + first;
+    if (mGreet) mGreet.textContent = 'Signed in as ' + (user.email || first);
   }
 
   // ── USER DROPDOWN MENU ─────────────────────────────────────────────────
