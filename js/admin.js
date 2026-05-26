@@ -464,10 +464,14 @@
       );
       statWeek.textContent = inWeek.length;
       if (statWeekSub) {
-        const confirmedInWeek = inWeek.filter(b => b.status === 'confirmed' || b.status === 'in_progress' || b.status === 'completed').length;
-        statWeekSub.textContent = inWeek.length === 0
-          ? 'No cleans scheduled'
-          : `${confirmedInWeek} confirmed · ${inWeek.length - confirmedInWeek} pending`;
+        const doneInWeek = inWeek.filter(b => b.status === 'completed').length;
+        const confirmedInWeek = inWeek.filter(b => b.status === 'confirmed' || b.status === 'in_progress').length;
+        const pendingInWeek = inWeek.length - doneInWeek - confirmedInWeek;
+        const parts = [];
+        if (doneInWeek) parts.push(`${doneInWeek} done`);
+        if (confirmedInWeek) parts.push(`${confirmedInWeek} confirmed`);
+        if (pendingInWeek) parts.push(`${pendingInWeek} pending`);
+        statWeekSub.textContent = parts.length === 0 ? 'No cleans scheduled' : parts.join(' · ');
       }
     }
 
