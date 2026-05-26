@@ -428,7 +428,7 @@
         created_at, customer_notes,
         services ( name, slug ),
         addresses ( street_address, unit, city, postal_code ),
-        booking_addons ( quantity, price_cents, addons ( name, slug ) )
+        booking_addons ( quantity, price_cents, addons ( name, slug, price_cents ) )
       `)
       .eq('user_id', user.id)
       .order('preferred_date', { ascending: false, nullsFirst: false })
@@ -507,7 +507,9 @@
       const total = b.estimated_price_cents != null
         ? '$' + Math.round(b.estimated_price_cents / 100)
         : 'Quote on request';
-      const addonNames = (b.booking_addons || []).map(ba => ba.addons?.name).filter(Boolean);
+      const addonItems = (b.booking_addons || [])
+        .map(ba => ba.addons ? { name: ba.addons.name, price_cents: ba.addons.price_cents } : null)
+        .filter(Boolean);
       const classes = ['booking-card'];
       if (isUpcoming(b)) classes.push('is-upcoming');
       if (b.status === 'cancelled') classes.push('is-cancelled');
@@ -520,7 +522,7 @@
             <div>
               <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
               <div class="booking-card-svc">${escapeHtml(svcName)}</div>
-              ${addonNames.length ? `<div class="booking-card-addons">${addonNames.map(n => `<div>✨ ${escapeHtml(n)}</div>`).join('')}</div>` : ''}
+              ${addonItems.length ? `<div class="booking-card-addons">${addonItems.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
               <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
             </div>
           </div>

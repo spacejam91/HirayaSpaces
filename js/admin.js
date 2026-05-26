@@ -127,7 +127,7 @@
           <div>
             <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
             <div class="booking-card-svc">${svc}${freqBadge}</div>
-            ${(b.addon_names && b.addon_names.length) ? `<div class="booking-card-addons">${b.addon_names.map(n => `<div>✨ ${escapeHtml(n)}</div>`).join('')}</div>` : ''}
+            ${(b.addon_items && b.addon_items.length) ? `<div class="booking-card-addons">${b.addon_items.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
             <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
           </div>
         </div>
@@ -386,15 +386,19 @@
       console.warn('booking_addons fetch failed:', error.message);
       return;
     }
-    const addonNameById = new Map(addonsCache.map(a => [a.id, a.name]));
+    const addonInfoById = new Map(addonsCache.map(a => [a.id, { name: a.name, price_cents: a.price_cents }]));
     const byBooking = new Map();
     (data || []).forEach(row => {
-      const name = addonNameById.get(row.addon_id);
-      if (!name) return;
+      const info = addonInfoById.get(row.addon_id);
+      if (!info) return;
       if (!byBooking.has(row.booking_id)) byBooking.set(row.booking_id, []);
-      byBooking.get(row.booking_id).push(name);
+      byBooking.get(row.booking_id).push(info);
     });
-    bookings.forEach(b => { b.addon_names = byBooking.get(b.id) || []; });
+    bookings.forEach(b => {
+      const items = byBooking.get(b.id) || [];
+      b.addon_items = items;
+      b.addon_names = items.map(i => i.name);
+    });
   }
 
   // ── STATS ──────────────────────────────────────────────────────────────
@@ -2766,9 +2770,9 @@ Hiraya Spaces`
     $('detail-service').innerHTML = escapeHtml(b.service_name || 'Cleaning service');
     $('detail-when').innerHTML = `<strong>${escapeHtml(dateStr)}</strong>${escapeHtml(timeStr)}`;
 
-    const addons = b.addon_names || [];
-    $('detail-addons').innerHTML = addons.length
-      ? addons.map(n => `<div>✨ ${escapeHtml(n)}</div>`).join('')
+    const addonItems = b.addon_items || [];
+    $('detail-addons').innerHTML = addonItems.length
+      ? addonItems.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')
       : '<span style="color:var(--muted)">No add-ons</span>';
 
     const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}">${escapeHtml(b.customer_phone)}</a>` : '';
