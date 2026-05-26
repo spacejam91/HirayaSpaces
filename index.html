@@ -1109,6 +1109,8 @@
     .hero-left { padding: 3rem 5vw; }
     .hero-actions { flex-direction: column; align-items: stretch; gap: 0.75rem; }
     .hero-actions .btn-primary, .hero-actions .btn-ghost { width: 100%; justify-content: center; text-align: center; }
+    .hero-actions .btn-primary { order: 2; }
+    .hero-actions .btn-ghost { order: 1; }
     .services-grid { grid-template-columns: 1fr; }
     .addons-grid > .addon-card { flex: 1 1 100%; max-width: 100%; }
     .steps-layout { grid-template-columns: 1fr; }
@@ -1119,7 +1121,7 @@
     .nav-hamburger { display: flex; }
     .nav-call-icon { display: inline-flex; }
     .nav-phone { display: none; }
-    .nav-cta-book { padding: 8px 16px; font-size: 12px; }
+    .nav-cta-book { display: none; }
     .booking-left { padding: 2rem; }
     .booking-right { padding: 2rem; }
     nav { height: auto; padding: 10px 4vw; }
