@@ -9,21 +9,27 @@
   // is to scroll to 0 BEFORE the page unloads, so the captured position is
   // also 0.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  // Strip any hash fragment (e.g. #services left over from clicking a nav
-  // link before refresh) — otherwise the browser jumps to that anchor on
-  // load regardless of any scroll-reset code.
-  if (window.location.hash) {
+  // Detect a true reload (refresh) vs a navigation from another page. We only
+  // want to force-scroll-to-top on a reload; a click like /#how from a city
+  // landing page needs the hash to do its job.
+  var __isReload = false;
+  try {
+    var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+    __isReload = nav ? nav.type === 'reload' : (performance.navigation && performance.navigation.type === 1);
+  } catch (_) { __isReload = false; }
+  if (__isReload && window.location.hash) {
     try { history.replaceState(null, '', window.location.pathname + window.location.search); }
     catch (_) { window.location.hash = ''; }
   }
   function __resetScroll() {
+    if (window.location.hash) return; // honor anchor links
     window.scrollTo(0, 0);
     if (document.documentElement) document.documentElement.scrollTop = 0;
     if (document.body) document.body.scrollTop = 0;
   }
-  __resetScroll();
-  window.addEventListener('beforeunload', __resetScroll);
-  window.addEventListener('pagehide', __resetScroll);
+  if (__isReload) __resetScroll();
+  window.addEventListener('beforeunload', function () { if (!window.location.hash) window.scrollTo(0, 0); });
+  window.addEventListener('pagehide', function () { if (!window.location.hash) window.scrollTo(0, 0); });
   window.addEventListener('DOMContentLoaded', __resetScroll);
   window.addEventListener('load', function () {
     __resetScroll();
@@ -1756,7 +1762,7 @@
         <li><a href="/#reviews">Reviews</a></li>
         <li><a href="/faq">FAQ</a></li>
         <li><a href="/#contact">Contact</a></li>
-        <li><a href="/#booking">Book a clean</a></li>
+        <li><a href="/#how">Book a clean</a></li>
       </ul>
     </div>
   </div>

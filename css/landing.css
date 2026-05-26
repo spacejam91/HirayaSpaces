@@ -186,6 +186,19 @@ body {
 }
 .lnd-svc-link:hover { text-decoration: underline; }
 
+/* Room/inclusion cards — same look but with a bullet list inside. */
+.lnd-svc-card ul {
+  list-style: none; padding: 0; margin: 0;
+}
+.lnd-svc-card ul li {
+  padding: 6px 0 6px 20px; position: relative;
+  font-size: 13px; color: var(--muted); line-height: 1.5;
+}
+.lnd-svc-card ul li::before {
+  content: '✓'; position: absolute; left: 0; top: 6px;
+  color: var(--sage); font-weight: 700; font-size: 12px;
+}
+
 /* ── PRICE STRIP ── */
 .lnd-prices {
   background: var(--warm); border-radius: 18px;
