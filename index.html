@@ -1606,7 +1606,7 @@ const SERVICES = [
 // price by the selected quantity. `unitLabel` is the singular noun shown
 // next to the number ("fridge", "load", "window").
 const ADDONS = [
-  {id:'oven',icon:'🍳',name:'Inside Oven',price:'+$35',addonPrice:35,desc:'Deep clean inside your oven'},
+  {id:'oven',icon:'🍳',name:'Inside Oven / Stove',price:'+$35 each',addonPrice:35,qty:{max:3,unitLabel:'unit'},desc:'Deep clean inside the oven and stovetop. Pick how many units (e.g. wall oven + range).'},
   {id:'fridge',icon:'❄️',name:'Inside Fridge',price:'+$35 each',addonPrice:35,qty:{max:3,unitLabel:'fridge'},desc:'Full clean inside your refrigerator. Pick how many.'},
   {id:'windows-small',icon:'🪟',name:'Small Windows',price:'+$8 each',addonPrice:8,qty:{max:30,unitLabel:'window'},desc:'Bathroom, basement, or small bedroom windows. Wiped streak-free.'},
   {id:'windows-standard',icon:'🪟',name:'Standard Windows',price:'+$12 each',addonPrice:12,qty:{max:30,unitLabel:'window'},desc:'Living room, bedroom, kitchen-sized windows. Inside cleaned.'},
