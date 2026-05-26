@@ -2040,6 +2040,23 @@ Hiraya Spaces`
       } else {
         $('invoice-paid-at-wrap').style.display = 'none';
       }
+
+      // Line items breakdown: service line(s) at derived price, then each
+      // add-on with its catalog price, then total.
+      const linesEl = $('invoice-lines');
+      if (linesEl) {
+        const addonItems = b.addon_items || [];
+        const addonsSum = addonItems.reduce((s, a) => s + (a.price_cents || 0), 0);
+        const invoiceTotal = inv.total_cents || 0;
+        const svcPrice = Math.max(0, invoiceTotal - addonsSum);
+        const rows = [];
+        rows.push(`<div style="display:flex;justify-content:space-between"><span>${escapeHtml(b.service_name || 'Cleaning service')}</span><strong>$${Math.round(svcPrice / 100)}</strong></div>`);
+        addonItems.forEach(a => {
+          rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
+        });
+        rows.push(`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--sage);font-size:16px"><span><strong>Total</strong></span><strong>$${Math.round(invoiceTotal / 100)}</strong></div>`);
+        linesEl.innerHTML = rows.join('');
+      }
       const paidBtn = $('invoice-paid-btn');
       if (paidBtn) {
         paidBtn.textContent = inv.status === 'paid' ? 'Mark as unpaid' : 'Mark as paid';

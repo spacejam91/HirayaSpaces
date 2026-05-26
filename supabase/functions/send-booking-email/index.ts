@@ -55,6 +55,8 @@ async function buildInvoicePdf(opts: {
   addressLine: string;
   lineItems: { name: string; priceLabel: string }[];
   totalDisplay: string;
+  paid?: boolean;
+  paidDisplay?: string;
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([612, 792]); // US Letter @ 72 dpi
@@ -137,25 +139,69 @@ async function buildInvoicePdf(opts: {
     y -= 18;
   }
 
-  // Total
+  // Total line — show invoiced amount, then a $0 "balance due" line when paid
   y -= 4;
   page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.5, color: border });
   y -= 20;
-  drawAt("Total due", left, y, bold, 13, text);
-  drawRight(opts.totalDisplay, y, bold, 14, sage);
+  if (opts.paid) {
+    drawAt("Invoice total", left, y, font, 11, muted);
+    drawRight(opts.totalDisplay, y, font, 11, muted);
+    y -= 16;
+    drawAt("Payment received", left, y, font, 11, muted);
+    drawRight("-" + opts.totalDisplay, y, font, 11, muted);
+    y -= 6;
+    page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.5, color: border });
+    y -= 20;
+    drawAt("Balance due", left, y, bold, 13, text);
+    drawRight("$0", y, bold, 14, sage);
+  } else {
+    drawAt("Total due", left, y, bold, 13, text);
+    drawRight(opts.totalDisplay, y, bold, 14, sage);
+  }
 
-  // How to pay
+  // How to pay (only when unpaid). When paid we show a thank-you box instead.
   y -= 50;
-  page.drawRectangle({ x: left, y: y - 60, width: right - left, height: 76, color: rgb(255 / 255, 251 / 255, 235 / 255), borderColor: rgb(229 / 255, 211 / 255, 160 / 255), borderWidth: 1 });
-  drawAt("HOW TO PAY", left + 14, y, bold, 9, rgb(90 / 255, 67 / 255, 24 / 255));
-  y -= 18;
-  drawAt("Cash: on arrival.", left + 14, y, font, 10, rgb(61 / 255, 44 / 255, 13 / 255));
-  y -= 14;
-  drawAt(`E-transfer: hirayaspaces@gmail.com  -  reference ${opts.invoiceNumber}.`, left + 14, y, font, 10, rgb(61 / 255, 44 / 255, 13 / 255));
+  if (opts.paid) {
+    page.drawRectangle({ x: left, y: y - 60, width: right - left, height: 76, color: rgb(228 / 255, 240 / 255, 233 / 255), borderColor: sage, borderWidth: 1 });
+    drawAt("PAYMENT RECEIVED", left + 14, y, bold, 9, sage);
+    y -= 18;
+    drawAt("Thank you — this invoice has been paid in full.", left + 14, y, font, 10, text);
+    if (opts.paidDisplay) {
+      y -= 14;
+      drawAt(`Paid on ${opts.paidDisplay}.`, left + 14, y, font, 10, muted);
+    }
+  } else {
+    page.drawRectangle({ x: left, y: y - 60, width: right - left, height: 76, color: rgb(255 / 255, 251 / 255, 235 / 255), borderColor: rgb(229 / 255, 211 / 255, 160 / 255), borderWidth: 1 });
+    drawAt("HOW TO PAY", left + 14, y, bold, 9, rgb(90 / 255, 67 / 255, 24 / 255));
+    y -= 18;
+    drawAt("Cash: on arrival.", left + 14, y, font, 10, rgb(61 / 255, 44 / 255, 13 / 255));
+    y -= 14;
+    drawAt(`E-transfer: hirayaspaces@gmail.com  -  reference ${opts.invoiceNumber}.`, left + 14, y, font, 10, rgb(61 / 255, 44 / 255, 13 / 255));
+  }
 
   // Footer
   y = 40;
   drawAt("Questions? Reply to the invoice email or call (226) 751-4566.", left, y, font, 9, muted);
+
+  // PAID watermark — drawn LAST so it sits on top of everything underneath.
+  // Big diagonal sage-tinted text across the page center.
+  if (opts.paid) {
+    const stampText = "PAID";
+    const stampSize = 140;
+    const stampW = bold.widthOfTextAtSize(stampText, stampSize);
+    const cx = 306; // page center x (612 / 2)
+    const cy = 420; // roughly mid-page
+    const rad = Math.PI / 6; // 30° tilt
+    page.drawText(stampText, {
+      x: cx - (stampW / 2) * Math.cos(rad),
+      y: cy - (stampW / 2) * Math.sin(rad),
+      font: bold,
+      size: stampSize,
+      color: sage,
+      opacity: 0.18,
+      rotate: { type: "radians", angle: rad },
+    } as any);
+  }
 
   return await pdf.save();
 }
@@ -667,7 +713,7 @@ Deno.serve(async (req) => {
       const finalCents = (booking.final_price_cents ?? booking.estimated_price_cents) ?? 0;
       const { data: existingInv } = await sb
         .from("invoices")
-        .select("id, invoice_number, status, total_cents")
+        .select("id, invoice_number, status, total_cents, paid_at")
         .eq("booking_id", booking_id)
         .maybeSingle();
 
@@ -811,6 +857,10 @@ Deno.serve(async (req) => {
 
       // Build the PDF copy of the invoice. Used both as email attachment
       // AND as the response payload for the admin "Download PDF" button.
+      const isPaid = (existingInv?.status === "paid") || !!existingInv?.paid_at;
+      const paidDisplay = existingInv?.paid_at
+        ? new Date(existingInv.paid_at).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" })
+        : "";
       const pdfBytes = await buildInvoicePdf({
         invoiceNumber: invoiceNumber!,
         issuedDisplay,
@@ -823,6 +873,8 @@ Deno.serve(async (req) => {
         addressLine,
         lineItems,
         totalDisplay: subtotalDisplay,
+        paid: isPaid,
+        paidDisplay,
       });
 
       // Admin "Download PDF" path: don't send email, just return the bytes
