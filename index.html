@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>
+  // Always land at the top on refresh / back-forward — without this, Safari
+  // and Chrome remember the prior scroll position and the user reloads to a
+  // mid-page section instead of the hero.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.addEventListener('load', function () { window.scrollTo(0, 0); });
+</script>
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -1127,11 +1134,11 @@
     .booking-left { padding: 2rem; }
     .booking-right { padding: 2rem; }
     nav { height: auto; padding: 10px 4vw; }
-    nav img { height: 40px !important; width: 40px !important; }
+    nav img { height: 52px !important; width: 52px !important; }
     .logo { flex-direction: row !important; align-items: center !important; }
     .logo > div { display: flex; flex-direction: column; }
     .logo > div > span:last-child { display: none !important; }
-    .logo > div > span:first-child { font-size: 13px !important; letter-spacing: 1.5px !important; line-height: 1 !important; }
+    .logo > div > span:first-child { font-size: 17px !important; letter-spacing: 1.8px !important; line-height: 1 !important; }
     .nav-cta { padding: 10px 18px; font-size: 12px; letter-spacing: 0.4px; }
     .nav-login { padding: 9px 16px; font-size: 12px; }
     .nav-user-btn { padding: 7px 10px; font-size: 11px; }
