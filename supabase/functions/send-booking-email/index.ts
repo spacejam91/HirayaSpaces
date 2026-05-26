@@ -15,7 +15,7 @@
 
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { PDFDocument, StandardFonts, rgb, degrees } from "https://esm.sh/pdf-lib@1.17.1";
 
 // pdf-lib's standard fonts only encode WinAnsi (Latin-1). Stripping/
 // substituting any unicode the catalog uses (≤, ×, —, …) so we don't crash
@@ -82,14 +82,34 @@ async function buildInvoicePdf(opts: {
     page.drawText(sanitizePdfText(str), { x, y: yPos, font: f, size, color });
   };
 
-  // Brand header
-  drawAt("HIRAYA SPACES", left, y, bold, 14, sage);
-  drawRight("Waterloo, ON - hirayaspaces.ca", y, font, 10, muted);
-  y -= 14;
-  drawAt("Turning homes into dream spaces", left, y, font, 9, muted);
+  // Brand header — embed the live logo image. Falls back to the text wordmark
+  // if the fetch fails so the invoice still renders.
+  let headerBottomY = y - 30;
+  try {
+    const logoResp = await fetch("https://hirayaspaces.ca/logo-horizontal.jpg");
+    if (!logoResp.ok) throw new Error(`logo fetch ${logoResp.status}`);
+    const logoBytes = new Uint8Array(await logoResp.arrayBuffer());
+    const logo = await pdf.embedJpg(logoBytes);
+    const logoDims = logo.scaleToFit(180, 80);
+    const logoTop = 770;
+    page.drawImage(logo, {
+      x: left,
+      y: logoTop - logoDims.height,
+      width: logoDims.width,
+      height: logoDims.height,
+    });
+    drawRight("Waterloo, ON - hirayaspaces.ca", logoTop - logoDims.height / 2 - 4, font, 10, muted);
+    headerBottomY = logoTop - logoDims.height - 12;
+  } catch (_logoErr) {
+    drawAt("HIRAYA SPACES", left, y, bold, 14, sage);
+    drawRight("Waterloo, ON - hirayaspaces.ca", y, font, 10, muted);
+    y -= 14;
+    drawAt("Turning homes into dream spaces", left, y, font, 9, muted);
+    headerBottomY = y - 16;
+  }
 
   // Divider
-  y -= 16;
+  y = headerBottomY;
   page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 2, color: sage });
 
   // INVOICE badge
@@ -184,21 +204,23 @@ async function buildInvoicePdf(opts: {
   drawAt("Questions? Reply to the invoice email or call (226) 751-4566.", left, y, font, 9, muted);
 
   // PAID watermark — drawn LAST so it sits on top of everything underneath.
-  // Big sage-tinted text across the page center. Horizontal (no rotation)
-  // to keep the pdf-lib API surface minimal and avoid Rotation-instance bugs.
+  // Big sage-tinted text rotated diagonally across the page center.
   if (opts.paid) {
     const stampText = "PAID";
-    const stampSize = 120;
+    const stampSize = 140;
     const stampW = bold.widthOfTextAtSize(stampText, stampSize);
+    const angleDeg = 30;
+    const angleRad = (angleDeg * Math.PI) / 180;
     const cx = 306; // page center x (612 / 2)
-    const cy = 400;
+    const cy = 420;
     page.drawText(stampText, {
-      x: cx - stampW / 2,
-      y: cy,
+      x: cx - (stampW / 2) * Math.cos(angleRad),
+      y: cy - (stampW / 2) * Math.sin(angleRad),
       font: bold,
       size: stampSize,
       color: sage,
       opacity: 0.15,
+      rotate: degrees(angleDeg),
     });
   }
 
