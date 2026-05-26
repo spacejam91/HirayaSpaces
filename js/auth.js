@@ -470,7 +470,7 @@
     const meta = user.user_metadata || {};
     const fullName = meta.full_name || user.email || '';
     const first = fullName.split(' ')[0] || fullName;
-    if (greet) greet.textContent = 'Welcome, ' + first;
+    if (greet) greet.textContent = first;
   }
 
   // ── USER DROPDOWN MENU ─────────────────────────────────────────────────
