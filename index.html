@@ -409,6 +409,71 @@
   .section-h2 em { font-style: italic; color: var(--sage-mid); }
   .section-sub { font-size: 16px; color: var(--muted); font-weight: 300; line-height: 1.75; max-width: 520px; }
 
+  /* ── BEFORE / AFTER GALLERY ── */
+  #gallery { background: white; }
+  .ba-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem; max-width: 1080px; margin: 0 auto;
+  }
+  .ba-card { margin: 0; }
+  .ba-slider {
+    position: relative; aspect-ratio: 4 / 3; width: 100%;
+    border-radius: 14px; overflow: hidden;
+    background: var(--cream);
+    cursor: ew-resize; touch-action: none;
+    box-shadow: 0 6px 20px rgba(30, 77, 43, 0.08);
+    user-select: none;
+  }
+  .ba-img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block; pointer-events: none;
+  }
+  .ba-before {
+    /* Clipped to the left of the handle. CSS var driven by JS. */
+    clip-path: inset(0 calc(100% - var(--ba-pos, 50%)) 0 0);
+    transition: clip-path .05s linear;
+  }
+  .ba-handle {
+    position: absolute; top: 0; bottom: 0;
+    left: var(--ba-pos, 50%); width: 2px;
+    background: white; box-shadow: 0 0 8px rgba(0,0,0,0.3);
+    pointer-events: none;
+  }
+  .ba-handle-bar {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 36px; height: 36px; border-radius: 50%;
+    background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+  .ba-handle-bar::before,
+  .ba-handle-bar::after {
+    content: ''; position: absolute; top: 50%; transform: translateY(-50%);
+    width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+  }
+  .ba-handle-bar::before {
+    left: 8px; border-right: 7px solid var(--sage);
+  }
+  .ba-handle-bar::after {
+    right: 8px; border-left: 7px solid var(--sage);
+  }
+  .ba-tag {
+    position: absolute; top: 14px;
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; padding: 5px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.92); color: var(--sage);
+    pointer-events: none;
+  }
+  .ba-tag-before { left: 14px; }
+  .ba-tag-after { right: 14px; background: var(--sage); color: white; }
+  .ba-caption {
+    margin-top: 0.75rem; font-family: 'Cormorant Garamond', serif;
+    font-size: 17px; font-weight: 500; color: var(--text);
+    text-align: center;
+  }
+  @media (max-width: 720px) {
+    .ba-grid { grid-template-columns: 1fr; gap: 1.25rem; }
+  }
+
   /* ── SERVICES ── */
   #services { background: white; }
   .services-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3rem; flex-wrap: wrap; gap: 1rem; }
@@ -1235,6 +1300,64 @@
   </div>
 </section>
 
+<!-- BEFORE / AFTER GALLERY -->
+<section id="gallery" style="background:white">
+  <div style="text-align:center;max-width:680px;margin:0 auto 2.5rem">
+    <span class="section-label fade-up">Our work</span>
+    <h2 class="section-h2 fade-up" style="transition-delay:.1s">Before & <em>after</em></h2>
+    <p class="section-sub fade-up" style="transition-delay:.15s;margin:0 auto">Real homes from real clients across Waterloo Region. Drag the slider on each photo to reveal the after.</p>
+  </div>
+
+  <div class="ba-grid">
+    <!-- 4 placeholder pairs. Swap each set of two images for real ones when ready. -->
+    <figure class="ba-card fade-up" style="transition-delay:.1s" data-room="Kitchen">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Kitchen — Deep Clean</figcaption>
+    </figure>
+
+    <figure class="ba-card fade-up" style="transition-delay:.15s" data-room="Bathroom">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Bathroom — Move-Out Clean</figcaption>
+    </figure>
+
+    <figure class="ba-card fade-up" style="transition-delay:.2s" data-room="Carpet">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Living Room — Carpet Clean</figcaption>
+    </figure>
+
+    <figure class="ba-card fade-up" style="transition-delay:.25s" data-room="Living">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
+        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Upholstery — Sectional</figcaption>
+    </figure>
+  </div>
+
+  <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:2rem;font-style:italic">More photos rolling in. Want to be featured? Tag <strong>@hirayaspaces</strong> after your next clean.</p>
+</section>
+
 <!-- REVIEWS -->
 <section id="reviews">
   <div class="reviews-header">
@@ -1315,6 +1438,32 @@ document.addEventListener('click', function (e) {
   void a.offsetWidth; // force reflow so the animation can restart
   a.style.animation = 'step-num-bounce .55s ease';
 });
+
+// ── Before/After slider ────────────────────────────────────────────────
+// Sets a CSS var on the slider container as the user drags; the .ba-before
+// image's clip-path uses that var, so we don't reflow or repaint anything
+// expensive. Works on pointer events (mouse + touch + pen).
+let baActive = null;
+function baSetPos(el, clientX) {
+  const rect = el.getBoundingClientRect();
+  const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+  el.style.setProperty('--ba-pos', (x / rect.width) * 100 + '%');
+}
+function baStart(e) {
+  baActive = e.currentTarget;
+  baActive.setPointerCapture(e.pointerId);
+  baSetPos(baActive, e.clientX);
+}
+function baMove(e) {
+  if (!baActive) return;
+  baSetPos(baActive, e.clientX);
+}
+function baEnd(e) {
+  if (baActive) {
+    try { baActive.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+  baActive = null;
+}
 
 // Hide the nav "Book now" CTA once the user scrolls past the hero. The hero
 // already has its own big CTAs; once you're into How it works, Services, or

@@ -1243,6 +1243,9 @@ Hiraya Spaces`
         return;
       }
       showToast('Checked in. Have a great clean!', 'success');
+      // Fire the "cleaner has arrived" email to the customer.
+      sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'checked_in' } })
+        .catch(err => console.warn('checked_in email failed:', err));
       await refreshAll();
       refreshPending();
     } catch (err) {

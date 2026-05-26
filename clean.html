@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Today's Jobs · Hiraya Spaces</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<meta name="robots" content="noindex,nofollow">
+<style>
+  :root {
+    --sage: #1e4d2b;
+    --sage-mid: #5a9470;
+    --sage-light: #e4f0e9;
+    --cream: #f8faf8;
+    --text: #1a2e1e;
+    --muted: #6a7d6e;
+    --border: #d4e2d8;
+    --rose: #b85c5c;
+    --warm: #fff8ef;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--cream);
+    color: var(--text);
+    font-family: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { padding: 0 0 4rem; min-height: 100vh; }
+
+  .clean-nav {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--cream);
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+  }
+  .clean-brand {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 18px; font-weight: 500;
+    color: var(--sage); letter-spacing: 1px;
+  }
+  .clean-nav-btn {
+    background: white; border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 12px;
+    font-family: inherit; font-size: 12px; color: var(--muted);
+    cursor: pointer;
+  }
+
+  .clean-shell { padding: 18px 16px 0; max-width: 600px; margin: 0 auto; }
+
+  .clean-greet { margin-bottom: 6px; }
+  .clean-greet h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 28px; font-weight: 400; line-height: 1.1;
+  }
+  .clean-greet h1 em { font-style: italic; color: var(--sage-mid); }
+  .clean-greet p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .clean-day-tabs {
+    display: flex; gap: 6px; margin: 18px 0 12px;
+    background: white; padding: 4px; border-radius: 999px;
+    border: 1px solid var(--border);
+  }
+  .clean-day-tab {
+    flex: 1; padding: 8px 10px;
+    border: none; background: transparent;
+    font-family: inherit; font-size: 12px; font-weight: 500;
+    color: var(--muted); border-radius: 999px;
+    cursor: pointer; transition: all .15s;
+  }
+  .clean-day-tab.active { background: var(--sage); color: white; }
+
+  .clean-empty {
+    background: white; border: 1px dashed var(--border);
+    border-radius: 16px; padding: 2rem 1rem;
+    text-align: center; color: var(--muted); font-size: 14px;
+    margin-top: 12px;
+  }
+  .clean-empty-icon { font-size: 36px; display: block; margin-bottom: 8px; }
+
+  .job {
+    background: white; border: 1px solid var(--border);
+    border-radius: 16px; padding: 16px 16px 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(30,77,43,0.04);
+  }
+  .job.is-in-progress { border-color: var(--sage-mid); background: var(--sage-light); }
+  .job-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .job-time {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; font-weight: 500; line-height: 1.1;
+    color: var(--text);
+  }
+  .job-time-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .job-status {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; padding: 4px 10px; border-radius: 999px;
+    background: var(--warm); color: #b08c4a;
+  }
+  .job-status.confirmed { background: var(--sage-light); color: var(--sage); }
+  .job-status.in_progress { background: #e0eef7; color: #2b5a73; }
+
+  .job-svc {
+    font-size: 14px; font-weight: 600; margin: 10px 0 4px;
+    color: var(--text); line-height: 1.4;
+  }
+  .job-svc div + div { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .job-customer { font-size: 14px; color: var(--text); }
+  .job-actions-row {
+    display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .job-action {
+    flex: 1; min-width: 120px;
+    padding: 10px 12px;
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; font-family: inherit; font-size: 13px;
+    color: var(--text); text-decoration: none;
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; cursor: pointer;
+  }
+  .job-action:active { transform: scale(.97); }
+  .job-action.primary {
+    background: var(--sage); color: white; border-color: var(--sage);
+    font-weight: 600;
+  }
+  .job-action.danger {
+    background: #fff5f5; color: var(--rose); border-color: #f3c8c8;
+  }
+  .job-notes {
+    background: var(--warm); border-left: 3px solid #b08c4a;
+    padding: 10px 12px; border-radius: 8px;
+    font-size: 12px; color: #3d2c0d; line-height: 1.5;
+    margin-top: 10px;
+  }
+  .job-checkin-strip {
+    margin-top: 10px; padding: 8px 12px;
+    background: #e0eef7; border-radius: 8px;
+    font-size: 12px; color: #2b5a73;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .job-meta {
+    margin-top: 8px; font-size: 12px; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .job-meta a { color: var(--sage); text-decoration: none; }
+  .job-meta a:active { opacity: .7; }
+
+  .clean-toast {
+    position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: white;
+    padding: 12px 18px; border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    opacity: 0; pointer-events: none; transition: opacity .15s;
+    z-index: 50;
+  }
+  .clean-toast.show { opacity: 1; }
+  .clean-toast.error { background: var(--rose); }
+
+  /* Login view */
+  #login-view { padding: 4rem 1.5rem; max-width: 420px; margin: 0 auto; }
+  #login-view h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 28px; font-weight: 400; margin-bottom: 8px;
+  }
+  #login-view p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .login-field { display: flex; flex-direction: column; margin-bottom: 12px; }
+  .login-field label {
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 4px;
+  }
+  .login-field input {
+    padding: 12px 14px; border: 1.5px solid var(--border);
+    border-radius: 12px; font-family: inherit; font-size: 14px;
+    background: white; outline: none;
+  }
+  .login-field input:focus { border-color: var(--sage); }
+  .login-btn {
+    width: 100%; padding: 14px; background: var(--sage);
+    color: white; border: none; border-radius: 12px;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-top: 8px;
+  }
+  .login-err {
+    color: var(--rose); font-size: 13px; margin: 8px 0;
+    display: none;
+  }
+  .login-err.show { display: block; }
+</style>
+</head>
+<body>
+
+<!-- Login view (shown when not authenticated) -->
+<div id="login-view" style="display:none">
+  <h2>Cleaner sign-in</h2>
+  <p>Use your Hiraya admin email to see today's jobs.</p>
+  <form id="login-form" onsubmit="event.preventDefault(); HirayaClean.doLogin();">
+    <div class="login-field">
+      <label for="cl-email">Email</label>
+      <input type="email" id="cl-email" autocomplete="email" autocapitalize="off" autocorrect="off" inputmode="email">
+    </div>
+    <div class="login-field">
+      <label for="cl-pass">Password</label>
+      <input type="password" id="cl-pass" autocomplete="current-password" autocapitalize="off">
+    </div>
+    <div class="login-err" id="cl-err"></div>
+    <button type="submit" class="login-btn" id="cl-submit">Log in</button>
+  </form>
+</div>
+
+<!-- Logged-in view -->
+<div id="clean-app" style="display:none">
+  <nav class="clean-nav">
+    <span class="clean-brand">Hiraya · Today</span>
+    <button class="clean-nav-btn" onclick="HirayaClean.refresh()">↻ Refresh</button>
+    <button class="clean-nav-btn" onclick="HirayaClean.logout()">Sign out</button>
+  </nav>
+
+  <div class="clean-shell">
+    <div class="clean-greet">
+      <h1>Hey <em id="clean-name">there</em></h1>
+      <p id="clean-sub">Loading your jobs…</p>
+    </div>
+
+    <div class="clean-day-tabs" role="tablist">
+      <button class="clean-day-tab active" data-day="today" onclick="HirayaClean.switchDay('today')">Today</button>
+      <button class="clean-day-tab" data-day="tomorrow" onclick="HirayaClean.switchDay('tomorrow')">Tomorrow</button>
+      <button class="clean-day-tab" data-day="week" onclick="HirayaClean.switchDay('week')">This week</button>
+    </div>
+
+    <div id="job-list"></div>
+    <div id="job-empty" class="clean-empty" style="display:none">
+      <span class="clean-empty-icon">🌿</span>
+      No jobs in this window. Enjoy the day off.
+    </div>
+  </div>
+
+  <div id="clean-toast" class="clean-toast"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script src="/js/supabase-client.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const sb = () => window.HirayaSb && window.HirayaSb();
+  const OWNER_EMAILS = ['aaron-thompson@outlook.com', 'hirayaspaces@gmail.com', 'jaeannecm@gmail.com'];
+
+  let bookings = [];
+  let activeDay = 'today';
+  let currentUser = null;
+
+  function ymd(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T12:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  function timeOnly(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function showToast(msg, kind) {
+    const el = $('clean-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'clean-toast show' + (kind === 'error' ? ' error' : '');
+    setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  async function doLogin() {
+    const err = $('cl-err');
+    err.classList.remove('show');
+    const email = $('cl-email').value.trim().toLowerCase();
+    const pass = $('cl-pass').value;
+    if (!email || !pass) {
+      err.textContent = 'Please enter your email and password.';
+      err.classList.add('show');
+      return;
+    }
+    if (!OWNER_EMAILS.includes(email)) {
+      err.textContent = 'This sign-in is for Hiraya staff only.';
+      err.classList.add('show');
+      return;
+    }
+    const btn = $('cl-submit');
+    btn.disabled = true; btn.textContent = 'Logging in…';
+    const { error } = await sb().auth.signInWithPassword({ email, password: pass });
+    btn.disabled = false; btn.textContent = 'Log in';
+    if (error) {
+      err.textContent = error.message || 'Could not sign in.';
+      err.classList.add('show');
+      return;
+    }
+    window.location.reload();
+  }
+
+  async function logout() {
+    await sb().auth.signOut();
+    window.location.reload();
+  }
+
+  function switchDay(name) {
+    activeDay = name;
+    document.querySelectorAll('.clean-day-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.day === name);
+    });
+    render();
+  }
+
+  function bookingsForDay() {
+    const today = ymd(new Date());
+    const tomorrowD = new Date(); tomorrowD.setDate(tomorrowD.getDate() + 1);
+    const tomorrow = ymd(tomorrowD);
+    const weekEndD = new Date(); weekEndD.setDate(weekEndD.getDate() + 7);
+    const weekEnd = ymd(weekEndD);
+    const active = ['confirmed', 'in_progress'];
+    return bookings
+      .filter(b => active.includes(b.status))
+      .filter(b => {
+        if (activeDay === 'today') return b.preferred_date === today;
+        if (activeDay === 'tomorrow') return b.preferred_date === tomorrow;
+        return b.preferred_date >= today && b.preferred_date <= weekEnd;
+      })
+      .sort((a, b) => {
+        const dateCmp = (a.preferred_date || '').localeCompare(b.preferred_date || '');
+        if (dateCmp !== 0) return dateCmp;
+        return (a.preferred_time_slot || '').localeCompare(b.preferred_time_slot || '');
+      });
+  }
+
+  function render() {
+    const list = $('job-list');
+    const empty = $('job-empty');
+    const rows = bookingsForDay();
+    if (!rows.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = rows.map(b => {
+      const rawSvc = b.service_name || 'Cleaning';
+      const svcLines = rawSvc.split(' · ').map(s => `<div>${escapeHtml(s)}</div>`).join('');
+      const addr = [
+        [b.street_address, b.unit].filter(Boolean).join(', '),
+        [b.city, b.postal_code].filter(Boolean).join(' '),
+      ].filter(Boolean).join(' · ');
+      const mapsUrl = addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : '';
+      const phoneDigits = b.customer_phone ? b.customer_phone.replace(/[^\d+]/g, '') : '';
+      const entry = (b.entry_method && b.entry_method !== 'home')
+        ? `<div class="job-notes">🔐 <strong>${escapeHtml(b.entry_method)}</strong>${b.entry_instructions ? ': ' + escapeHtml(b.entry_instructions) : ''}</div>`
+        : (b.entry_method === 'home' ? '<div class="job-meta">🏠 Customer will be home</div>' : '');
+      const notes = b.customer_notes ? `<div class="job-notes">📝 ${escapeHtml(b.customer_notes)}</div>` : '';
+
+      const canCheckIn = b.status === 'confirmed' && !b.check_in_at;
+      const canCheckOut = b.status === 'in_progress' && b.check_in_at && !b.check_out_at;
+      const checkinLine = (b.check_in_at || b.check_out_at) ? `
+        <div class="job-checkin-strip">
+          ⏱ ${b.check_in_at ? timeOnly(b.check_in_at) : '—'} → ${b.check_out_at ? timeOnly(b.check_out_at) : '—'}
+        </div>` : '';
+
+      const actions = [];
+      if (canCheckIn) actions.push(`<button class="job-action primary" onclick="HirayaClean.checkIn('${b.id}')">▶ Check in</button>`);
+      if (canCheckOut) actions.push(`<button class="job-action primary" onclick="HirayaClean.checkOut('${b.id}')">⏹ Check out</button>`);
+      if (canCheckIn || canCheckOut) actions.push(`<button class="job-action" onclick="HirayaClean.markComplete('${b.id}')">Mark complete</button>`);
+
+      return `
+      <div class="job ${b.status === 'in_progress' ? 'is-in-progress' : ''}">
+        <div class="job-head">
+          <div>
+            <div class="job-time">${escapeHtml(b.preferred_time_slot || 'TBD')}</div>
+            <div class="job-time-sub">${escapeHtml(fmtDate(b.preferred_date))}</div>
+          </div>
+          <span class="job-status ${escapeHtml(b.status)}">${escapeHtml(b.status === 'in_progress' ? 'In progress' : 'Confirmed')}</span>
+        </div>
+        <div class="job-svc">${svcLines}</div>
+        <div class="job-customer">👤 ${escapeHtml(b.customer_name || 'Customer')}</div>
+        <div class="job-meta">
+          ${phoneDigits ? `<a href="tel:${escapeHtml(phoneDigits)}">📞 ${escapeHtml(b.customer_phone)}</a>` : ''}
+          ${mapsUrl ? `<a href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener">🗺 ${escapeHtml(addr)}</a>` : ''}
+        </div>
+        ${entry}
+        ${notes}
+        ${checkinLine}
+        ${actions.length ? `<div class="job-actions-row">${actions.join('')}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  async function refresh() {
+    if (!sb()) return;
+    const { data, error } = await sb().rpc('get_all_bookings');
+    if (error) { showToast('Could not load: ' + error.message, 'error'); return; }
+    bookings = data || [];
+    render();
+    const todayCount = bookings.filter(b => b.preferred_date === ymd(new Date()) && ['confirmed','in_progress'].includes(b.status)).length;
+    $('clean-sub').textContent = todayCount === 0
+      ? 'Nothing on the schedule for today.'
+      : `${todayCount} clean${todayCount === 1 ? '' : 's'} on the schedule today.`;
+  }
+
+  async function checkIn(id) {
+    if (!confirm('Check in to this job?')) return;
+    const { error } = await sb().rpc('checkin_booking', { booking_id: id });
+    if (error) { showToast('Check-in failed: ' + error.message, 'error'); return; }
+    showToast('Checked in.', 'success');
+    // Email the customer "your cleaner has arrived" — fire and forget.
+    sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'checked_in' } })
+      .catch(() => {});
+    await refresh();
+  }
+
+  async function checkOut(id) {
+    if (!confirm('Check out — mark this clean as done?')) return;
+    const { error } = await sb().rpc('checkout_booking', { booking_id: id });
+    if (error) { showToast('Check-out failed: ' + error.message, 'error'); return; }
+    showToast('Checked out.', 'success');
+    await refresh();
+  }
+
+  async function markComplete(id) {
+    if (!confirm('Mark this booking as complete? The customer will get a thank-you email.')) return;
+    const { error } = await sb().rpc('complete_booking', { booking_id: id, final_cents: null });
+    if (error) { showToast('Complete failed: ' + error.message, 'error'); return; }
+    // Fire the thank-you email (fire-and-forget).
+    sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'completed' } })
+      .catch(() => {});
+    showToast('Marked complete.', 'success');
+    await refresh();
+  }
+
+  async function boot() {
+    if (!sb()) {
+      document.body.innerHTML = '<div style="padding:2rem;text-align:center;color:#666">Supabase config missing.</div>';
+      return;
+    }
+    const { data: { user } } = await sb().auth.getUser();
+    if (!user || !OWNER_EMAILS.includes((user.email || '').toLowerCase())) {
+      $('login-view').style.display = 'block';
+      return;
+    }
+    currentUser = user;
+    $('clean-app').style.display = 'block';
+    const first = (user.user_metadata?.full_name || user.email || '').split(/[ @]/)[0];
+    $('clean-name').textContent = first || 'there';
+    await refresh();
+  }
+
+  window.HirayaClean = { doLogin, logout, refresh, switchDay, checkIn, checkOut, markComplete };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+
+</body>
+</html>

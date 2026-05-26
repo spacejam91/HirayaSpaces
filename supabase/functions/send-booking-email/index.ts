@@ -327,9 +327,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const booking_id = body?.booking_id;
     const declineReason: string | null = typeof body?.reason === "string" ? body.reason : null;
-    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice" | "updated" | "rescheduled";
+    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice" | "updated" | "rescheduled" | "reminder" | "checked_in";
     const requestedMode = body?.mode;
-    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice" || requestedMode === "updated" || requestedMode === "rescheduled")
+    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice" || requestedMode === "updated" || requestedMode === "rescheduled" || requestedMode === "reminder" || requestedMode === "checked_in")
       ? requestedMode : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
@@ -424,6 +424,17 @@ Deno.serve(async (req) => {
     } else if (mode === "rescheduled") {
       if (!["pending_review","awaiting_quote","confirmed","in_progress"].includes(booking.status)) {
         return jsonResponse({ error: "Cannot send reschedule for a non-active booking" }, 400);
+      }
+    } else if (mode === "reminder") {
+      if (!["confirmed"].includes(booking.status)) {
+        return jsonResponse({ error: "Only confirmed bookings get 24h reminders" }, 400);
+      }
+      if (booking.reminder_sent_at) {
+        return jsonResponse({ ok: true, skipped: true, reason: "already_sent", booking_id }, 200);
+      }
+    } else if (mode === "checked_in") {
+      if (booking.status !== "in_progress" || !booking.check_in_at) {
+        return jsonResponse({ error: "Booking is not in_progress with a check_in_at" }, 400);
       }
     } else {
       const ageMs = Date.now() - new Date(booking.created_at).getTime();
@@ -865,6 +876,153 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Invoice email failed", debug: msg }, 502);
       }
       return jsonResponse({ ok: true, booking_id, mode: "invoice", invoice_number: invoiceNumber, status: invoiceStatus });
+    }
+
+    // ── CHECKED-IN PATH (cleaner just arrived) ────────────────────────────
+    if (mode === "checked_in") {
+      const arrivedAt = booking.check_in_at
+        ? new Date(booking.check_in_at).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" })
+        : "";
+      const checkedInHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#3b82a8;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">CLEANER ON SITE</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">We've arrived, ${escapeHtml(customerName.split(' ')[0])}!</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            Your cleaner just checked in${arrivedAt ? ` at ${escapeHtml(arrivedAt)}` : ""} for booking <strong style="color:#1e4d2b">${idShort}</strong>. You'll get another note when we wrap up.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e0eef7;border:1px solid #3b82a8;border-radius:12px;margin-bottom:18px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:600;color:#2b5a73;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Today's clean</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
+                <tr><td style="padding:5px 0;color:#6a7d6e">Service</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(serviceName)}</td></tr>
+                <tr><td style="padding:5px 0;color:#6a7d6e">Address</td><td style="padding:5px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:0">
+            Need to flag anything to us mid-clean? Just reply to this email or call (226) 751-4566.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortCi = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const ciClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortCi, tls: smtpPortCi === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      let ciErr: unknown = null;
+      try {
+        await ciClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Your cleaner has arrived - ${idShort}`,
+          html: tidyHtml(checkedInHtml),
+        });
+      } catch (e) { console.warn("checked_in email failed:", e); ciErr = e; }
+      try { await ciClient.close(); } catch (_) {}
+      if (ciErr) {
+        const msg = (ciErr as Error)?.message || String(ciErr);
+        return jsonResponse({ error: "Checked-in email failed", debug: msg }, 502);
+      }
+      return jsonResponse({ ok: true, booking_id, mode: "checked_in" });
+    }
+
+    // ── REMINDER PATH (24h before a confirmed clean) ──────────────────────
+    if (mode === "reminder") {
+      const reminderHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">TOMORROW</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">See you tomorrow, ${escapeHtml(customerName.split(' ')[0])}!</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            Just a friendly heads up — your clean is on the schedule for tomorrow. Here are the details so nothing slips by:
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:12px;margin-bottom:18px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:600;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Your booking</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
+                <tr><td style="padding:5px 0;color:#6a7d6e">Service</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(serviceName)}</td></tr>
+                <tr><td style="padding:5px 0;color:#6a7d6e">When</td><td style="padding:5px 0;text-align:right;font-weight:600">${escapeHtml(dateDisplay)}${timeDisplay ? " at " + escapeHtml(timeDisplay) : ""}</td></tr>
+                <tr><td style="padding:5px 0;color:#6a7d6e">Address</td><td style="padding:5px 0;text-align:right">${escapeHtml(addressLine)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fffbeb;border:1px solid #e5d3a0;border-radius:12px;margin-bottom:14px">
+            <tr><td style="padding:16px 20px">
+              <div style="font-size:13px;color:#5a4318;line-height:1.7">
+                <strong style="color:#3d2c0d">Before we arrive:</strong> tidy any loose items so we can focus on the deep clean, and let us know about pets, alarm codes, or parking. Just reply to this email.
+              </div>
+            </td></tr>
+          </table>
+
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:0">
+            Need to change anything? Reply to this email or call (226) 751-4566. Cancellations within 24 hours are subject to a $45 fee.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const smtpPortRem = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const remClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortRem, tls: smtpPortRem === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      let remErr: unknown = null;
+      try {
+        await remClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Your Hiraya clean is tomorrow - ${idShort}`,
+          html: tidyHtml(reminderHtml),
+        });
+      } catch (e) { console.warn("reminder email failed:", e); remErr = e; }
+      try { await remClient.close(); } catch (_) {}
+      if (remErr) {
+        const msg = (remErr as Error)?.message || String(remErr);
+        return jsonResponse({ error: "Reminder email failed", debug: msg }, 502);
+      }
+      // Stamp reminder_sent_at so the cron job doesn't pick this up again.
+      const { error: stampErr } = await sb.from("bookings")
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .eq("id", booking_id);
+      if (stampErr) {
+        console.warn("reminder_sent_at update failed:", stampErr.message);
+      }
+      return jsonResponse({ ok: true, booking_id, mode: "reminder" });
     }
 
     // ── RESCHEDULED PATH (admin moved date/time) ──────────────────────────

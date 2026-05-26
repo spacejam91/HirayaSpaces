@@ -16,4 +16,16 @@
 <url><loc>https://hirayaspaces.ca/cleaning-cambridge</loc><priority>0.9</priority></url>
 <url><loc>https://hirayaspaces.ca/cleaning-guelph</loc><priority>0.8</priority></url>
 
+<!-- Region × service long-tail pages -->
+<url><loc>https://hirayaspaces.ca/regular-cleaning-waterloo</loc><priority>0.85</priority></url>
+<url><loc>https://hirayaspaces.ca/regular-cleaning-kitchener</loc><priority>0.85</priority></url>
+<url><loc>https://hirayaspaces.ca/deep-cleaning-waterloo</loc><priority>0.85</priority></url>
+<url><loc>https://hirayaspaces.ca/deep-cleaning-kitchener</loc><priority>0.85</priority></url>
+<url><loc>https://hirayaspaces.ca/move-out-cleaning-waterloo</loc><priority>0.85</priority></url>
+<url><loc>https://hirayaspaces.ca/move-out-cleaning-kitchener</loc><priority>0.85</priority></url>
+<url><loc>https://hirayaspaces.ca/carpet-cleaning-waterloo</loc><priority>0.8</priority></url>
+<url><loc>https://hirayaspaces.ca/carpet-cleaning-kitchener</loc><priority>0.8</priority></url>
+<url><loc>https://hirayaspaces.ca/airbnb-cleaning-waterloo</loc><priority>0.8</priority></url>
+<url><loc>https://hirayaspaces.ca/post-renovation-cleaning-waterloo</loc><priority>0.8</priority></url>
+
 </urlset>
