@@ -23,6 +23,8 @@
     pets:               'pet-hair-removal',
     walls:              'wall-spot-cleaning',
     basement:           'basement-cleaning',
+    cupboards:          'inside-cupboards',
+    balcony:            'balcony-tidy',
     eco:                'eco-friendly'
   };
 
