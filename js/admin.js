@@ -2817,8 +2817,11 @@ Hiraya Spaces`
       });
     }
 
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    } catch (e) {
+      console.warn('openBookingDetail failed:', e);
+    }
   }
 
   function closeBookingDetail() {
