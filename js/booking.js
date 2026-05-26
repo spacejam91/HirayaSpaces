@@ -490,12 +490,12 @@
         + addonRows.reduce((s, a) => s + (a.price_cents || 0), 0)
       );
 
-      // 5. Insert booking row
-      const notesParts = [];
-      notesParts.push(`Name: ${f.customer_name}`);
-      notesParts.push(`Phone: ${f.customer_phone}`);
-      if (!addressId) notesParts.push(`Address: ${f.customer_address}`);
-      const customerNotes = notesParts.join(' · ');
+      // 5. Insert booking row.
+      // customer_notes is reserved for actual notes the customer types in
+      // the booking flow. Until that input exists, leave it null — the
+      // cleaner sees name/phone/address via the joined customer + address
+      // columns on the admin dashboard.
+      const customerNotes = (f.customer_notes && f.customer_notes.trim()) || null;
 
       const status = svcRow.requires_quote ? 'awaiting_quote' : 'pending_review';
 
