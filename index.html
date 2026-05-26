@@ -114,7 +114,8 @@
     display: none;
     width: 36px; height: 36px;
     background: none; border: none; cursor: pointer;
-    padding: 0; margin-left: auto;
+    padding: 0; margin-left: 8px;
+    order: 99;
     flex-direction: column; justify-content: center;
     align-items: center; gap: 5px;
   }
@@ -1239,7 +1240,7 @@
     <!-- Mobile-only tap-to-call icon. Hidden on desktop where the phone
          number lives in the nav text. -->
     <a href="tel:+12267514566" class="nav-call-icon" aria-label="Call Hiraya Spaces">📞</a>
-    <button class="nav-cta-book" id="nav-login-btn" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book now</button>
+    <button class="nav-cta-book" id="nav-login-btn" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Book now</button>
     <!-- Logged-in user menu — only shows after a customer signs in. The
          pre-login Log in / Sign up buttons were removed; customers hit
          "Book now" and the booking flow prompts auth when needed. -->
