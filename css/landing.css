@@ -138,6 +138,54 @@ body {
   .lnd-included { grid-template-columns: 1fr; }
 }
 
+/* ── SERVICE CARDS (city landing pages) ── */
+.lnd-svc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 640px) {
+  .lnd-svc-grid { grid-template-columns: 1fr; }
+}
+.lnd-svc-card {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  padding: 1.5rem;
+  transition: border-color .2s, transform .2s, box-shadow .2s;
+  display: flex; flex-direction: column;
+}
+.lnd-svc-card:hover {
+  border-color: var(--sage);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(30, 77, 43, 0.06);
+}
+.lnd-svc-icon {
+  font-size: 28px; line-height: 1;
+  margin-bottom: 0.75rem;
+}
+.lnd-svc-card h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px; font-weight: 500;
+  margin: 0 0 4px;
+}
+.lnd-svc-price {
+  color: var(--sage); font-weight: 600;
+  font-size: 14px; margin-bottom: 0.5rem;
+}
+.lnd-svc-desc {
+  font-size: 13px; color: var(--muted);
+  line-height: 1.6; margin: 0 0 0.75rem; flex: 1;
+}
+.lnd-svc-link {
+  display: inline-block;
+  font-size: 12px; color: var(--sage);
+  font-weight: 600; text-decoration: none;
+  letter-spacing: 0.3px;
+}
+.lnd-svc-link:hover { text-decoration: underline; }
+
 /* ── PRICE STRIP ── */
 .lnd-prices {
   background: var(--warm); border-radius: 18px;
