@@ -395,11 +395,11 @@
   }
   .section-break-line {
     flex: 1; max-width: 160px; height: 1px;
-    background: linear-gradient(to right, transparent, var(--sage-mid), transparent);
-    opacity: 0.7;
+    background: var(--sage-mid);
+    opacity: 0.5;
   }
   .section-break-mark {
-    color: var(--sage-mid); font-size: 16px; line-height: 1;
+    color: var(--sage-mid); font-size: 14px; line-height: 1;
   }
   .section-label {
     display: inline-block; font-size: 11px; font-weight: 600;
@@ -543,10 +543,10 @@
   .flex-divider {
     display: flex; align-items: center; gap: 1rem;
     margin: 0 auto 2.5rem; max-width: 540px;
-    color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--sage-mid); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
   }
   .flex-divider::before, .flex-divider::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
+    content: ''; flex: 1; height: 1px; background: var(--sage-mid); opacity: 0.5;
   }
   .flex-card {
     max-width: 920px; margin: 0 auto;
