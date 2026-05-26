@@ -730,15 +730,18 @@
     if (!sb()) return;
 
     // Initial login state — drives the save-checkbox visibility.
+    // .catch swallows the harmless "AuthSessionMissingError" that
+    // supabase-js logs for every anonymous visitor on page load.
     sb().auth.getUser().then(function (res) {
       isLoggedIn = !!(res && res.data && res.data.user);
-      // Trigger an initial fetch so the picker populates on page load
-      // (account.js's auth listener only fires on state changes).
       if (isLoggedIn && window.HirayaAccount) {
         window.HirayaAccount.fetchAddresses();
       } else {
         refreshSavedAddressPicker([]);
       }
+    }).catch(function () {
+      isLoggedIn = false;
+      refreshSavedAddressPicker([]);
     });
 
     sb().auth.onAuthStateChange(function (event) {

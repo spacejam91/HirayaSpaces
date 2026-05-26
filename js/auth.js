@@ -520,7 +520,13 @@
       return;
     }
 
-    const { data: { user } } = await sb().auth.getUser();
+    // Wrap in try/catch — getUser() noisily logs "AuthSessionMissingError"
+    // to the console for every anonymous visitor, which clutters logs.
+    let user = null;
+    try {
+      const { data } = await sb().auth.getUser();
+      user = data?.user || null;
+    } catch (_) { /* anon visitor or expired token — silent. */ }
     if (user) {
       setNavLoggedIn(user);
       prefillBookingForm(user);

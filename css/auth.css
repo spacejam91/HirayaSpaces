@@ -479,6 +479,11 @@
   color: var(--muted);
   line-height: 1.6;
 }
+.booking-card-body > div {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.booking-card-body > div:last-child { border-bottom: 0; }
 .booking-card-body strong { color: var(--text); font-weight: 600; }
 .booking-card-actions {
   display: flex;

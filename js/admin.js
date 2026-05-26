@@ -497,7 +497,13 @@
     if (activePanel === 'customers') renderCustomers();
 
     const filter = ($('all-status-filter')?.value || '').trim();
-    const rows = filter ? allBookings.filter(b => b.status === filter) : allBookings;
+    const sortDir = ($('all-sort')?.value || 'newest');
+    const filtered = filter ? allBookings.filter(b => b.status === filter) : allBookings.slice();
+    const rows = filtered.sort((a, b) => {
+      const da = new Date(a.preferred_date || a.created_at || 0).getTime();
+      const db = new Date(b.preferred_date || b.created_at || 0).getTime();
+      return sortDir === 'oldest' ? da - db : db - da;
+    });
 
     if (!rows.length) {
       list.innerHTML = '';

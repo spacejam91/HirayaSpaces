@@ -312,8 +312,11 @@
       font-size: 14px; line-height: 1.85;
     }
     .booking-grid > .booking-card .booking-card-body > div {
-      margin-bottom: 4px;
+      padding: 10px 0;
+      margin-bottom: 0;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     }
+    .booking-grid > .booking-card .booking-card-body > div:last-child { border-bottom: 0; }
     .booking-grid > .booking-card .booking-card-actions {
       margin-top: 0; padding-top: 0; border-top: none;
       flex-direction: column; align-items: stretch;
@@ -919,6 +922,10 @@
               <option value="confirmed">Confirmed</option>
               <option value="in_progress">In progress</option>
               <option value="completed">Completed</option>
+            </select>
+            <select id="all-sort" onchange="HirayaAdmin.renderAll()">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
             </select>
             <button class="panel-refresh" onclick="HirayaAdmin.exportBookingsCsv()">⬇ Export CSV</button>
             <button class="panel-refresh" onclick="HirayaAdmin.refreshAll()">↻ Refresh</button>

@@ -87,6 +87,27 @@
   .nav-links a { font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; letter-spacing: 0.3px; transition: color .2s; }
   .nav-links a:hover { color: var(--text); }
 
+  /* Single primary CTA replacing the old Log in / Sign up duo. */
+  .nav-cta-book {
+    background: var(--sage); color: white; border: none;
+    padding: 10px 22px; border-radius: 999px;
+    font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.3px; cursor: pointer; text-decoration: none;
+    transition: background .15s, transform .08s;
+  }
+  .nav-cta-book:hover { background: #0f2e18; }
+  .nav-cta-book:active { transform: scale(.97); }
+
+  /* Mobile-only tap-to-call icon. */
+  .nav-call-icon {
+    display: none;
+    width: 40px; height: 40px;
+    align-items: center; justify-content: center;
+    font-size: 20px; text-decoration: none;
+    border-radius: 50%; background: var(--sage-light);
+  }
+  .nav-call-icon:active { background: var(--sage-mid); }
+
   /* Hamburger button (hidden on desktop, shown on mobile). Three thin sage
      bars that morph into an X when active. */
   .nav-hamburger {
@@ -553,7 +574,9 @@
 
   /* ── SERVICES ── */
   #services { background: white; }
-  .services-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3rem; flex-wrap: wrap; gap: 1rem; }
+  .services-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 3rem; gap: 1rem; }
+  .services-header > div { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .services-header .section-sub { max-width: 560px !important; margin: 0 auto; }
   .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
   .svc-card {
     border: 1.5px solid var(--border); border-radius: 20px;
@@ -951,7 +974,7 @@
   .review-stars { color: #f5a623; font-size: 15px; margin-bottom: 1rem; }
   .review-quote { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; line-height: 1.5; color: var(--text); margin-bottom: 1.5rem; font-style: italic; }
   .review-author { display: flex; align-items: center; gap: 12px; padding-top: 1rem; border-top: 1px solid var(--border); }
-  .author-av { width: 42px; height: 42px; border-radius: 50%; background: var(--warm); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .author-av { width: 42px; height: 42px; border-radius: 50%; background: var(--sage); color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; letter-spacing: 0.02em; font-family: 'Cormorant Garamond', serif; }
   .author-name { font-size: 14px; font-weight: 600; }
   .author-type { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
@@ -1089,6 +1112,9 @@
     .stats-strip { grid-template-columns: repeat(2, 1fr); }
     .nav-links { display: none; }
     .nav-hamburger { display: flex; }
+    .nav-call-icon { display: inline-flex; }
+    .nav-phone { display: none; }
+    .nav-cta-book { padding: 8px 16px; font-size: 12px; }
     .booking-left { padding: 2rem; }
     .booking-right { padding: 2rem; }
     nav { height: auto; padding: 10px 4vw; }
@@ -1208,9 +1234,13 @@
     <span></span><span></span><span></span>
   </button>
   <div style="display:flex;gap:10px;align-items:center">
-    <a class="nav-admin" id="nav-admin-link" href="/admin">Admin</a>
-    <button class="nav-login" id="nav-login-btn" onclick="HirayaAuth.openAuthModal('login')">Log in</button>
-    <button class="nav-login" id="nav-signup-btn" onclick="HirayaAuth.openAuthModal('signup')" style="display:none">Sign up</button>
+    <!-- Mobile-only tap-to-call icon. Hidden on desktop where the phone
+         number lives in the nav text. -->
+    <a href="tel:+12267514566" class="nav-call-icon" aria-label="Call Hiraya Spaces">📞</a>
+    <button class="nav-cta-book" id="nav-login-btn" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book now</button>
+    <!-- Logged-in user menu — only shows after a customer signs in. The
+         pre-login Log in / Sign up buttons were removed; customers hit
+         "Book now" and the booking flow prompts auth when needed. -->
     <div class="nav-user-wrap" id="nav-user-wrap">
       <button type="button" class="nav-user-trigger" id="nav-user-trigger"
               onclick="HirayaAuth.toggleUserMenu()" aria-haspopup="true" aria-expanded="false">
@@ -1225,8 +1255,6 @@
         <a role="menuitem" class="nav-user-menu-item" id="nav-user-menu-admin"
                 style="display:none;text-decoration:none"
                 href="/admin">Admin dashboard</a>
-        <button type="button" role="menuitem" class="nav-user-menu-item"
-                onclick="HirayaAuth.switchAccount()">Sign in as someone else</button>
         <button type="button" role="menuitem" class="nav-user-menu-item"
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
       </div>
@@ -1262,7 +1290,7 @@
 <!-- HERO -->
 <div class="hero" id="hero">
   <div class="hero-left">
-    <span class="hero-eyebrow fade-up">Trusted by 100+ families in the Waterloo Region</span>
+    <span class="hero-eyebrow fade-up">Same cleaner. Every visit.</span>
     <h1 class="hero-h1 fade-up" style="transition-delay:.1s">A space that<br>feels <em>truly</em> clean.</h1>
     <p class="hero-body fade-up" style="transition-delay:.2s">Turning homes into dream spaces. Professional residential cleaning tailored to your schedule — satisfaction guaranteed on every visit. Serving homeowners across Waterloo, Kitchener, and Cambridge with premium residential cleaning services.</p>
     <div class="hero-actions fade-up" style="transition-delay:.3s">
@@ -1273,7 +1301,7 @@
       <div class="trust-avatars">
         <div class="av">😊</div><div class="av">🙂</div><div class="av">😄</div><div class="av">😁</div>
       </div>
-      <div class="trust-text"><strong>100+ families</strong> in the Waterloo Region<br>have trusted us with their spaces</div>
+      <div class="trust-text"><strong>Background-checked cleaners</strong><br>vetted before they enter your home</div>
     </div>
   </div>
   <div class="hero-right">
@@ -1326,7 +1354,7 @@
 <section id="how">
   <div style="text-align:center">
     <span class="section-label fade-up">Simple process</span>
-    <h2 class="section-h2 fade-up" style="transition-delay:.1s;margin:0 auto">How it <em>works</em></h2>
+    <h2 class="section-h2 fade-up" style="transition-delay:.1s;margin:0 auto">How it works</h2>
   </div>
   <div class="steps-layout">
     <div class="step fade-up" style="transition-delay:.1s">
@@ -1362,9 +1390,9 @@
   <div class="services-header">
     <div>
       <span class="section-label fade-up"><span class="step-badge">1</span>What we offer</span>
-      <h2 class="section-h2 fade-up" style="transition-delay:.1s">Choose your <em>service</em></h2>
+      <h2 class="section-h2 fade-up" style="transition-delay:.1s">Choose your service</h2>
     </div>
-    <p class="section-sub fade-up" style="transition-delay:.15s;max-width:320px">Select the service that best fits your space. All prices start from the rates shown — final pricing based on home size & condition.</p>
+    <p class="section-sub fade-up" style="transition-delay:.15s;font-weight:300;font-size:14px;color:var(--muted);letter-spacing:0.01em;line-height:1.7">Select the service that best fits your space.<br><span style="font-size:13px;opacity:0.85">All prices in <strong style="font-weight:500">CAD</strong> — final pricing based on home size & condition.</span></p>
   </div>
   <div class="services-grid" id="svc-grid"></div>
   <div id="tier-picker" style="display:none"></div>
@@ -1405,7 +1433,7 @@
 <section id="addons">
   <div style="text-align:center;max-width:680px;margin:0 auto 2.5rem">
     <span class="section-label fade-up"><span class="step-badge">2</span>Extras</span>
-    <h2 class="section-h2 fade-up" style="transition-delay:.1s">Make it <em>perfect</em></h2>
+    <h2 class="section-h2 fade-up" style="transition-delay:.1s">Make it perfect</h2>
     <p class="section-sub fade-up" style="transition-delay:.2s;margin:0 auto">Customize your booking with add-on services. Mix and match to get exactly what your space needs.</p>
   </div>
   <div class="addons-grid" id="addon-grid"></div>
@@ -1416,7 +1444,7 @@
 <section id="booking" style="background:var(--warm)">
   <div style="text-align:center;margin-bottom:3.5rem">
     <span class="section-label fade-up"><span class="step-badge">3</span>Reserve your spot</span>
-    <h2 class="section-h2 fade-up" style="transition-delay:.1s;margin:0 auto">Book your <em>space</em></h2>
+    <h2 class="section-h2 fade-up" style="transition-delay:.1s;margin:0 auto">Book your space</h2>
     <p class="section-sub fade-up" style="transition-delay:.2s;margin:0.75rem auto 0;text-align:center">Takes less than 2 minutes. Cancellations not accepted within 24 hours of the booking.</p>
   </div>
   <div class="booking-wrapper">
@@ -1508,11 +1536,12 @@
   </div>
 </section>
 
-<!-- BEFORE / AFTER GALLERY -->
-<section id="gallery" style="background:white">
+<!-- BEFORE / AFTER GALLERY — hidden until real photos are ready. Set
+     style="display:block" or remove this comment block to bring it back. -->
+<section id="gallery" style="background:white;display:none">
   <div style="text-align:center;max-width:680px;margin:0 auto 2.5rem">
     <span class="section-label fade-up">Our work</span>
-    <h2 class="section-h2 fade-up" style="transition-delay:.1s">Before & <em>after</em></h2>
+    <h2 class="section-h2 fade-up" style="transition-delay:.1s">Before & after</h2>
     <p class="section-sub fade-up" style="transition-delay:.15s;margin:0 auto">Real homes from real clients across Waterloo Region. Drag the slider on each photo to reveal the after.</p>
   </div>
 
@@ -1584,7 +1613,7 @@
   <div class="reviews-header">
     <div>
       <span class="section-label fade-up">Client stories</span>
-      <h2 class="section-h2 fade-up" style="transition-delay:.1s">What they <em>say</em></h2>
+      <h2 class="section-h2 fade-up" style="transition-delay:.1s">What they say</h2>
     </div>
     <p class="section-sub fade-up" style="transition-delay:.15s;max-width:300px">Don't take our word for it — here's what our clients say.</p>
   </div>
@@ -1597,7 +1626,7 @@
   <div class="contact-layout">
     <div>
       <span class="section-label fade-up">Get in touch</span>
-      <h2 class="section-h2 fade-up" style="transition-delay:.1s">Have a <em>question?</em></h2>
+      <h2 class="section-h2 fade-up" style="transition-delay:.1s">Have a question?</h2>
       <p class="section-sub fade-up" style="transition-delay:.2s;margin-bottom:2.5rem">We're happy to help before you book. Proudly serving Waterloo, Kitchener, and Cambridge — reach out by phone or email and we'll get back to you quickly.</p>
       <div class="contact-card fade-up" style="transition-delay:.3s">
         <div class="contact-card-icon sage">📞</div>
@@ -1632,7 +1661,7 @@
 <!-- CTA BANNER -->
 <div class="cta-banner">
   <h2>Ready for a <em>spotless</em> space?</h2>
-  <p>Book today and see why 100+ families in the Waterloo Region trust us every month.</p>
+  <p>100% satisfaction guarantee — if it's not right, we come back within 24 hours and fix it. On us.</p>
   <button class="btn-white" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Book your clean →</button>
 </div>
 
@@ -1827,9 +1856,9 @@ const SERVICES = [
 const ADDONS = [
   {id:'oven',icon:'🍳',name:'Inside Oven / Stove',price:'+$35 each',addonPrice:35,qty:{max:3,unitLabel:'unit'},desc:'Deep clean inside the oven and stovetop. Pick how many units (e.g. wall oven + range).'},
   {id:'fridge',icon:'❄️',name:'Inside Fridge',price:'+$35 each',addonPrice:35,qty:{max:3,unitLabel:'fridge'},desc:'Full clean inside your refrigerator. Pick how many.'},
-  {id:'windows-small',icon:'🪟',name:'Small Windows',price:'+$8 each',addonPrice:8,qty:{max:30,unitLabel:'window'},desc:'Bathroom, basement, or small bedroom windows. Wiped streak-free.'},
+  {id:'windows-small',icon:'🔳',name:'Small Windows',price:'+$8 each',addonPrice:8,qty:{max:30,unitLabel:'window'},desc:'Bathroom, basement, or small bedroom windows. Wiped streak-free.'},
   {id:'windows-standard',icon:'🪟',name:'Standard Windows',price:'+$12 each',addonPrice:12,qty:{max:30,unitLabel:'window'},desc:'Living room, bedroom, kitchen-sized windows. Inside cleaned.'},
-  {id:'windows-large',icon:'🪟',name:'Large / Bay Windows',price:'+$20 each',addonPrice:20,qty:{max:15,unitLabel:'window'},desc:'Picture windows, sliding doors, bay or floor-to-ceiling glass.'},
+  {id:'windows-large',icon:'🌅',name:'Large / Bay Windows',price:'+$20 each',addonPrice:20,qty:{max:15,unitLabel:'window'},desc:'Picture windows, sliding doors, bay or floor-to-ceiling glass.'},
   {id:'laundry',icon:'🧺',name:'Laundry Folding',price:'+$25 / load',addonPrice:25,qty:{max:5,unitLabel:'load'},desc:'Wash, dry & fold per load.'},
   {id:'pets',icon:'🐾',name:'Pet Hair Removal',price:'+$25',addonPrice:25,desc:'Extra attention to fur on all surfaces'},
   {id:'walls',icon:'🧽',name:'Wall Spot Cleaning',price:'From $30',addonPrice:30,desc:'Spot clean marks & scuffs on walls. Final price depends on wall condition & chemicals required.'},
@@ -1839,9 +1868,9 @@ const ADDONS = [
   {id:'eco',icon:'🌿',name:'Eco Products',price:'+$10',addonPrice:10,desc:'All-natural, fragrance-free supplies'},
 ];
 const REVIEWS = [
-  {quote:'Been using Hiraya Spaces for weekly cleanings and she\'s fantastic. Always on time, thorough, and my one bedroom looks brand new after every visit. Communication is easy and she\'s upfront about pricing. Would definitely recommend to anyone in the area!',name:'Aaron',type:'Weekly cleaning',av:'😊'},
-  {quote:'She did an amazing job cleaning, pays attention to details. Highly recommend her.',name:'Dejan',type:'General cleaning',av:'🙂'},
-  {quote:'She did a wonderful job cleaning my home and was a pleasure to work with — very kind, professional, and thorough.',name:'Sarah',type:'Home clean',av:'😄'},
+  {quote:'Been using Hiraya Spaces for weekly cleanings and she\'s fantastic. Always on time, thorough, and my one bedroom looks brand new after every visit. Communication is easy and she\'s upfront about pricing. Would definitely recommend to anyone in the area!',name:'Aaron',type:'Weekly cleaning',av:'A'},
+  {quote:'She did an amazing job cleaning, pays attention to details. Highly recommend her.',name:'Dejan',type:'General cleaning',av:'D'},
+  {quote:'She did a wonderful job cleaning my home and was a pleasure to work with — very kind, professional, and thorough.',name:'Sarah',type:'Home clean',av:'S'},
 ];
 const TIMES = ['8:00 am','9:30 am','11:00 am','1:00 pm','2:30 pm','4:00 pm'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
