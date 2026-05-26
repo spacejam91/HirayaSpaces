@@ -1061,7 +1061,6 @@
                 onclick="HirayaAuth.doLogout(); HirayaAuth.closeUserMenu()">Log out</button>
       </div>
     </div>
-    <button class="nav-cta" id="nav-cta-book" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Book now</button>
     <a href="tel:+12267514566" class="nav-phone" style="font-size:13px;color:var(--muted);text-decoration:none;font-weight:500">(226) 751-4566</a>
   </div>
 </nav>
@@ -1189,7 +1188,7 @@
       <span class="flex-icon">⏱</span>
       <div>
         <h3>Flexible Cleaning</h3>
-        <p>Need help with something in between? Book a single cleaner by the hour — focus on whatever matters most to you. <strong>Starts at $200 for a 3-hour visit.</strong></p>
+        <p>Need help with something in between? Book a single cleaner by the hour — focus on whatever matters most to you. <strong>$45/hour. 3-hour minimum to book.</strong></p>
       </div>
     </div>
     <div class="flex-body">
@@ -1330,49 +1329,92 @@
   </div>
 
   <div class="ba-grid">
-    <!-- 4 placeholder pairs. Swap each set of two images for real ones when ready. -->
-    <figure class="ba-card fade-up" style="transition-delay:.1s" data-room="Kitchen">
+    <figure class="ba-card fade-up" style="transition-delay:.1s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
-        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/1-marble-bathroom-after.png" alt="Marble bathroom after Hiraya cleaning">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/1-marble-bathroom-before.png" alt="Marble bathroom before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Kitchen — Deep Clean</figcaption>
+      <figcaption class="ba-caption">Marble bathroom — Deep clean</figcaption>
     </figure>
 
-    <figure class="ba-card fade-up" style="transition-delay:.15s" data-room="Bathroom">
+    <figure class="ba-card fade-up" style="transition-delay:.15s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
-        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/2-glass-tub-after.png" alt="Glass shower enclosure after cleaning">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/2-glass-tub-before.png" alt="Glass shower enclosure before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Bathroom — Move-Out Clean</figcaption>
+      <figcaption class="ba-caption">Glass shower — Calcium descale</figcaption>
     </figure>
 
-    <figure class="ba-card fade-up" style="transition-delay:.2s" data-room="Carpet">
+    <figure class="ba-card fade-up" style="transition-delay:.2s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
-        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/3-shower-base-after.png" alt="Shower base after deep clean">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/3-shower-base-before.png" alt="Shower base with mould before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Living Room — Carpet Clean</figcaption>
+      <figcaption class="ba-caption">Shower base — Mould removal</figcaption>
     </figure>
 
-    <figure class="ba-card fade-up" style="transition-delay:.25s" data-room="Living">
+    <figure class="ba-card fade-up" style="transition-delay:.25s">
       <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
-        <img class="ba-img ba-after"  src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23e4f0e9'/%3E%3Ctext x='50%25' y='50%25' fill='%231e4d2b' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EAfter%3C/text%3E%3C/svg%3E" alt="After cleaning">
-        <img class="ba-img ba-before" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23d5cdbe'/%3E%3Ctext x='50%25' y='50%25' fill='%235c4d33' font-family='Georgia' font-size='42' text-anchor='middle' dominant-baseline='middle'%3EBefore%3C/text%3E%3C/svg%3E" alt="Before cleaning">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/4-small-bath-after.jpg" alt="Small bathroom after cleaning">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/4-small-bath-before.jpg" alt="Small bathroom before cleaning">
         <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
         <span class="ba-tag ba-tag-before">Before</span>
         <span class="ba-tag ba-tag-after">After</span>
       </div>
-      <figcaption class="ba-caption">Upholstery — Sectional</figcaption>
+      <figcaption class="ba-caption">Compact bath — Regular clean</figcaption>
+    </figure>
+
+    <figure class="ba-card fade-up" style="transition-delay:.3s">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/5-modern-bath-after.png" alt="Modern bathroom after cleaning">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/5-modern-bath-before.jpg" alt="Modern bathroom before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Modern marble bath — Full reset</figcaption>
+    </figure>
+
+    <figure class="ba-card fade-up" style="transition-delay:.35s">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/6-dark-counter-after.jpg" alt="Dark vanity counter after cleaning">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/6-dark-counter-before.jpg" alt="Dark vanity counter before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Quartz vanity — Detail clean</figcaption>
+    </figure>
+
+    <figure class="ba-card fade-up" style="transition-delay:.4s">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/7-grey-tile-shower-after.png" alt="Grey tile shower after cleaning">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/7-grey-tile-shower-before.jpg" alt="Grey tile shower before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Walk-in shower — Move-out clean</figcaption>
+    </figure>
+
+    <figure class="ba-card fade-up" style="transition-delay:.45s">
+      <div class="ba-slider" onpointerdown="baStart(event)" onpointermove="baMove(event)" onpointerup="baEnd(event)" onpointercancel="baEnd(event)">
+        <img class="ba-img ba-after"  loading="lazy" src="/photos/before-after/8-bathtub-bathroom-after.jpg" alt="Bathtub bathroom after cleaning">
+        <img class="ba-img ba-before" loading="lazy" src="/photos/before-after/8-bathtub-bathroom-before.jpg" alt="Bathtub bathroom before cleaning">
+        <div class="ba-handle" aria-hidden="true"><div class="ba-handle-bar"></div></div>
+        <span class="ba-tag ba-tag-before">Before</span>
+        <span class="ba-tag ba-tag-after">After</span>
+      </div>
+      <figcaption class="ba-caption">Family bath with tub — Deep clean</figcaption>
     </figure>
   </div>
 
@@ -1486,22 +1528,8 @@ function baEnd(e) {
   baActive = null;
 }
 
-// Hide the nav "Book now" CTA once the user scrolls past the hero. The hero
-// already has its own big CTAs; once you're into How it works, Services, or
-// the booking form, the nav button is redundant and (worse) bounced people
-// back to the top mid-flow. Reappears if the user scrolls back to the hero.
-(function hideNavCtaPastHero() {
-  const cta = document.getElementById('nav-cta-book');
-  const hero = document.getElementById('hero');
-  if (!cta || !hero || !('IntersectionObserver' in window)) return;
-  const io = new IntersectionObserver(function (entries) {
-    for (const entry of entries) {
-      // Hero in view → show. Hero out of view → hide.
-      cta.style.display = entry.isIntersecting ? '' : 'none';
-    }
-  }, { threshold: 0.05 });
-  io.observe(hero);
-})();
+// (Nav "Book now" CTA removed — the hero has its own Book a Clean button
+// and Jewel asked for the duplicate to be cleared from the top nav.)
 
 const SERVICES = [
   {id:'standard',icon:'🧹',name:'Regular Residential Cleaning',price:'From $120',
@@ -1580,7 +1608,9 @@ const SERVICES = [
 const ADDONS = [
   {id:'oven',icon:'🍳',name:'Inside Oven',price:'+$35',addonPrice:35,desc:'Deep clean inside your oven'},
   {id:'fridge',icon:'❄️',name:'Inside Fridge',price:'+$35 each',addonPrice:35,qty:{max:3,unitLabel:'fridge'},desc:'Full clean inside your refrigerator. Pick how many.'},
-  {id:'windows',icon:'🪟',name:'Interior Windows',price:'+$10 each',addonPrice:10,qty:{max:30,unitLabel:'window'},desc:'Interior windows wiped streak-free. Tell us how many.'},
+  {id:'windows-small',icon:'🪟',name:'Small Windows',price:'+$8 each',addonPrice:8,qty:{max:30,unitLabel:'window'},desc:'Bathroom, basement, or small bedroom windows. Wiped streak-free.'},
+  {id:'windows-standard',icon:'🪟',name:'Standard Windows',price:'+$12 each',addonPrice:12,qty:{max:30,unitLabel:'window'},desc:'Living room, bedroom, kitchen-sized windows. Inside cleaned.'},
+  {id:'windows-large',icon:'🪟',name:'Large / Bay Windows',price:'+$20 each',addonPrice:20,qty:{max:15,unitLabel:'window'},desc:'Picture windows, sliding doors, bay or floor-to-ceiling glass.'},
   {id:'laundry',icon:'🧺',name:'Laundry Folding',price:'+$25 / load',addonPrice:25,qty:{max:5,unitLabel:'load'},desc:'Wash, dry & fold per load.'},
   {id:'pets',icon:'🐾',name:'Pet Hair Removal',price:'+$25',addonPrice:25,desc:'Extra attention to fur on all surfaces'},
   {id:'walls',icon:'🧽',name:'Wall Spot Cleaning',price:'From $30',addonPrice:30,desc:'Spot clean marks & scuffs on walls. Final price depends on wall condition & chemicals required.'},
@@ -1645,11 +1675,11 @@ const HOURLY_MAX = 8;
 let selHours = HOURLY_MIN;
 let selHourly = false;
 
+// Straight $45/hr. Minimum 3 hours to book (enforced by the HOURLY_MIN
+// stepper bound). 3hr=$135, 4hr=$180, 5hr=$225, 6hr=$270, 7hr=$315, 8hr=$360.
 function synthesizeHourlyTier(hours) {
   return {
     slug: 'hourly-flexible',
-    // Just the duration — booking.js composes the full service_name as
-    // "Flexible Cleaning — N hours" via the parent svc.name + tier.name.
     name: `${hours} hours`,
     basePrice: hours * HOURLY_RATE,
     durationMin: hours * 60,
@@ -1721,15 +1751,9 @@ function renderHourlyState() {
   const btn = document.getElementById('flex-pick-btn');
   if (!card) return;
   if (hoursEl) hoursEl.textContent = selHours;
-  const raw = selHours * HOURLY_RATE;
-  const floor = computeHourlyFloor(selHours);
-  const total = Math.max(raw, floor);
+  const total = selHours * HOURLY_RATE;
   if (totalEl) totalEl.textContent = '$' + total;
-  if (mathEl) {
-    mathEl.textContent = total > raw
-      ? `${selHours} hr · package minimum`
-      : `${selHours} × $${HOURLY_RATE}/hr`;
-  }
+  if (mathEl) mathEl.textContent = `${selHours} × $${HOURLY_RATE}/hr`;
   card.classList.toggle('selected', selHourly);
   if (btn) btn.textContent = selHourly ? '✓ Selected — tap to change' : 'Choose Flexible';
   // Disable +/- at the bounds so the customer doesn't smash a no-op button.
