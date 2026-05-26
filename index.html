@@ -675,6 +675,27 @@
   .addon-card.selected .addon-check { display: flex; }
   .addon-check { background: var(--sage) !important; }
   .addon-card.selected .addon-price-tag { display: none; }
+  /* Per-addon quantity stepper (windows, fridge, laundry). Hidden until the
+     card is selected so it doesn't compete with the price tag. */
+  .addon-qty {
+    display: none; align-items: center; gap: 8px;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid rgba(30,77,43,0.18);
+  }
+  .addon-card.selected .addon-qty { display: flex; }
+  .addon-qty-btn {
+    width: 28px; height: 28px; border: 1.5px solid var(--sage);
+    background: white; color: var(--sage); border-radius: 50%;
+    font-size: 16px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Jost', sans-serif; flex-shrink: 0;
+  }
+  .addon-qty-btn:hover { background: var(--sage); color: white; }
+  .addon-qty-value {
+    font-family: 'Cormorant Garamond', serif; font-size: 20px;
+    font-weight: 500; min-width: 22px; text-align: center;
+  }
+  .addon-qty-unit { font-size: 12px; color: var(--muted); flex: 1; }
 
   /* ── BOOKING ── */
   #booking { background: white; }
@@ -1553,15 +1574,18 @@ const SERVICES = [
      {slug:'post-renovation', name:'Post-renovation clean', basePrice:null, durationMin:null, quoteOnly:true},
    ]},
 ];
+// Addons. `qty` makes the card render a 1-N stepper and multiplies the
+// price by the selected quantity. `unitLabel` is the singular noun shown
+// next to the number ("fridge", "load", "window").
 const ADDONS = [
   {id:'oven',icon:'🍳',name:'Inside Oven',price:'+$35',addonPrice:35,desc:'Deep clean inside your oven'},
-  {id:'fridge',icon:'❄️',name:'Inside Fridge',price:'+$35',addonPrice:35,desc:'Full clean inside your refrigerator'},
-  {id:'windows',icon:'🪟',name:'Interior Windows',price:'+$5–10 each',addonPrice:10,desc:'Interior windows wiped streak-free'},
-  {id:'laundry',icon:'🧺',name:'Laundry Folding',price:'+$25',addonPrice:25,desc:'Wash, dry & fold one load'},
+  {id:'fridge',icon:'❄️',name:'Inside Fridge',price:'+$35 each',addonPrice:35,qty:{max:3,unitLabel:'fridge'},desc:'Full clean inside your refrigerator. Pick how many.'},
+  {id:'windows',icon:'🪟',name:'Interior Windows',price:'+$10 each',addonPrice:10,qty:{max:30,unitLabel:'window'},desc:'Interior windows wiped streak-free. Tell us how many.'},
+  {id:'laundry',icon:'🧺',name:'Laundry Folding',price:'+$25 / load',addonPrice:25,qty:{max:5,unitLabel:'load'},desc:'Wash, dry & fold per load.'},
   {id:'pets',icon:'🐾',name:'Pet Hair Removal',price:'+$25',addonPrice:25,desc:'Extra attention to fur on all surfaces'},
-  {id:'walls',icon:'🧽',name:'Wall Spot Cleaning',price:'+$30',addonPrice:30,desc:'Spot clean marks & scuffs on walls'},
+  {id:'walls',icon:'🧽',name:'Wall Spot Cleaning',price:'From $30',addonPrice:30,desc:'Spot clean marks & scuffs on walls. Final price depends on wall condition & chemicals required.'},
   {id:'basement',icon:'🏚️',name:'Basement Cleaning',price:'From $50',addonPrice:50,desc:'Full basement clean included'},
-  {id:'eco',icon:'🌿',name:'Eco Products',price:'On request',addonPrice:0,desc:'All-natural, fragrance-free supplies'},
+  {id:'eco',icon:'🌿',name:'Eco Products',price:'+$10',addonPrice:10,desc:'All-natural, fragrance-free supplies'},
 ];
 const REVIEWS = [
   {quote:'Been using Hiraya Spaces for weekly cleanings and she\'s fantastic. Always on time, thorough, and my one bedroom looks brand new after every visit. Communication is easy and she\'s upfront about pricing. Would definitely recommend to anyone in the area!',name:'Aaron',type:'Weekly cleaning',av:'😊'},
@@ -1615,41 +1639,26 @@ function getSelectedServiceLines() {
 // fiddling with the stepper doesn't silently override a tier they already
 // picked). When selHourly is true, selSvc='hourly' and selTier is synthesized
 // from the hour count so the existing review/submit pipeline keeps working.
-const HOURLY_RATE = 50;
+const HOURLY_RATE = 45;
 const HOURLY_MIN = 3;
 const HOURLY_MAX = 8;
 let selHours = HOURLY_MIN;
 let selHourly = false;
 
-// Anti-undercut floor: hourly should never be cheaper than the most
-// expensive tier whose duration fits inside the requested hour count.
-// Otherwise a 6hr hourly booking ($300) lets a customer get the same
-// labor as Move-In 2-3BR ($350) for less.
-function computeHourlyFloor(hours) {
-  const minutes = hours * 60;
-  let floor = 0;
-  for (const svc of SERVICES) {
-    if (!svc.tiers) continue;
-    for (const t of svc.tiers) {
-      if (!t.basePrice || !t.durationMin) continue;
-      if (t.durationMin <= minutes && t.basePrice > floor) floor = t.basePrice;
-    }
-  }
-  return floor;
-}
-
 function synthesizeHourlyTier(hours) {
-  const raw = hours * HOURLY_RATE;
-  const floor = computeHourlyFloor(hours);
   return {
     slug: 'hourly-flexible',
     // Just the duration — booking.js composes the full service_name as
     // "Flexible Cleaning — N hours" via the parent svc.name + tier.name.
     name: `${hours} hours`,
-    basePrice: Math.max(raw, floor),
+    basePrice: hours * HOURLY_RATE,
     durationMin: hours * 60,
   };
 }
+
+// Legacy floor helper kept as a no-op so any remaining call sites
+// (renderHourlyState's math line) don't break.
+function computeHourlyFloor() { return 0; }
 
 function adjustHours(delta) {
   const next = Math.max(HOURLY_MIN, Math.min(HOURLY_MAX, selHours + delta));
@@ -1880,7 +1889,23 @@ function slotEndTime(slot, durMin){
 }
 
 // Addons
-document.getElementById('addon-grid').innerHTML = ADDONS.map(a=>`
+// Quantity-per-addon (only used by addons that declare `qty`). Defaults to 1
+// when an addon is first selected.
+let addonQtys = new Map();
+function addonQty(id) {
+  const v = addonQtys.get(id);
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
+document.getElementById('addon-grid').innerHTML = ADDONS.map(a=>{
+  const qtyControl = a.qty ? `
+    <div class="addon-qty" onclick="event.stopPropagation()">
+      <button type="button" class="addon-qty-btn" onclick="addonQtyChange('${a.id}',-1)" aria-label="Decrease">−</button>
+      <span class="addon-qty-value" id="addon-qty-val-${a.id}">1</span>
+      <span class="addon-qty-unit" id="addon-qty-unit-${a.id}">${a.qty.unitLabel}</span>
+      <button type="button" class="addon-qty-btn" onclick="addonQtyChange('${a.id}',1)" aria-label="Increase">+</button>
+    </div>` : '';
+  return `
   <div class="addon-card" id="addon-${a.id}" onclick="toggleAddon('${a.id}')">
     <div class="addon-header">
       <span class="addon-icon">${a.icon}</span>
@@ -1889,15 +1914,48 @@ document.getElementById('addon-grid').innerHTML = ADDONS.map(a=>`
     </div>
     <div class="addon-title">${a.name}</div>
     <div class="addon-desc">${a.desc}</div>
-  </div>`).join('');
+    ${qtyControl}
+  </div>`;
+}).join('');
+
+function addonQtyChange(id, delta){
+  const a = ADDONS.find(x => x.id === id);
+  if (!a || !a.qty) return;
+  // Bumping the stepper for an unselected addon also selects it.
+  if (!selAddons.includes(id)) {
+    selAddons.push(id);
+    const card = document.getElementById('addon-'+id);
+    if (card) card.classList.add('selected');
+  }
+  const cur = addonQty(id);
+  const next = Math.max(1, Math.min(a.qty.max || 99, cur + delta));
+  addonQtys.set(id, next);
+  const valEl = document.getElementById('addon-qty-val-'+id);
+  if (valEl) valEl.textContent = next;
+  const unitEl = document.getElementById('addon-qty-unit-'+id);
+  if (unitEl && a.qty.unitLabel) {
+    unitEl.textContent = next === 1 ? a.qty.unitLabel : a.qty.unitLabel + 's';
+  }
+  updateSummary();
+}
 
 function toggleAddon(id){
-  if(selAddons.includes(id)) selAddons=selAddons.filter(a=>a!==id);
-  else selAddons.push(id);
+  if(selAddons.includes(id)) {
+    selAddons = selAddons.filter(a=>a!==id);
+    addonQtys.delete(id);
+  } else {
+    selAddons.push(id);
+    const a = ADDONS.find(x => x.id === id);
+    if (a?.qty) addonQtys.set(id, 1);
+  }
   ADDONS.forEach(a=>{ document.getElementById('addon-'+a.id).classList.toggle('selected',selAddons.includes(a.id)); });
   const sel = selAddons.map(i=>ADDONS.find(a=>a.id===i));
   document.getElementById('addon-selected-list').innerHTML = sel.length
-    ? '<strong style="color:var(--text)">Selected extras:</strong><br>' + sel.map(a=>`${a.icon} ${a.name} <span style="color:var(--rose)">${a.price}</span>`).join('<br>')
+    ? '<strong style="color:var(--text)">Selected extras:</strong><br>' + sel.map(a => {
+        const q = a.qty ? ` × ${addonQty(a.id)}` : '';
+        const lineTotal = a.qty ? '$' + (a.addonPrice * addonQty(a.id)) : a.price;
+        return `${a.icon} ${a.name}${q} <span style="color:var(--rose)">${lineTotal}</span>`;
+      }).join('<br>')
     : 'No extras selected. All add-ons are optional.';
   updateSummary();
 }
@@ -1927,7 +1985,7 @@ function onFrequencyChange() {
   if (pct === 0) {
     note.textContent = 'One-time clean — no recurring discount applied.';
   } else {
-    note.innerHTML = `A <strong>${pct}% recurring discount</strong> is applied to this booking and any future cleans we schedule together.`;
+    note.innerHTML = `Your first clean is at full price. From your <strong>second visit</strong> onward, you'll save <strong>${pct}%</strong> on every recurring clean.`;
   }
   // Re-run the quote so the discounted total reflects in the summary.
   updateSummary();
@@ -1994,26 +2052,28 @@ function updateQuote(svcLines, addons) {
   }
 
   addons.forEach(a => {
-    const ap = a.addonPrice;
+    const q = a.qty ? addonQty(a.id) : 1;
+    const ap = (a.addonPrice || 0) * q;
+    const label = a.qty && q > 1 ? `${a.icon} ${a.name} × ${q}` : `${a.icon} ${a.name}`;
     if (ap > 0) {
-      html += `<div class="quote-line"><span>${a.icon} ${a.name}</span><span>$${ap}</span></div>`;
+      html += `<div class="quote-line"><span>${label}</span><span>$${ap}</span></div>`;
       total += ap;
     } else {
-      html += `<div class="quote-line"><span>${a.icon} ${a.name}</span><span>On request</span></div>`;
+      html += `<div class="quote-line"><span>${label}</span><span>On request</span></div>`;
     }
   });
 
-  // Apply recurring-frequency discount if the customer picked one.
+  // Recurring discount kicks in on the SECOND booking onward. Show full
+  // price for this first booking, with a small note about the future saving.
   const freqEl = document.getElementById('f-frequency');
   const freq = freqEl ? freqEl.value : 'one_time';
   const pct = FREQUENCY_DISCOUNTS[freq] || 0;
-  if (pct > 0) {
-    const discount = Math.round(total * (pct / 100));
-    html += `<div class="quote-line" style="color:var(--sage)"><span>${pct}% recurring discount</span><span>−$${discount}</span></div>`;
-    total = total - discount;
-  }
 
   html += `<div class="quote-line total"><span>Estimated total</span><span>$${total}+</span></div>`;
+  if (pct > 0) {
+    const futureSaving = Math.round(total * (pct / 100));
+    html += `<div class="quote-line" style="color:var(--sage);font-size:12px;margin-top:6px"><span>From visit 2: ${pct}% off</span><span>save ~$${futureSaving}/clean</span></div>`;
+  }
   lines.innerHTML = html;
 }
 

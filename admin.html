@@ -693,16 +693,31 @@
     .stats-row { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
     .booking-grid { grid-template-columns: 1fr; }
     .admin-tab { padding: 10px 12px; font-size: 12px; }
-    .admin-nav { padding: 0 4vw; height: 60px; }
-    .admin-brand { font-size: 14px; letter-spacing: 1.5px; }
+    .admin-nav { padding: 0 4vw; height: 60px; gap: 8px; }
+    .admin-brand { font-size: 14px; letter-spacing: 1.5px; gap: 8px; flex-shrink: 0; }
     .admin-brand .admin-tag { font-size: 10px; padding: 3px 8px; }
-    .admin-nav-btn { padding: 7px 11px; font-size: 11px; }
+    .admin-nav-right { gap: 6px; flex-wrap: nowrap; }
+    .admin-nav-btn { padding: 7px 10px; font-size: 11px; }
     .admin-greet { display: none; }
     .cal-grid-wrap { display: none; }
     .cal-agenda { display: block; }
     .customers-grid { grid-template-columns: 1fr; }
     .customer-stats { grid-template-columns: repeat(2, 1fr); }
     #customers-search { min-width: 0; flex: 1; }
+  }
+  /* Very narrow phones — strip the wordmark, keep just the ADMIN pill so
+     the action buttons get room to breathe in a single row. */
+  @media (max-width: 540px) {
+    .admin-brand-word { display: none; }
+    .admin-brand { font-size: 0; }
+    .admin-brand .admin-tag { font-size: 11px; padding: 4px 10px; }
+    .admin-nav-btn { padding: 6px 10px; font-size: 11px; }
+    .admin-new .admin-new-label { display: none; }
+    .admin-new::before { content: '+ New'; font-size: 12px; font-weight: 600; }
+    .admin-nav-btn-view .admin-view-label { display: none; }
+    .admin-nav-btn-view::before { content: '↗ Site'; font-size: 11px; }
+    .admin-nav-btn-out .admin-out-label { display: none; }
+    .admin-nav-btn-out::before { content: 'Out'; font-size: 11px; }
   }
 </style>
 </head>
@@ -740,14 +755,14 @@
 
   <nav class="admin-nav">
     <a href="/admin" class="admin-brand">
-      Hiraya Spaces
+      <span class="admin-brand-word">Hiraya Spaces</span>
       <span class="admin-tag">Admin</span>
     </a>
     <div class="admin-nav-right">
       <span class="admin-greet" id="admin-greet"></span>
-      <button class="admin-nav-btn admin-new" onclick="HirayaAdmin.openNewBooking()">+ New booking</button>
-      <a href="/" class="admin-nav-btn">View site</a>
-      <button class="admin-nav-btn" onclick="HirayaAdmin.doLogout()">Sign out</button>
+      <button class="admin-nav-btn admin-new" onclick="HirayaAdmin.openNewBooking()"><span class="admin-new-label">+ New booking</span></button>
+      <a href="/" class="admin-nav-btn admin-nav-btn-view"><span class="admin-view-label">View site</span></a>
+      <button class="admin-nav-btn admin-nav-btn-out" onclick="HirayaAdmin.doLogout()"><span class="admin-out-label">Sign out</span></button>
     </div>
   </nav>
 
@@ -1052,6 +1067,10 @@
         <div class="customer-section">
           <h3>Notes & tags <span style="font-size:12px;color:var(--muted);font-weight:400">— private, only visible to you and Jewel</span></h3>
           <div style="background:white;border:1px solid var(--border);border-radius:14px;padding:1.25rem">
+            <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);cursor:pointer;padding:10px 12px;background:var(--sage-light);border-radius:10px;margin-bottom:12px">
+              <input type="checkbox" id="customer-meta-regular" style="width:18px;height:18px;accent-color:var(--sage);cursor:pointer">
+              <span><strong>Regular customer</strong> — show a 🌿 chip on this profile and exclude from "new customer" lists.</span>
+            </label>
             <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);font-weight:500">Notes</label>
             <textarea id="customer-meta-notes" rows="3" style="width:100%;font-family:'Jost',sans-serif;font-size:14px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none;margin-top:6px;resize:vertical" placeholder="Has cats, prefers eco products, prefers Tuesdays…"></textarea>
             <label style="font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);font-weight:500;margin-top:14px;display:block">Tags (comma-separated)</label>

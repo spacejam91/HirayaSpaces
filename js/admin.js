@@ -866,8 +866,13 @@ Hiraya Spaces`
     const meta = customerMetaMap.get(c.user_id) || { notes: '', tags: [] };
     const notesEl = $('customer-meta-notes');
     const tagsEl = $('customer-meta-tags');
+    const regularEl = $('customer-meta-regular');
     if (notesEl) notesEl.value = meta.notes || '';
-    if (tagsEl) tagsEl.value = (meta.tags || []).join(', ');
+    // Pre-check "Regular" if the tag is on file; keep it out of the visible
+    // tag text input so admins don't see duplicate "regular" chips.
+    const otherTags = (meta.tags || []).filter(t => t.toLowerCase() !== 'regular');
+    if (tagsEl) tagsEl.value = otherTags.join(', ');
+    if (regularEl) regularEl.checked = (meta.tags || []).some(t => t.toLowerCase() === 'regular');
     // Stash the user_id on a known DOM node so the save button can find it.
     if (notesEl) notesEl.dataset.userId = c.user_id;
 
@@ -963,11 +968,18 @@ Hiraya Spaces`
   function saveCustomerMetaFromForm() {
     const notesEl = $('customer-meta-notes');
     const tagsEl = $('customer-meta-tags');
+    const regularEl = $('customer-meta-regular');
     if (!notesEl) return;
     const userId = notesEl.dataset.userId;
     if (!userId) return;
     const notes = notesEl.value.trim();
-    const tags = tagsEl.value.split(',').map(t => t.trim()).filter(Boolean);
+    // Manual tags from the comma input, minus any stray 'regular' the admin
+    // typed — the checkbox is the source of truth for that one.
+    const manualTags = tagsEl.value.split(',')
+      .map(t => t.trim())
+      .filter(Boolean)
+      .filter(t => t.toLowerCase() !== 'regular');
+    const tags = regularEl?.checked ? ['regular', ...manualTags] : manualTags;
     saveCustomerMeta(userId, notes, tags);
   }
 

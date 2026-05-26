@@ -574,7 +574,12 @@
       showBookingsListView();
     } catch (err) {
       console.error('cancel_booking failed:', err);
-      showToast(err.message || 'Could not cancel the booking.', 'error');
+      const msg = err?.message || String(err);
+      if (/within_24h/i.test(msg)) {
+        showToast("Bookings can't be cancelled within 24 hours of the service. Reply to your booking email or call (226) 751-4566 and we'll work something out.", 'error');
+      } else {
+        showToast(msg || 'Could not cancel the booking.', 'error');
+      }
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Yes, cancel'; }
     }

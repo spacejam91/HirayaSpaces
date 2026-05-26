@@ -141,16 +141,28 @@
       display_name: `${l.svc.name} — ${l.tier.name}`,
     }));
 
+    // Per-addon quantities (windows, fridge, laundry, etc). Multiplied into
+    // the line totals and passed through to booking_addons.quantity.
+    const addonQtyOf = (id) => {
+      if (typeof addonQtys !== 'undefined' && addonQtys?.get) {
+        const v = addonQtys.get(id);
+        return Number.isFinite(v) && v > 0 ? v : 1;
+      }
+      return 1;
+    };
     const basePrice = svcLines.reduce((sum, l) => sum + (l.tier.basePrice || 0), 0);
-    const addonTotal = addons.reduce((s, a) => s + (a.addonPrice || 0), 0);
+    const addonTotal = addons.reduce((s, a) => s + ((a.addonPrice || 0) * addonQtyOf(a.id)), 0);
     const subtotal = basePrice + addonTotal;
 
     // Recurring discount (matches the FREQUENCY_DISCOUNTS map in index.html).
+    // Discount only kicks in on the customer's SECOND booking onward — the
+    // server-side count happens in saveBookingFor. Here we send the FULL
+    // price; the server may apply the discount on save if priors > 0.
     const frequencyEl = $('f-frequency');
     const frequency = frequencyEl ? frequencyEl.value : 'one_time';
     const discountPct = ({ one_time: 0, weekly: 20, biweekly: 15, monthly: 10 })[frequency] || 0;
-    const discountAmount = Math.round(subtotal * (discountPct / 100));
-    const total = subtotal - discountAmount;
+    const discountAmount = 0;
+    const total = subtotal;
 
     // Entry method — defaults to "home" so customers who skip the picker
     // (e.g. on an older cached page load) don't break submission.
@@ -187,6 +199,8 @@
         service_id_page: svc.id,
         service_name: combinedServiceName,
         addon_ids_page: selAddons.slice(),
+        // {addonId: quantity} so booking_addons rows carry the right counts.
+        addon_qty_map: Object.fromEntries(selAddons.map(id => [id, addonQtyOf(id)])),
         preferred_date: isoDate,
         preferred_time_slot: selTime,
         dbServiceSlug,
@@ -441,9 +455,33 @@
       // Prefer the client-side total (already includes all selected services,
       // addons, and any recurring discount). Fall back to primary + addons
       // only if the client total is missing for some reason.
-      const clientTotalCents = (typeof f.estimated_total_dollars === 'number')
+      let clientTotalCents = (typeof f.estimated_total_dollars === 'number')
         ? Math.round(f.estimated_total_dollars * 100)
         : null;
+
+      // Recurring discount policy: 20%/15%/10% only applies starting with
+      // the customer's SECOND booking. The client sends full price; here
+      // we check prior bookings and apply the discount if eligible.
+      let appliedDiscountPct = 0;
+      const declaredPct = f.recurring_discount_pct || 0;
+      if (declaredPct > 0) {
+        try {
+          const { count: priorCount } = await sb()
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+          if (priorCount && priorCount > 0) {
+            // 2nd+ booking on a recurring schedule — apply the discount.
+            appliedDiscountPct = declaredPct;
+            if (clientTotalCents != null) {
+              clientTotalCents = Math.round(clientTotalCents * (1 - declaredPct / 100));
+            }
+          }
+        } catch (countErr) {
+          console.warn('prior booking count failed:', countErr.message || countErr);
+        }
+      }
+
       const totalCents = clientTotalCents ?? (
         (svcRow.starting_price_cents || 0)
         + addonRows.reduce((s, a) => s + (a.price_cents || 0), 0)
@@ -472,7 +510,7 @@
           entry_method: f.entry_method || 'home',
           entry_instructions: f.entry_instructions || null,
           frequency: f.frequency || 'one_time',
-          recurring_discount_pct: f.recurring_discount_pct || 0,
+          recurring_discount_pct: appliedDiscountPct,
         })
         .select()
         .single();
@@ -480,12 +518,21 @@
 
       // 6. Insert booking_addons rows (best effort — booking is already saved)
       if (addonRows.length) {
-        const addonsToInsert = addonRows.map(a => ({
-          booking_id: bookingRow.id,
-          addon_id: a.id,
-          quantity: 1,
-          price_cents: a.price_cents
-        }));
+        // Map slug → page id so we can look up quantities per row.
+        const slugToPageId = Object.fromEntries(
+          Object.entries(ADDON_SLUG_MAP || {}).map(([k, v]) => [v, k])
+        );
+        const qtyMap = f.addon_qty_map || {};
+        const addonsToInsert = addonRows.map(a => {
+          const pageId = slugToPageId[a.slug];
+          const qty = (pageId && qtyMap[pageId]) ? qtyMap[pageId] : 1;
+          return {
+            booking_id: bookingRow.id,
+            addon_id: a.id,
+            quantity: qty,
+            price_cents: a.price_cents,
+          };
+        });
         const { error: bkAddonErr } = await sb()
           .from('booking_addons')
           .insert(addonsToInsert);
