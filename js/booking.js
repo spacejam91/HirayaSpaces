@@ -14,14 +14,16 @@
     commercial: 'commercial-cleaning'
   };
   const ADDON_SLUG_MAP = {
-    oven:     'inside-oven',
-    fridge:   'inside-fridge',
-    windows:  'interior-windows',
-    laundry:  'laundry-folding',
-    pets:     'pet-hair-removal',
-    walls:    'wall-spot-cleaning',
-    basement: 'basement-cleaning',
-    eco:      'eco-friendly'
+    oven:               'inside-oven',
+    fridge:             'inside-fridge',
+    'windows-small':    'windows-small',
+    'windows-standard': 'windows-standard',
+    'windows-large':    'windows-large',
+    laundry:            'laundry-folding',
+    pets:               'pet-hair-removal',
+    walls:              'wall-spot-cleaning',
+    basement:           'basement-cleaning',
+    eco:                'eco-friendly'
   };
 
   const PENDING_KEY = 'hiraya:pendingBooking';
