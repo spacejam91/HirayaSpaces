@@ -1,0 +1,118 @@
+<!--
+  ARCHIVED REVIEWS CODE — removed from index.html on 2026-05-27.
+
+  Reason: the site was flagged (Google) for self-serving review structured
+  data (aggregateRating/Review markup on our own HouseCleaningService is
+  against Google's review-snippet policy). Removed all reviews-related markup
+  for now; kept here so it can be re-added later.
+
+  This folder is named with a leading underscore, so GitHub Pages (Jekyll)
+  does NOT serve or index it. Safe place to park code.
+
+  The CSS rules (.reviews-*, .review-*, .hero-float-card, .float-*) were LEFT
+  IN PLACE in index.html (they're invisible when unused), so re-adding just
+  means restoring the HTML/JS snippets below.
+
+  ============================================================================
+  1) JSON-LD STRUCTURED DATA  — was inside the HouseCleaningService schema,
+     between "openingHoursSpecification" and "makesOffer".
+  ============================================================================
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.9",
+    "reviewCount": "3",
+    "bestRating": "5",
+    "worstRating": "1"
+  },
+  "review": [
+    {
+      "@type": "Review",
+      "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+      "author": { "@type": "Person", "name": "Aaron" },
+      "reviewBody": "Been using Hiraya Spaces for weekly cleanings and she's fantastic. Always on time, thorough, and my one bedroom looks brand new after every visit."
+    },
+    {
+      "@type": "Review",
+      "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+      "author": { "@type": "Person", "name": "Dejan" },
+      "reviewBody": "She did an amazing job cleaning, pays attention to details. Highly recommend her."
+    },
+    {
+      "@type": "Review",
+      "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+      "author": { "@type": "Person", "name": "Sarah" },
+      "reviewBody": "She did a wonderful job cleaning my home and was a pleasure to work with — very kind, professional, and thorough."
+    }
+  ],
+
+  NOTE: Google disallows self-serving aggregateRating/review on your own
+  business. If re-adding, prefer pulling real Google reviews via the Places
+  API rather than hard-coding them, or this will get flagged again.
+
+  ============================================================================
+  2) VISIBLE REVIEWS SECTION  — was in the body before the CONTACT section.
+  ============================================================================
+<!-- REVIEWS -->
+<section id="reviews">
+  <div class="reviews-header">
+    <div>
+      <span class="section-label fade-up">Client stories</span>
+      <h2 class="section-h2 fade-up" style="transition-delay:.1s">What they say</h2>
+    </div>
+    <p class="section-sub fade-up" style="transition-delay:.15s;font-weight:300;font-size:14px;color:var(--muted);letter-spacing:0.01em;line-height:1.7">Don't take our word for it — here's what our clients say.</p>
+  </div>
+  <div class="reviews-grid" id="reviews-grid"></div>
+</section>
+
+  ============================================================================
+  3) REVIEWS DATA ARRAY  — was in the page <script>.
+  ============================================================================
+const REVIEWS = [
+  {quote:'Been using Hiraya Spaces for weekly cleanings and she\'s fantastic. Always on time, thorough, and my one bedroom looks brand new after every visit. Communication is easy and she\'s upfront about pricing. Would definitely recommend to anyone in the area!',name:'Aaron',type:'Weekly cleaning',av:'A'},
+  {quote:'She did an amazing job cleaning, pays attention to details. Highly recommend her.',name:'Dejan',type:'General cleaning',av:'D'},
+  {quote:'She did a wonderful job cleaning my home and was a pleasure to work with — very kind, professional, and thorough.',name:'Sarah',type:'Home clean',av:'S'},
+];
+
+  ============================================================================
+  4) REVIEWS RENDER JS  — was in the page <script> (// Reviews).
+  ============================================================================
+// Reviews
+document.getElementById('reviews-grid').innerHTML = REVIEWS.map(r=>`
+  <div class="review-card fade-up">
+    <div class="review-stars">★★★★★</div>
+    <div class="review-quote">"${r.quote}"</div>
+    <div class="review-author">
+      <div class="author-av">${r.av}</div>
+      <div><div class="author-name">${r.name}</div><div class="author-type">${r.type}</div></div>
+    </div>
+  </div>`).join('');
+
+  ============================================================================
+  5) NAV LINKS  — re-add to restore the "Reviews" menu items.
+  ============================================================================
+  Desktop nav (.nav-links):
+    <li><a href="#reviews">Reviews</a></li>
+
+  Mobile nav:
+    <a href="#reviews" onclick="closeMobileMenu()">Reviews</a>
+
+  Footer nav:
+    <li><a href="/#reviews">Reviews</a></li>
+
+  ============================================================================
+  6) HERO FLOATING RATING CARD  — was inside .hero-img-area, after the hero img.
+  ============================================================================
+      <div class="hero-float-card" style="max-width:340px;">
+        <div class="float-rating" style="margin-bottom:0.5rem;">
+          <span class="float-stars">★★★★★</span>
+          <span>4.9 · 100+ happy clients</span>
+        </div>
+        <div class="float-sub" style="margin-bottom:0;">"Turned our space into something we truly love coming back to."</div>
+      </div>
+
+  ============================================================================
+  7) "HOW IT WORKS" STEP 4 LINK  — the step number "4" linked to #reviews.
+     It was reverted to a plain step-num div on removal. Original:
+  ============================================================================
+      <a href="#reviews" class="step-num step-num-link" aria-label="Jump to reviews">4</a>
+-->
