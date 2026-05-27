@@ -302,6 +302,8 @@
       $('customer-detail-view').style.display = 'none';
       renderCustomers();
       refreshAll();
+    } else if (name === 'invoices') {
+      refreshInvoices();
     }
   }
 
@@ -597,7 +599,7 @@
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
         }
         if (ownerCancellable) {
-          parts.push(`<button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
+          parts.push(`<button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
         }
         actions = `<div class="booking-card-actions">${parts.join('')}</div>`;
       }
@@ -1012,7 +1014,7 @@ Hiraya Spaces`
             <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="event.stopPropagation(); HirayaAdmin.jumpToPending('${b.id}','confirm')">Confirm</button>
           </div>`;
       } else if (ownerCancellable) {
-        actions = `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="event.stopPropagation(); HirayaAdmin.jumpToAllAndCancel('${b.id}')">Cancel booking</button></div>`;
+        actions = `<div class="booking-card-actions"><button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="event.stopPropagation(); HirayaAdmin.jumpToAllAndCancel('${b.id}')">Cancel booking</button></div>`;
       }
       return bookingCardHtml(b, { actions, showInternal: true });
     }).join('');
@@ -2004,6 +2006,135 @@ Hiraya Spaces`
     showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
   }
 
+  // ── INVOICES TABLE ─────────────────────────────────────────────────────
+  let allInvoices = []; // rows from admin_get_all_invoices()
+
+  async function refreshInvoices() {
+    if (!sb() || !isOwner) return;
+    const tbody = $('inv-tbody');
+    if (tbody) tbody.innerHTML = '';
+    const { data, error } = await sb().rpc('admin_get_all_invoices');
+    if (error) {
+      console.warn('admin_get_all_invoices failed:', error.message);
+      if (/function .* does not exist/i.test(error.message)) {
+        showToast('Invoices need a SQL migration — run admin_get_all_invoices() in Supabase.', 'error');
+      }
+      allInvoices = [];
+    } else {
+      allInvoices = data || [];
+    }
+    renderInvoices();
+  }
+
+  function invoiceStatusLabel(s) {
+    return ({ unpaid: 'Unpaid', paid: 'Paid', refunded: 'Refunded', cancelled: 'Cancelled' })[s] || s || '—';
+  }
+
+  function getFilteredInvoices() {
+    const q = ($('inv-search')?.value || '').trim().toLowerCase();
+    const status = ($('inv-status-filter')?.value || '').trim();
+    return allInvoices.filter(inv => {
+      if (status && inv.status !== status) return false;
+      if (q) {
+        const hay = `${inv.invoice_number || ''} ${inv.customer_name || ''} ${inv.customer_email || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderInvoices() {
+    const tbody = $('inv-tbody');
+    const empty = $('inv-empty');
+    const totalsEl = $('inv-totals');
+    const tableWrap = document.querySelector('.inv-table-wrap');
+    if (!tbody) return;
+
+    // Totals reflect the full set (not the filter) so Aaron always sees the
+    // true outstanding/collected picture.
+    const outstandingCents = allInvoices
+      .filter(i => i.status === 'unpaid')
+      .reduce((s, i) => s + (i.total_cents || 0), 0);
+    const collectedCents = allInvoices
+      .filter(i => i.status === 'paid')
+      .reduce((s, i) => s + (i.total_cents || 0), 0);
+    if (totalsEl) {
+      totalsEl.innerHTML = `
+        <div class="inv-total-card"><div class="inv-total-label">Outstanding</div><div class="inv-total-value outstanding">$${Math.round(outstandingCents / 100).toLocaleString()}</div></div>
+        <div class="inv-total-card"><div class="inv-total-label">Collected</div><div class="inv-total-value collected">$${Math.round(collectedCents / 100).toLocaleString()}</div></div>
+        <div class="inv-total-card"><div class="inv-total-label">Invoices</div><div class="inv-total-value">${allInvoices.length}</div></div>`;
+    }
+
+    const rows = getFilteredInvoices();
+    if (!rows.length) {
+      tbody.innerHTML = '';
+      if (empty) empty.style.display = 'block';
+      if (tableWrap) tableWrap.style.display = 'none';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    if (tableWrap) tableWrap.style.display = '';
+
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+    tbody.innerHTML = rows.map(inv => {
+      const issued = fmtDate(inv.created_at);
+      const paid = inv.paid_at ? fmtDate(inv.paid_at) : '<span class="inv-muted">—</span>';
+      const amount = inv.total_cents != null ? '$' + Math.round(inv.total_cents / 100).toLocaleString() : '—';
+      return `<tr onclick="HirayaAdmin.openInvoiceFromTable('${inv.booking_id}')">
+        <td class="inv-num-cell">${escapeHtml(inv.invoice_number || '—')}</td>
+        <td>${escapeHtml(inv.customer_name || 'Customer')}<div class="inv-muted" style="font-size:12px">${escapeHtml(inv.customer_email || '')}</div></td>
+        <td>${escapeHtml(inv.service_name || 'Cleaning')}</td>
+        <td>${escapeHtml(issued)}</td>
+        <td class="inv-num">${escapeHtml(amount)}</td>
+        <td><span class="inv-badge ${escapeHtml(inv.status || 'unpaid')}">${escapeHtml(invoiceStatusLabel(inv.status))}</span></td>
+        <td>${paid}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Open the existing invoice modal from a table row (keyed by booking id).
+  function openInvoiceFromTable(bookingId) {
+    viewInvoice(bookingId);
+  }
+
+  function exportInvoicesCsv() {
+    const rows = getFilteredInvoices();
+    if (!rows.length) {
+      showToast('Nothing to export.', 'error');
+      return;
+    }
+    const headers = ['Invoice #', 'Customer', 'Email', 'Service', 'Issued', 'Amount', 'Status', 'Paid on', 'Booking ref'];
+    const csvCell = (v) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const dollars = (c) => (c == null) ? '' : (c / 100).toFixed(2);
+    const lines = [headers.join(',')];
+    for (const inv of rows) {
+      lines.push([
+        inv.invoice_number || '',
+        inv.customer_name || '',
+        inv.customer_email || '',
+        inv.service_name || '',
+        inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-CA') : '',
+        dollars(inv.total_cents),
+        invoiceStatusLabel(inv.status),
+        inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('en-CA') : '',
+        (inv.booking_id || '').slice(0, 8).toUpperCase(),
+      ].map(csvCell).join(','));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hiraya-invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Invoices exported.', 'success');
+  }
+
   // ── VIEW INVOICE ───────────────────────────────────────────────────────
   let viewingInvoiceBookingId = null;
   let viewingInvoice = null; // populated row from admin_get_invoice_for_booking
@@ -2104,6 +2235,8 @@ Hiraya Spaces`
       const bookingId = viewingInvoiceBookingId;
       closeInvoiceView();
       viewInvoice(bookingId);
+      // Keep the Invoices table in sync if it's the active view.
+      if (activePanel === 'invoices') refreshInvoices();
     } catch (err) {
       console.error('admin_set_invoice_status failed:', err);
       showErr('invoice-err', err?.message || 'Could not update status.');
@@ -2367,7 +2500,7 @@ Hiraya Spaces`
                 <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.jumpToPending('${b.id}','confirm')">Confirm</button>
               </div>`;
           } else if (ownerCancellable) {
-            actions = `<div class="booking-card-actions"><button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.jumpToAllAndCancel('${b.id}')">Cancel booking</button></div>`;
+            actions = `<div class="booking-card-actions"><button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.jumpToAllAndCancel('${b.id}')">Cancel booking</button></div>`;
           }
           return bookingCardHtml(b, { actions, showInternal: true });
         }).join('');
@@ -2903,6 +3036,10 @@ Hiraya Spaces`
     toggleInvoicePaid,
     resendInvoice,
     downloadInvoicePdf,
+    refreshInvoices,
+    renderInvoices,
+    exportInvoicesCsv,
+    openInvoiceFromTable,
     exportBookingsCsv,
     askReschedule,
     cancelReschedule,
