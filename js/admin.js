@@ -1145,10 +1145,14 @@ Hiraya Spaces`
     $('nb-address').innerHTML = '<option value="">Select a customer first…</option>';
     $('nb-customer-notes').value = '';
     $('nb-internal-notes').value = '';
+    renderNbExtras();
+    renderNbAddons();
     hideErr('nb-err');
     $('nb-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
+    // Load catalogs, then (re)render the add-on checkboxes once they're in.
     loadServicesCache();
+    loadAddonsCache().then(renderNbAddons);
   }
 
   function closeNewBooking() {
@@ -1238,24 +1242,135 @@ Hiraya Spaces`
     const slug = $('nb-service').value;
     const isHourly = slug === 'hourly-flexible';
     $('nb-hourly-wrap').style.display = isHourly ? 'block' : 'none';
-    updatePriceHint();
+    recalcNbPrice();
   }
 
-  function updatePriceHint() {
+  // Kept for the nb-hours oninput hook; delegates to the full recalc so the
+  // hint always reflects base + add-ons + additional services.
+  function updatePriceHint() { recalcNbPrice(); }
+
+  // ── New Booking: add-ons + additional services ─────────────────────────
+  function nbBaseCents() {
     const slug = $('nb-service').value;
-    const hint = $('nb-price-hint');
-    if (!slug) { hint.textContent = ''; return; }
+    if (!slug) return 0;
     if (slug === 'hourly-flexible') {
       const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
-      hint.textContent = `Estimated price: ${hrs} × $50 = $${hrs * 50}`;
-      return;
+      return hrs * 5000;
     }
     const svc = servicesCache.find(s => s.slug === slug);
-    if (svc && svc.starting_price_cents != null) {
-      hint.textContent = `Estimated price: $${Math.round(svc.starting_price_cents / 100)}`;
-    } else {
-      hint.textContent = '';
+    return svc?.starting_price_cents || 0;
+  }
+
+  function recalcNbPrice() {
+    const slug = $('nb-service').value;
+    const addonsCents = Array.from(document.querySelectorAll('.nb-addon-cb'))
+      .filter(cb => cb.checked)
+      .reduce((sum, cb) => sum + (parseInt(cb.dataset.price, 10) || 0), 0);
+    const extrasCents = Array.from(document.querySelectorAll('.nb-extra-row'))
+      .reduce((sum, row) => {
+        const priceInput = row.querySelector('.nb-extra-price');
+        const v = priceInput ? Number(priceInput.value) : 0;
+        return sum + (Number.isFinite(v) ? Math.round(v * 100) : 0);
+      }, 0);
+    const totalCents = nbBaseCents() + addonsCents + extrasCents;
+    const hint = $('nb-price-hint');
+    if (hint) hint.textContent = slug ? `Estimated price: $${Math.round(totalCents / 100)}` : '';
+    return totalCents;
+  }
+
+  function renderNbAddons() {
+    const el = $('nb-addons');
+    if (!el) return;
+    el.innerHTML = addonsCache.map(a => {
+      const priceLabel = a.price_cents ? ` (+$${Math.round(a.price_cents / 100)})` : '';
+      return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" class="nb-addon-cb" value="${a.id}" data-price="${a.price_cents || 0}" onchange="HirayaAdmin.recalcNbPrice()">
+        <span>${escapeHtml(a.name)}${priceLabel}</span>
+      </label>`;
+    }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
+  }
+
+  function renderNbExtras() {
+    const host = $('nb-extras-list');
+    if (!host) return;
+    host.innerHTML = '';
+    maybeShowNbExtrasEmpty();
+  }
+
+  function maybeShowNbExtrasEmpty() {
+    const host = $('nb-extras-list');
+    if (!host) return;
+    if (!host.querySelector('.nb-extra-row') && !$('nb-extras-empty')) {
+      const hint = document.createElement('div');
+      hint.style.cssText = 'color:var(--muted);font-size:13px;font-style:italic';
+      hint.textContent = 'No additional services. Click below to add one.';
+      hint.id = 'nb-extras-empty';
+      host.appendChild(hint);
     }
+  }
+
+  function buildNbExtraRow() {
+    const row = document.createElement('div');
+    row.className = 'nb-extra-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 110px 36px;gap:8px;align-items:center';
+
+    const svcSel = document.createElement('select');
+    svcSel.className = 'nb-input nb-extra-svc';
+    svcSel.innerHTML = '<option value="">Pick a service…</option>' + servicesCache.map(s => {
+      const price = s.requires_quote ? 'Quote' : '$' + Math.round((s.starting_price_cents || 0) / 100);
+      return `<option value="${s.id}" data-slug="${escapeHtml(s.slug)}" data-name="${escapeHtml(s.name)}" data-price="${s.starting_price_cents || 0}">${escapeHtml(s.name)} — ${price}</option>`;
+    }).join('');
+
+    const priceInput = document.createElement('input');
+    priceInput.type = 'number'; priceInput.min = '0'; priceInput.step = '1';
+    priceInput.className = 'nb-input nb-extra-price'; priceInput.placeholder = '$';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button'; removeBtn.className = 'btn-ghost';
+    removeBtn.style.cssText = 'padding:6px 10px;color:#c0392b;font-size:18px;line-height:1';
+    removeBtn.title = 'Remove this service';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = () => { row.remove(); recalcNbPrice(); maybeShowNbExtrasEmpty(); };
+
+    svcSel.onchange = () => {
+      const opt = svcSel.selectedOptions[0];
+      const cents = parseInt(opt?.dataset.price || '0', 10);
+      if (cents) priceInput.value = Math.round(cents / 100);
+      recalcNbPrice();
+    };
+    priceInput.oninput = recalcNbPrice;
+
+    row.appendChild(svcSel);
+    row.appendChild(priceInput);
+    row.appendChild(removeBtn);
+    return row;
+  }
+
+  function addNbExtra() {
+    const empty = $('nb-extras-empty');
+    if (empty) empty.remove();
+    const host = $('nb-extras-list');
+    if (!host) return;
+    host.appendChild(buildNbExtraRow());
+    recalcNbPrice();
+  }
+
+  function collectNbExtras() {
+    return Array.from(document.querySelectorAll('.nb-extra-row')).map(row => {
+      const svcSel = row.querySelector('.nb-extra-svc');
+      const priceInput = row.querySelector('.nb-extra-price');
+      if (!svcSel?.value) return null;
+      const opt = svcSel.selectedOptions[0];
+      const priceCents = priceInput?.value ? Math.round(Number(priceInput.value) * 100) : null;
+      return {
+        service_id: parseInt(svcSel.value, 10),
+        tier_slug: opt?.dataset.slug || null,
+        tier_name: opt?.dataset.name || null,
+        price_cents: priceCents,
+        duration_minutes: null,
+        quantity: 1,
+      };
+    }).filter(Boolean);
   }
 
   async function submitNewBooking() {
@@ -1270,14 +1385,13 @@ Hiraya Spaces`
     const addressId = $('nb-address').value;
     if (!addressId) { showErr('nb-err', 'Pick an address.'); return; }
 
-    let priceCents = null;
-    if (slug === 'hourly-flexible') {
-      const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
-      priceCents = hrs * 5000;
-    } else {
-      const svc = servicesCache.find(s => s.slug === slug);
-      priceCents = svc?.starting_price_cents ?? null;
-    }
+    // Price = primary service base + checked add-ons + additional services.
+    const priceCents = recalcNbPrice();
+    const addonIds = Array.from(document.querySelectorAll('.nb-addon-cb'))
+      .filter(cb => cb.checked)
+      .map(cb => parseInt(cb.value, 10))
+      .filter(n => Number.isFinite(n));
+    const extras = collectNbExtras();
 
     const btn = $('nb-submit');
     btn.disabled = true; btn.textContent = 'Creating…';
@@ -1294,6 +1408,24 @@ Hiraya Spaces`
         p_status: 'confirmed',
       });
       if (error) throw error;
+      const newBookingId = data; // admin_create_booking returns the new uuid
+
+      // Attach add-ons + additional services (same RPCs the Edit modal uses).
+      if (newBookingId && addonIds.length) {
+        const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
+          p_booking_id: newBookingId,
+          p_addon_ids: addonIds,
+        });
+        if (addonErr) console.warn('admin_set_booking_addons failed:', addonErr.message || addonErr);
+      }
+      if (newBookingId && extras.length) {
+        const { error: bsErr } = await sb().rpc('admin_set_booking_services', {
+          p_booking_id: newBookingId,
+          p_services: extras,
+        });
+        if (bsErr) console.warn('admin_set_booking_services failed:', bsErr.message || bsErr);
+      }
+
       showToast('Booking created and confirmed.', 'success');
       closeNewBooking();
       await refreshAll();
@@ -3035,6 +3167,8 @@ Hiraya Spaces`
     closeInvoiceIfBackdrop,
     toggleInvoicePaid,
     resendInvoice,
+    addNbExtra,
+    recalcNbPrice,
     downloadInvoicePdf,
     refreshInvoices,
     renderInvoices,
