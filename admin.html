@@ -1415,6 +1415,23 @@
   }
   .bd-value a { color: var(--sage); text-decoration: none; }
   .bd-value strong { font-weight: 600; }
+  /* Action buttons in the detail modal: even 2-up grid instead of the
+     right-aligned wrap the cards use, so they line up cleanly in the narrow
+     modal. The danger/cancel action spans the full width on its own row. */
+  #detail-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  #detail-actions .booking-card-btn {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    min-height: 46px;
+  }
+  #detail-actions .booking-card-btn[onclick*="askOwnerCancel"] {
+    grid-column: 1 / -1;
+  }
   /* Mobile: compact card. Tap to open the detail modal. Hide the lower-
      priority body rows so the card stays scannable at a glance — the
      modal shows everything when tapped. */

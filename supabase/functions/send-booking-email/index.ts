@@ -586,6 +586,25 @@ Deno.serve(async (req) => {
     const totalDisplay = dollars(totalCents);
     const isQuote = booking.estimated_price_cents == null || booking.status === "awaiting_quote";
 
+    // Recurring banner — shown on every customer email for a recurring booking
+    // so the customer always sees the schedule (and the applied discount once
+    // it kicks in). Empty string for one-time bookings.
+    const FREQ_LABELS: Record<string, string> = {
+      weekly: "Weekly",
+      biweekly: "Every 2 weeks",
+      monthly: "Monthly",
+    };
+    const freqLabel = FREQ_LABELS[booking.frequency] || "";
+    const recurringBanner = (booking.frequency && booking.frequency !== "one_time" && freqLabel)
+      ? `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:14px 0 0">
+          <tr><td align="center">
+            <div style="display:inline-block;background:#e4f0e9;color:#1e4d2b;font-size:13px;font-weight:600;padding:8px 16px;border-radius:20px;letter-spacing:0.3px">
+              &#128257; Recurring clean &mdash; ${escapeHtml(freqLabel)}${booking.recurring_discount_pct ? ` &middot; ${booking.recurring_discount_pct}% off` : ""}
+            </div>
+          </td></tr>
+        </table>`
+      : "";
+
     // ── CONFIRMED PATH (owner confirms a pending booking) ─────────────────
     if (mode === "confirmed") {
       const confirmedHtml = `<!DOCTYPE html>
@@ -595,6 +614,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">CONFIRMED</div>
@@ -656,6 +676,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">CLEAN COMPLETE</div>
@@ -826,6 +847,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">INVOICE</div>
@@ -963,6 +985,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#3b82a8;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">CLEANER ON SITE</div>
@@ -1027,6 +1050,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">TOMORROW</div>
@@ -1119,6 +1143,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">RESCHEDULED</div>
@@ -1191,6 +1216,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">BOOKING UPDATED</div>
@@ -1269,6 +1295,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#b08c4a;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">UNABLE TO ACCEPT</div>
@@ -1349,6 +1376,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">Booking cancelled</h1>
@@ -1504,6 +1532,7 @@ Deno.serve(async (req) => {
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
           <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
           <div style="display:inline-block;background:#b08c4a;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">${isQuote ? "AWAITING QUOTE" : "PENDING REVIEW"}</div>

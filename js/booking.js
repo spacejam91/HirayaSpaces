@@ -462,26 +462,29 @@
         ? Math.round(f.estimated_total_dollars * 100)
         : null;
 
-      // Recurring discount policy: 20%/15%/10% only applies starting with
-      // the customer's SECOND booking. The client sends full price; here
-      // we check prior bookings and apply the discount if eligible.
+      // Recurring discount policy: 20%/15%/10% only applies once the customer
+      // has at least one COMPLETED clean. Their first visit (and anything
+      // booked before that first clean is finished) is full price; the
+      // discount kicks in on bookings made after a completed visit. The client
+      // sends full price; here we check completed history and apply if eligible.
       let appliedDiscountPct = 0;
       const declaredPct = f.recurring_discount_pct || 0;
       if (declaredPct > 0) {
         try {
-          const { count: priorCount } = await sb()
+          const { count: completedCount } = await sb()
             .from('bookings')
             .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id);
-          if (priorCount && priorCount > 0) {
-            // 2nd+ booking on a recurring schedule — apply the discount.
+            .eq('user_id', user.id)
+            .eq('status', 'completed');
+          if (completedCount && completedCount > 0) {
+            // Customer has a completed visit — apply the recurring discount.
             appliedDiscountPct = declaredPct;
             if (clientTotalCents != null) {
               clientTotalCents = Math.round(clientTotalCents * (1 - declaredPct / 100));
             }
           }
         } catch (countErr) {
-          console.warn('prior booking count failed:', countErr.message || countErr);
+          console.warn('completed booking count failed:', countErr.message || countErr);
         }
       }
 
