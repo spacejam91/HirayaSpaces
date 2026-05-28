@@ -135,7 +135,7 @@
             <div class="booking-card-svc">${svc}${svcPriceStr ? ` — <strong>${svcPriceStr}</strong>` : ''}${freqBadge}</div>
             ${(b.addon_items && b.addon_items.length) ? `<div class="booking-card-addons">${b.addon_items.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
             <div class="booking-card-total"><strong>Total: ${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
-            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>
+            <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>${b.invoice?.status === 'paid' ? `<span class="booking-status paid" style="background:#1e4d2b;color:white;margin-left:6px">$ PAID</span>` : ''}
           </div>
         </div>
         <div class="booking-card-body">
@@ -3746,7 +3746,12 @@ Hiraya Spaces`
     ].filter(Boolean).join(' · ');
     const mapsLink = addr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="font-size:12px">🗺 Open in Maps →</a>` : '';
 
-    $('detail-subtitle').textContent = `Ref ${b.id.slice(0, 8).toUpperCase()} · ${statusLabel(b.status)}`;
+    // Subtitle includes the PAID indicator when the booking's invoice is
+    // paid — so admin can tell at a glance from the modal header.
+    const paidIndicator = b.invoice?.status === 'paid'
+      ? ` · <span style="display:inline-block;background:#1e4d2b;color:white;font-weight:700;font-size:11px;letter-spacing:0.5px;padding:2px 8px;border-radius:8px;vertical-align:middle">$ PAID</span>`
+      : '';
+    $('detail-subtitle').innerHTML = `Ref ${escapeHtml(b.id.slice(0, 8).toUpperCase())} · ${escapeHtml(statusLabel(b.status))}${paidIndicator}`;
     // Show the main service price inline (booking total minus add-ons) so the
     // modal matches the card layout.
     const detailAddonsSumCents = (b.addon_items || []).reduce((s, a) => s + (a.price_cents || 0), 0);
