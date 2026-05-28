@@ -252,7 +252,7 @@
   let activePanel = 'pending';
 
   // Tabs that share the All-Bookings panel DOM but pre-apply a status filter.
-  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all' };
+  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all', cancelled: 'all', thisweek: 'all' };
 
   function switchPanel(name) {
     activePanel = name;
@@ -270,7 +270,7 @@
       $('decline-view').style.display = 'none';
       // Edit modal lives at top level now — closes on cancel, not on tab switch.
       refreshPending();
-    } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed' || name === 'cancelled') {
+    } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed' || name === 'cancelled' || name === 'thisweek') {
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
       const completeView = $('complete-view');
@@ -287,6 +287,7 @@
           : name === 'in_progress' ? 'In-progress bookings'
           : name === 'completed' ? 'Completed bookings'
           : name === 'cancelled' ? 'Cancelled bookings'
+          : name === 'thisweek' ? "This week's jobs"
           : 'All bookings';
       }
       refreshAll();
@@ -569,8 +570,15 @@
     const filter = currentStatusFilter();
     const sortDir = ($('all-sort')?.value || 'newest');
     const query = ($('all-search')?.value || '').trim().toLowerCase();
-    const filtered = (filter ? allBookings.filter(b => b.status === filter) : allBookings.slice())
-      .filter(b => bookingMatchesSearch(b, query));
+    let filtered = filter ? allBookings.filter(b => b.status === filter) : allBookings.slice();
+    if (activePanel === 'thisweek') {
+      const { start: weekStart, end: weekEnd } = currentWeekRange();
+      filtered = filtered.filter(b =>
+        b.preferred_date && b.preferred_date >= weekStart && b.preferred_date <= weekEnd &&
+        ACTIVE_STATUSES.includes(b.status)
+      );
+    }
+    filtered = filtered.filter(b => bookingMatchesSearch(b, query));
     const rows = filtered.sort((a, b) => {
       const da = new Date(a.preferred_date || a.created_at || 0).getTime();
       const db = new Date(b.preferred_date || b.created_at || 0).getTime();
@@ -1161,6 +1169,8 @@ Hiraya Spaces`
     $('nb-address').innerHTML = '<option value="">Select a customer first…</option>';
     $('nb-customer-notes').value = '';
     $('nb-internal-notes').value = '';
+    if ($('nb-frequency')) $('nb-frequency').value = 'one_time';
+    if ($('nb-discount-hint')) $('nb-discount-hint').textContent = '';
     renderNbExtras();
     renderNbAddons();
     hideErr('nb-err');
@@ -1242,6 +1252,8 @@ Hiraya Spaces`
       console.warn('admin_list_addresses failed:', err);
       addrSel.innerHTML = `<option value="">Couldn't load addresses</option>`;
     }
+    // Customer changed — recompute price + discount hint based on their history.
+    recalcNbPrice();
   }
 
   function clearCustomer() {
@@ -1252,6 +1264,7 @@ Hiraya Spaces`
     $('nb-customer-search').value = '';
     $('nb-customer-search').focus();
     $('nb-address').innerHTML = '<option value="">Select a customer first…</option>';
+    recalcNbPrice();
   }
 
   function onServicePicked() {
@@ -1277,6 +1290,19 @@ Hiraya Spaces`
     return svc?.starting_price_cents || 0;
   }
 
+  // Mirror the customer flow's recurring discount policy in the admin form:
+  // weekly/biweekly/monthly only apply their 20/15/10% off once the customer
+  // has at least one COMPLETED booking on file.
+  const NB_FREQUENCY_DISCOUNTS = { one_time: 0, weekly: 20, biweekly: 15, monthly: 10 };
+
+  function nbAppliedDiscountPct() {
+    const freq = $('nb-frequency')?.value || 'one_time';
+    const declared = NB_FREQUENCY_DISCOUNTS[freq] || 0;
+    if (!declared) return 0;
+    const earned = nbSelectedCustomer?.earned_count || 0;
+    return earned > 0 ? declared : 0;
+  }
+
   function recalcNbPrice() {
     const slug = $('nb-service').value;
     const addonsCents = Array.from(document.querySelectorAll('.nb-addon-cb'))
@@ -1288,9 +1314,40 @@ Hiraya Spaces`
         const v = priceInput ? Number(priceInput.value) : 0;
         return sum + (Number.isFinite(v) ? Math.round(v * 100) : 0);
       }, 0);
-    const totalCents = nbBaseCents() + addonsCents + extrasCents;
+    const subtotalCents = nbBaseCents() + addonsCents + extrasCents;
+    const appliedPct = nbAppliedDiscountPct();
+    const totalCents = appliedPct > 0
+      ? Math.round(subtotalCents * (1 - appliedPct / 100))
+      : subtotalCents;
+
     const hint = $('nb-price-hint');
-    if (hint) hint.textContent = slug ? `Estimated price: $${Math.round(totalCents / 100)}` : '';
+    if (hint) {
+      if (!slug) {
+        hint.textContent = '';
+      } else if (appliedPct > 0) {
+        hint.textContent = `Estimated price: $${Math.round(totalCents / 100)} (was $${Math.round(subtotalCents / 100)}, -${appliedPct}% recurring discount)`;
+      } else {
+        hint.textContent = `Estimated price: $${Math.round(totalCents / 100)}`;
+      }
+    }
+
+    // Discount eligibility hint — explains WHY the discount is or isn't
+    // applied, so it's obvious that the customer's history is being checked.
+    const dHint = $('nb-discount-hint');
+    if (dHint) {
+      const freq = $('nb-frequency')?.value || 'one_time';
+      const declared = NB_FREQUENCY_DISCOUNTS[freq] || 0;
+      if (!nbSelectedCustomer) {
+        dHint.textContent = '';
+      } else if (freq === 'one_time') {
+        dHint.textContent = '';
+      } else if (appliedPct > 0) {
+        dHint.textContent = `↻ ${declared}% recurring discount applied (customer has ${nbSelectedCustomer.earned_count} completed clean${nbSelectedCustomer.earned_count === 1 ? '' : 's'}).`;
+      } else {
+        dHint.textContent = `Discount holds until customer has 1 completed clean. Full price for this visit.`;
+      }
+    }
+
     return totalCents;
   }
 
@@ -1401,8 +1458,12 @@ Hiraya Spaces`
     const addressId = $('nb-address').value;
     if (!addressId) { showErr('nb-err', 'Pick an address.'); return; }
 
-    // Price = primary service base + checked add-ons + additional services.
+    // Price = primary service base + checked add-ons + additional services,
+    // minus the recurring discount when the customer is eligible (has at
+    // least 1 completed clean and a recurring frequency is selected).
     const priceCents = recalcNbPrice();
+    const frequency = $('nb-frequency')?.value || 'one_time';
+    const appliedDiscountPct = nbAppliedDiscountPct();
     const addonIds = Array.from(document.querySelectorAll('.nb-addon-cb'))
       .filter(cb => cb.checked)
       .map(cb => parseInt(cb.value, 10))
@@ -1422,6 +1483,8 @@ Hiraya Spaces`
         p_customer_notes: $('nb-customer-notes').value.trim() || null,
         p_internal_notes: $('nb-internal-notes').value.trim() || null,
         p_status: 'confirmed',
+        p_frequency: frequency,
+        p_recurring_discount_pct: appliedDiscountPct,
       });
       if (error) throw error;
       const newBookingId = data; // admin_create_booking returns the new uuid
@@ -2413,6 +2476,11 @@ Hiraya Spaces`
       if (paidBtn) {
         paidBtn.textContent = inv.status === 'paid' ? 'Mark as unpaid' : 'Mark as paid';
       }
+      const refundBtn = $('invoice-refund-btn');
+      if (refundBtn) {
+        refundBtn.textContent = inv.status === 'refunded' ? '↩ Reverse refund' : '↩ Mark refunded';
+        refundBtn.disabled = false;
+      }
       $('invoice-body').style.display = 'block';
     } catch (err) {
       console.error('admin_get_invoice_for_booking failed:', err);
@@ -2459,6 +2527,54 @@ Hiraya Spaces`
       showErr('invoice-err', err?.message || 'Could not update status.');
       btn.disabled = false;
       btn.textContent = viewingInvoice.status === 'paid' ? 'Mark as unpaid' : 'Mark as paid';
+    }
+  }
+
+  async function refundInvoice() {
+    if (!viewingInvoice || !sb()) return;
+    if (viewingInvoice.status === 'refunded') {
+      // Already refunded — offer to flip back to unpaid.
+      const undo = window.confirm('This invoice is already marked refunded. Flip it back to unpaid?');
+      if (!undo) return;
+      const btn = $('invoice-refund-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        const { error } = await sb().rpc('admin_set_invoice_status', {
+          p_invoice_id: viewingInvoice.id,
+          p_status: 'unpaid',
+        });
+        if (error) throw error;
+        showToast('Refund reversed — now unpaid.', 'success');
+        const bookingId = viewingInvoiceBookingId;
+        closeInvoiceView();
+        viewInvoice(bookingId);
+        if (activePanel === 'invoices') refreshInvoices();
+      } catch (err) {
+        console.error('admin_set_invoice_status failed:', err);
+        showErr('invoice-err', err?.message || 'Could not update status.');
+        btn.disabled = false; btn.textContent = '↩ Mark refunded';
+      }
+      return;
+    }
+    const ok = window.confirm('Mark this invoice as refunded? The amount stays on record but the invoice will show as refunded.');
+    if (!ok) return;
+    const btn = $('invoice-refund-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { error } = await sb().rpc('admin_set_invoice_status', {
+        p_invoice_id: viewingInvoice.id,
+        p_status: 'refunded',
+      });
+      if (error) throw error;
+      showToast('Invoice marked refunded.', 'success');
+      const bookingId = viewingInvoiceBookingId;
+      closeInvoiceView();
+      viewInvoice(bookingId);
+      if (activePanel === 'invoices') refreshInvoices();
+    } catch (err) {
+      console.error('admin_set_invoice_status failed:', err);
+      showErr('invoice-err', err?.message || 'Could not update status.');
+      btn.disabled = false; btn.textContent = '↩ Mark refunded';
     }
   }
 
@@ -3267,6 +3383,7 @@ Hiraya Spaces`
     closeInvoiceView,
     closeInvoiceIfBackdrop,
     toggleInvoicePaid,
+    refundInvoice,
     resendInvoice,
     addNbExtra,
     recalcNbPrice,

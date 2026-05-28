@@ -226,6 +226,7 @@
   /* ── TAB BAR ── */
   .admin-tabs {
     display: flex; gap: 4px; flex-wrap: wrap;
+    justify-content: center;
     border-bottom: 1px solid var(--border);
     margin-bottom: 1.5rem;
   }
@@ -871,11 +872,11 @@
         <div class="stat-card-value" id="stat-confirmed">—</div>
         <div class="stat-card-sub">Upcoming jobs</div>
       </button>
-      <div class="stat-card">
+      <button type="button" class="stat-card stat-card-clickable" onclick="HirayaAdmin.switchPanel('thisweek')">
         <div class="stat-card-label">This week</div>
         <div class="stat-card-value" id="stat-week">—</div>
         <div class="stat-card-sub" id="stat-week-sub">Cleans scheduled</div>
-      </div>
+      </button>
       <div class="stat-card">
         <div class="stat-card-label">Revenue MTD</div>
         <div class="stat-card-value" id="stat-revenue">—</div>
@@ -1265,6 +1266,18 @@
       <div style="margin-top:6px;font-size:12px;color:var(--muted)" id="nb-price-hint"></div>
     </div>
 
+    <!-- FREQUENCY -->
+    <div class="nb-section">
+      <div class="nb-section-label">Frequency</div>
+      <select id="nb-frequency" class="nb-select" onchange="HirayaAdmin.recalcNbPrice()">
+        <option value="one_time">One-time</option>
+        <option value="weekly">Weekly (20% off after 1st clean)</option>
+        <option value="biweekly">Every 2 weeks (15% off after 1st clean)</option>
+        <option value="monthly">Monthly (10% off after 1st clean)</option>
+      </select>
+      <div style="margin-top:6px;font-size:12px;color:var(--muted)" id="nb-discount-hint"></div>
+    </div>
+
     <!-- ADDITIONAL SERVICES -->
     <div class="nb-section">
       <div class="nb-section-label">Additional services (optional)</div>
@@ -1445,6 +1458,7 @@
       <div class="nb-actions">
         <button class="btn-ghost" id="invoice-pdf-btn" onclick="HirayaAdmin.downloadInvoicePdf()">⬇ Download PDF</button>
         <button class="btn-ghost" id="invoice-resend-btn" onclick="HirayaAdmin.resendInvoice()">↻ Resend email</button>
+        <button class="btn-ghost" id="invoice-refund-btn" onclick="HirayaAdmin.refundInvoice()" style="color:#9a6a16;border-color:#e6cfa3">↩ Mark refunded</button>
         <button class="btn-primary" id="invoice-paid-btn" onclick="HirayaAdmin.toggleInvoicePaid()">Mark as paid</button>
       </div>
     </div>
