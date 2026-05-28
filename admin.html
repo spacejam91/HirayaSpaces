@@ -130,6 +130,14 @@
     border-radius: 12px; outline: none; background: white; color: var(--text);
   }
   .nb-input:focus, .nb-select:focus { border-color: var(--sage); }
+  /* Date input — iOS Safari renders the date text awkwardly aligned by
+     default; explicit text-align keeps it consistent across iOS / Chrome /
+     desktop. */
+  .nb-input[type="date"] {
+    text-align: center;
+    -webkit-appearance: none;
+    appearance: none;
+  }
   .nb-textarea {
     width: 100%; font-family: 'Jost', sans-serif; font-size: 14px;
     padding: 10px 14px; border: 1.5px solid var(--border);
@@ -1581,6 +1589,11 @@
     color: var(--sage);
     font-weight: 600;
     cursor: pointer;
+  }
+  /* Mark refunded is a rare admin action — hide on phones to keep the
+     invoice modal compact. Still accessible from desktop. */
+  @media (max-width: 640px) {
+    #invoice-refund-btn { display: none !important; }
   }
   @media (max-width: 880px) {
     .booking-card { cursor: pointer; }
