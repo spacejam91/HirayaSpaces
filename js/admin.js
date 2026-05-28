@@ -271,6 +271,15 @@
       // Edit modal lives at top level now — closes on cancel, not on tab switch.
       refreshPending();
     } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed' || name === 'cancelled' || name === 'thisweek' || name === 'today') {
+      // Search box only makes sense on tabs where you're looking through
+      // historical/long lists. Hide on the short-list tabs (today's jobs,
+      // confirmed, in-progress, this-week).
+      const searchEl = $('all-search');
+      if (searchEl) {
+        const showSearch = (name === 'completed' || name === 'cancelled' || name === 'all');
+        searchEl.style.display = showSearch ? '' : 'none';
+        if (!showSearch && searchEl.value) searchEl.value = ''; // clear stale query
+      }
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
       const completeView = $('complete-view');
