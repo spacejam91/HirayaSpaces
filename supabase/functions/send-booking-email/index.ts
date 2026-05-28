@@ -397,9 +397,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const booking_id = body?.booking_id;
     const declineReason: string | null = typeof body?.reason === "string" ? body.reason : null;
-    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice" | "updated" | "rescheduled" | "reminder" | "checked_in";
+    type Mode = "booked" | "cancelled" | "confirmed" | "declined" | "completed" | "invoice" | "payment_received" | "updated" | "rescheduled" | "reminder" | "checked_in";
     const requestedMode = body?.mode;
-    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice" || requestedMode === "updated" || requestedMode === "rescheduled" || requestedMode === "reminder" || requestedMode === "checked_in")
+    const mode: Mode = (requestedMode === "cancelled" || requestedMode === "confirmed" || requestedMode === "declined" || requestedMode === "completed" || requestedMode === "invoice" || requestedMode === "payment_received" || requestedMode === "updated" || requestedMode === "rescheduled" || requestedMode === "reminder" || requestedMode === "checked_in")
       ? requestedMode : "booked";
     if (!booking_id || typeof booking_id !== "string") {
       return jsonResponse({ error: "booking_id required" }, 400);
@@ -485,6 +485,12 @@ Deno.serve(async (req) => {
       // weeks later. Booking just has to be completed.
       if (booking.status !== "completed") {
         return jsonResponse({ error: "Cannot invoice a booking that is not completed" }, 400);
+      }
+    } else if (mode === "payment_received") {
+      // Payment confirmation goes out after admin marks the invoice paid.
+      // The booking must be completed AND have a paid invoice on file.
+      if (booking.status !== "completed") {
+        return jsonResponse({ error: "Cannot confirm payment for a non-completed booking" }, 400);
       }
     } else if (mode === "updated") {
       // Edit notifications: only meaningful for active/editable bookings.
@@ -974,6 +980,148 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Invoice email failed", debug: msg }, 502);
       }
       return jsonResponse({ ok: true, booking_id, mode: "invoice", invoice_number: invoiceNumber, status: invoiceStatus });
+    }
+
+    // ── PAYMENT RECEIVED PATH (admin marked invoice paid) ─────────────────
+    if (mode === "payment_received") {
+      // Look up the existing invoice — payment can only be confirmed once an
+      // invoice has been created. Marked paid is the trigger, but we still
+      // verify here in case the admin marks paid → unpaid → fires this stale.
+      const { data: paidInv } = await sb
+        .from("invoices")
+        .select("id, invoice_number, status, total_cents, paid_at, amount_cents")
+        .eq("booking_id", booking_id)
+        .maybeSingle();
+      if (!paidInv) {
+        return jsonResponse({ error: "No invoice on file for this booking" }, 400);
+      }
+      if (paidInv.status !== "paid") {
+        return jsonResponse({ error: "Invoice is not marked paid" }, 400);
+      }
+
+      const issuedDisplay = paidInv.paid_at
+        ? new Date(paidInv.paid_at).toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" })
+        : new Date().toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" });
+      const paidTotal = paidInv.total_cents ?? 0;
+      const paidTotalDisplay = dollars(paidTotal);
+
+      // Rebuild the same line items as the invoice mode so the attached PDF
+      // matches the original invoice (just stamped PAID this time).
+      const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
+      const extrasTotalCents = extraServices.reduce((s: number, es: any) => s + ((es.price_cents || 0) * (es.quantity || 1)), 0);
+      const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+      const lineSubtotalCents = baseCatalogCents + extrasTotalCents + addonsTotalCents;
+      const additionalCents = paidTotal - lineSubtotalCents;
+      const lineItems: { name: string; priceLabel: string }[] = [];
+      lineItems.push({ name: serviceName, priceLabel: dollars(baseCatalogCents) });
+      for (const es of extraServices) {
+        const svcName = es.services?.name || "Service";
+        const tierLabel = es.tier_name ? ` — ${es.tier_name}` : "";
+        const qty = es.quantity > 1 ? ` × ${es.quantity}` : "";
+        const lineTotal = (es.price_cents || 0) * (es.quantity || 1);
+        lineItems.push({ name: svcName + tierLabel + qty, priceLabel: dollars(lineTotal) });
+      }
+      for (const ba of bookingAddons) {
+        const baseName = ba.addons?.name || "Add-on";
+        const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
+        const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
+        lineItems.push({ name: baseName + qty, priceLabel: dollars(lineTotal) });
+      }
+      if (additionalCents > 0) {
+        lineItems.push({ name: "Additional services provided", priceLabel: dollars(additionalCents) });
+      } else if (additionalCents < 0) {
+        lineItems.push({ name: "Discount", priceLabel: "-" + dollars(Math.abs(additionalCents)) });
+      }
+
+      const paidHtml = `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8faf8;font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2e1e">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8faf8;padding:40px 16px">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
+        <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          ${recurringBanner}
+        </td></tr>
+        <tr><td style="padding:36px 30px 20px">
+          <div style="display:inline-block;background:#1e4d2b;color:white;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:6px 14px;border-radius:6px;margin-bottom:14px">PAYMENT RECEIVED</div>
+          <h1 style="font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;margin:0 0 10px;color:#1a2e1e">Thank you, ${escapeHtml(customerName)}!</h1>
+          <p style="font-size:14px;color:#6a7d6e;line-height:1.7;margin:0 0 24px">
+            We've received your payment for invoice <strong style="color:#1e4d2b">${escapeHtml(paidInv.invoice_number)}</strong>. A copy of the paid invoice is attached for your records.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e4f0e9;border:1px solid #5a9470;border-radius:12px;margin-bottom:20px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:11px;font-weight:700;color:#1e4d2b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Payment summary</div>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;color:#1a2e1e">
+                <tr><td style="padding:4px 0;color:#6a7d6e">Invoice</td><td style="padding:4px 0;text-align:right;font-weight:600">${escapeHtml(paidInv.invoice_number)}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Service date</td><td style="padding:4px 0;text-align:right">${escapeHtml(dateDisplay)}</td></tr>
+                <tr><td style="padding:4px 0;color:#6a7d6e">Paid on</td><td style="padding:4px 0;text-align:right">${escapeHtml(issuedDisplay)}</td></tr>
+                <tr><td style="padding:8px 0 0;border-top:1px solid #5a9470;font-weight:700;font-size:15px">Amount paid</td><td style="padding:8px 0 0;border-top:1px solid #5a9470;text-align:right;font-weight:700;color:#1e4d2b;font-size:18px">${escapeHtml(paidTotalDisplay)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <p style="font-size:13px;color:#6a7d6e;line-height:1.7;margin:0 0 8px">
+            Want another clean? Book any time at <a href="https://hirayaspaces.ca/#booking" style="color:#1e4d2b;font-weight:600;text-decoration:none">hirayaspaces.ca</a> — or just reply to this email.
+          </p>
+          <p style="font-size:12px;color:#6a7d6e;line-height:1.7;margin:14px 0 0">
+            Questions about the receipt? Reply here or call (226) 751-4566.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      // Generate the PAID-stamped PDF copy.
+      const paidPdfBytes = await buildInvoicePdf({
+        invoiceNumber: paidInv.invoice_number,
+        issuedDisplay,
+        idShort,
+        customerName,
+        customerEmail,
+        customerPhone,
+        dateDisplay,
+        timeDisplay,
+        addressLine,
+        lineItems,
+        totalDisplay: paidTotalDisplay,
+        paid: true,
+        paidDisplay: issuedDisplay,
+      });
+
+      const smtpPortPaid = parseInt(Deno.env.get("SMTP_PORT") || "465");
+      const paidClient = new SMTPClient({
+        connection: {
+          hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+          port: smtpPortPaid, tls: smtpPortPaid === 465,
+          auth: { username: Deno.env.get("SMTP_USER")!, password: Deno.env.get("SMTP_PASS")! },
+        },
+      });
+      let paidErr: unknown = null;
+      try {
+        await paidClient.send({
+          from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
+          to: customerEmail,
+          subject: `Payment received — ${paidInv.invoice_number}`,
+          html: tidyHtml(paidHtml),
+          attachments: [{
+            contentType: "application/pdf",
+            filename: `${paidInv.invoice_number}-paid.pdf`,
+            encoding: "binary",
+            content: paidPdfBytes,
+          }],
+        });
+      } catch (e) { console.warn("payment_received email failed:", e); paidErr = e; }
+      try { await paidClient.close(); } catch (_) {}
+      if (paidErr) {
+        const msg = (paidErr as Error)?.message || String(paidErr);
+        return jsonResponse({ error: "Payment receipt email failed", debug: msg }, 502);
+      }
+      return jsonResponse({ ok: true, booking_id, mode: "payment_received", invoice_number: paidInv.invoice_number });
     }
 
     // ── CHECKED-IN PATH (cleaner just arrived) ────────────────────────────

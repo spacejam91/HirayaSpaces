@@ -2028,6 +2028,10 @@ Hiraya Spaces`
     } else if (nextWrap) {
       nextWrap.style.display = 'none';
     }
+    // "Paid on-site" defaults to unchecked — admin opts in explicitly so we
+    // never accidentally fire payment emails for unpaid jobs.
+    const paidOnsite = $('complete-paid-onsite');
+    if (paidOnsite) paidOnsite.checked = false;
     hideErr('complete-err');
     $('all-list-view').style.display = 'none';
     $('owner-cancel-view').style.display = 'none';
@@ -2055,9 +2059,60 @@ Hiraya Spaces`
       }
       finalCents = Math.round(num * 100);
     }
+    const paidOnSite = !!$('complete-paid-onsite')?.checked;
+
     const btn = $('complete-btn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
+      if (paidOnSite) {
+        // ON-SITE PATH: one atomic SQL call completes the booking AND stamps
+        // the invoice paid. Then JS fires the customer's "payment received"
+        // email + (optionally) the next recurring visit.
+        const { data: rows, error: collectErr } = await sb().rpc('admin_complete_and_collect', {
+          p_booking_id: id,
+          p_final_cents: finalCents,
+        });
+        if (collectErr) {
+          const msg = collectErr.message || String(collectErr);
+          if (/does not exist|not found/i.test(msg)) {
+            showErr('complete-err', 'On-site flow needs a SQL migration — run admin_complete_and_collect() in Supabase.');
+          } else {
+            showErr('complete-err', msg);
+          }
+          return;
+        }
+        const collected = Array.isArray(rows) ? rows[0] : rows;
+        const invNum = collected?.invoice_number || '';
+        showToast(`Marked complete & paid${invNum ? ' (' + invNum + ')' : ''}. Sending receipt…`, 'success');
+        // Fire the payment_received email + auto-recurring (if applicable).
+        sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'payment_received' } })
+          .then(({ error: e }) => {
+            if (e) {
+              console.warn('payment_received email failed:', e);
+              showToast('Marked paid, but the receipt email failed — verify with customer.', 'error');
+            }
+          })
+          .catch(err => {
+            console.warn('payment_received email failed:', err);
+            showToast('Marked paid, but the receipt email failed: ' + (err?.message || err), 'error');
+          });
+        const wantNextOnsite = $('complete-next-wrap')?.style.display !== 'none' && $('complete-next')?.checked;
+        if (wantNextOnsite) {
+          try {
+            const { data: nextId, error: nextErr } = await sb().rpc('admin_create_next_recurring', { p_booking_id: id });
+            if (nextErr) throw nextErr;
+            if (nextId) showToast('Next visit auto-created. ✓', 'success');
+          } catch (nextE) {
+            console.warn('admin_create_next_recurring failed:', nextE);
+          }
+        }
+        completingId = null;
+        await refreshAll();
+        refreshPending();
+        cancelComplete();
+        return;
+      }
+
       const { data, error } = await sb().rpc('complete_booking', { booking_id: id, final_cents: finalCents });
       if (error) throw error;
       if (data === false) {
@@ -2575,6 +2630,16 @@ Hiraya Spaces`
       });
       if (error) throw error;
       showToast(`Marked ${next}.`, 'success');
+      // Fire the customer's "payment received" email automatically when we
+      // flip to paid. Fire-and-forget so the modal close + reload aren't
+      // blocked by SMTP.
+      if (next === 'paid' && viewingInvoiceBookingId) {
+        sb().functions.invoke('send-booking-email', {
+          body: { booking_id: viewingInvoiceBookingId, mode: 'payment_received' },
+        }).then(({ error: e }) => {
+          if (e) console.warn('payment_received email failed:', e);
+        });
+      }
       // Reopen to refresh the displayed status.
       const bookingId = viewingInvoiceBookingId;
       closeInvoiceView();
