@@ -2148,7 +2148,23 @@ Hiraya Spaces`
   // ── MARK COMPLETE (confirmed/in_progress → completed + final price) ────
   let completingId = null;
 
-  function askComplete(id) {
+  // Updates the live add-on subtotal hint as boxes are ticked in the
+  // Mark Complete modal. Doesn't auto-overwrite the price field — admin
+  // keeps full control of the final amount.
+  function refreshCompleteAddonHint() {
+    const hint = $('complete-addons-hint');
+    if (!hint) return;
+    const cbs = Array.from(document.querySelectorAll('.complete-addon-cb'));
+    const checked = cbs.filter(cb => cb.checked);
+    if (!checked.length) {
+      hint.textContent = 'Tick any add-ons performed during the visit.';
+      return;
+    }
+    const cents = checked.reduce((s, cb) => s + (parseInt(cb.dataset.price, 10) || 0), 0);
+    hint.textContent = `${checked.length} add-on${checked.length === 1 ? '' : 's'} selected · subtotal $${Math.round(cents / 100)}.`;
+  }
+
+  async function askComplete(id) {
     const b = allBookings.find(x => x.id === id);
     if (!b) return;
     completingId = id;
@@ -2160,6 +2176,34 @@ Hiraya Spaces`
     $('complete-est-hint').textContent = b.estimated_price_cents != null
       ? `Estimate was $${estDollars}`
       : 'No estimate on file.';
+
+    // Add-ons section — render the catalog with pre-checked rows for whatever
+    // was already attached to this booking. Admin can tick more during/after
+    // the visit (e.g., customer asked for Inside Oven last-minute) and they
+    // sync to booking_addons on submit. Price field stays manual.
+    if (!addonsCache.length) await loadAddonsCache();
+    let currentAddonIds = new Set();
+    try {
+      const { data: addonRows } = await sb()
+        .from('booking_addons')
+        .select('addon_id')
+        .eq('booking_id', id);
+      currentAddonIds = new Set((addonRows || []).map(r => r.addon_id));
+    } catch (e) {
+      console.warn('booking_addons fetch for complete failed:', e);
+    }
+    const addonsEl = $('complete-addons');
+    if (addonsEl) {
+      addonsEl.innerHTML = addonsCache.map(a => {
+        const checked = currentAddonIds.has(a.id) ? 'checked' : '';
+        const priceLabel = a.price_cents ? ` (+$${Math.round(a.price_cents / 100)})` : '';
+        return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" class="complete-addon-cb" value="${a.id}" data-price="${a.price_cents || 0}" ${checked} onchange="HirayaAdmin.refreshCompleteAddonHint()">
+          <span>${escapeHtml(a.name)}${priceLabel}</span>
+        </label>`;
+      }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
+    }
+    refreshCompleteAddonHint();
     // Recurring auto-create checkbox: only relevant when the booking has a
     // recurring frequency. Hidden for one-time bookings.
     const nextWrap = $('complete-next-wrap');
@@ -2209,6 +2253,24 @@ Hiraya Spaces`
     }
     const paidOnSite = !!$('complete-paid-onsite')?.checked;
 
+    // Collect the add-on selection up front so we can sync it in BOTH paths
+    // (paid-on-site receipt + regular invoice email both read this).
+    const completeAddonIds = Array.from(document.querySelectorAll('.complete-addon-cb'))
+      .filter(cb => cb.checked)
+      .map(cb => parseInt(cb.value, 10))
+      .filter(n => Number.isFinite(n));
+    const syncCompleteAddons = async () => {
+      try {
+        const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
+          p_booking_id: id,
+          p_addon_ids: completeAddonIds,
+        });
+        if (addonErr) console.warn('admin_set_booking_addons (complete) failed:', addonErr.message || addonErr);
+      } catch (addonE) {
+        console.warn('admin_set_booking_addons (complete) threw:', addonE);
+      }
+    };
+
     const btn = $('complete-btn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
@@ -2231,6 +2293,9 @@ Hiraya Spaces`
         }
         const collected = Array.isArray(rows) ? rows[0] : rows;
         const invNum = collected?.invoice_number || '';
+        // Sync any add-on changes BEFORE the receipt email fires so the PDF
+        // reflects the latest add-on list.
+        await syncCompleteAddons();
         showToast(`Marked complete & paid${invNum ? ' (' + invNum + ')' : ''}. Sending receipt…`, 'success');
         // Fire the payment_received email + auto-recurring (if applicable).
         sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'payment_received' } })
@@ -2266,6 +2331,10 @@ Hiraya Spaces`
       if (data === false) {
         showErr('complete-err', 'Booking is no longer eligible — refresh and try again.');
       } else {
+        // Sync any add-on changes BEFORE the invoice fires so the PDF
+        // reflects last-minute additions (e.g. customer asked for Inside
+        // Oven during the clean).
+        await syncCompleteAddons();
         // Auto-send the invoice email (create row + email PDF) if the
         // checkbox is on AND we didn't already do the paid-on-site flow.
         // Fire-and-forget so a slow SMTP doesn't block the modal.
@@ -3754,6 +3823,7 @@ Hiraya Spaces`
     recalcNbPrice,
     askDeleteBooking,
     markBookingPaid,
+    refreshCompleteAddonHint,
     downloadInvoicePdf,
     refreshInvoices,
     renderInvoices,
