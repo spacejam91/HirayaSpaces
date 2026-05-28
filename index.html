@@ -1190,6 +1190,9 @@
     .reviews-grid { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
     .stats-strip { grid-template-columns: repeat(2, 1fr); }
+    /* With 3 items in a 2-col grid, the 3rd wraps onto row 2 alone — span
+       both columns so it centers under the pair above. */
+    .stats-strip .stat-item:nth-child(3) { grid-column: 1 / -1; }
     .nav-links { display: none; }
     .nav-hamburger { display: flex; }
     .nav-call-icon { display: none !important; }
