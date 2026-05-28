@@ -616,7 +616,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -678,7 +678,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -849,7 +849,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -987,7 +987,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -1052,7 +1052,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -1145,7 +1145,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -1218,7 +1218,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -1297,7 +1297,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -1378,7 +1378,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -1418,8 +1418,8 @@ Deno.serve(async (req) => {
         <tr><td style="background:#1e4d2b;padding:20px 26px;color:white">
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
-              <td valign="middle" width="56">
-                <img src="https://hirayaspaces.ca/logo-mark.jpg" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:8px">
+              <td valign="middle" width="150">
+                <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="130" style="display:block;max-width:100%;height:auto">
               </td>
               <td valign="middle" style="padding-left:14px">
                 <div style="font-family:Georgia,serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
@@ -1534,7 +1534,7 @@ Deno.serve(async (req) => {
     <tr><td align="center">
       <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:white;border-radius:16px;overflow:hidden;border:1px solid #d4e2d8">
         <tr><td style="background:#f8faf8;padding:28px 24px;text-align:center;border-bottom:3px solid #1e4d2b">
-          <img src="https://hirayaspaces.ca/logo-horizontal.jpg" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
+          <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="320" style="display:block;margin:0 auto;max-width:100%;height:auto">
           ${recurringBanner}
         </td></tr>
         <tr><td style="padding:36px 30px 20px">
@@ -1633,8 +1633,8 @@ Deno.serve(async (req) => {
         <tr><td style="background:#1e4d2b;padding:20px 26px;color:white">
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
-              <td valign="middle" width="56">
-                <img src="https://hirayaspaces.ca/logo-mark.jpg" alt="Hiraya Spaces" width="44" height="44" style="display:block;border-radius:8px">
+              <td valign="middle" width="150">
+                <img src="https://hirayaspaces.ca/logo-horizontal-bw.png" alt="Hiraya Spaces" width="130" style="display:block;max-width:100%;height:auto">
               </td>
               <td valign="middle" style="padding-left:14px">
                 <div style="font-family:Georgia,serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85">HIRAYA · ADMIN</div>
