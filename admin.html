@@ -991,7 +991,7 @@
               <option value="oldest">Oldest first</option>
             </select>
             <button class="panel-refresh" onclick="HirayaAdmin.exportBookingsCsv()">⬇ Export CSV</button>
-            <button class="panel-refresh" onclick="HirayaAdmin.refreshAll()">↻ Refresh</button>
+            <button class="panel-refresh" onclick="HirayaAdmin.refreshAllClear()">↻ Refresh</button>
           </div>
         </div>
         <div id="all-list" class="booking-grid"></div>
@@ -1593,8 +1593,7 @@
     min-height: 46px;
   }
   #detail-actions .booking-card-btn[onclick*="askOwnerCancel"],
-  #detail-actions .booking-card-btn[onclick*="markBookingPaid"],
-  #detail-actions .booking-card-btn[onclick*="askComplete"] {
+  #detail-actions .booking-card-btn[onclick*="markBookingPaid"] {
     grid-column: 1 / -1;
   }
   /* Cancel the mobile "Edit goes last" order rule inside the detail modal —

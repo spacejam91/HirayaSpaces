@@ -380,6 +380,19 @@
   // ── ALL BOOKINGS ───────────────────────────────────────────────────────
   let allBookings = [];
 
+  // Variant used by the panel Refresh button: clears any active list-level
+  // filters (search + date range) before re-fetching so admin gets a clean
+  // slate, not a refresh of the previously-applied filter state.
+  async function refreshAllClear() {
+    const searchEl = $('all-search');
+    if (searchEl && searchEl.value) searchEl.value = '';
+    const fromEl = $('all-from-date');
+    if (fromEl && fromEl.value) fromEl.value = '';
+    const toEl = $('all-to-date');
+    if (toEl && toEl.value) toEl.value = '';
+    await refreshAll();
+  }
+
   async function refreshAll() {
     if (!sb() || !isOwner) return;
     // Bookings + blocked dates + customer meta + customer roster in parallel.
@@ -680,6 +693,14 @@
       let actions = '';
       if (canCheckIn || canCheckOut || completable || ownerCancellable || reschedulable || canInvoice || editable) {
         const parts = [];
+        // Row 1: scheduling adjustments (used most often, so put up top).
+        if (editable) {
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
+        }
+        if (reschedulable) {
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
+        }
+        // Row 2: day-of actions — check in + mark complete.
         if (canCheckIn) {
           parts.push(`<button class="booking-card-btn" style="background:#3b82a8;color:white" onclick="HirayaAdmin.checkInBooking('${b.id}')">▶ Check in</button>`);
         }
@@ -689,6 +710,7 @@
         if (completable) {
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askComplete('${b.id}')">Mark complete</button>`);
         }
+        // Post-completion: invoice actions.
         if (canInvoice) {
           // Resend invoice only shows after the first send (auto-send on
           // Mark Complete creates the invoice row, or the admin used Mark
@@ -699,12 +721,6 @@
           }
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
           parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
-        }
-        if (reschedulable) {
-          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
-        }
-        if (editable) {
-          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
         }
         if (ownerCancellable) {
           parts.push(`<button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
@@ -3870,6 +3886,7 @@ Hiraya Spaces`
     askDeleteBooking,
     markBookingPaid,
     refreshCompleteAddonHint,
+    refreshAllClear,
     downloadInvoicePdf,
     refreshInvoices,
     renderInvoices,
