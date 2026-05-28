@@ -694,11 +694,11 @@
       if (canCheckIn || canCheckOut || completable || ownerCancellable || reschedulable || canInvoice || editable) {
         const parts = [];
         // Row 1: scheduling adjustments (used most often, so put up top).
-        if (editable) {
-          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
-        }
         if (reschedulable) {
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
+        }
+        if (editable) {
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
         }
         // Row 2: day-of actions — check in + mark complete.
         if (canCheckIn) {

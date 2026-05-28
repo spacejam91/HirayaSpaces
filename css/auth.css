@@ -560,31 +560,26 @@
    tap them on the job without misfiring. Stacks full-width when only
    one action fits per row. */
 @media (max-width: 640px) {
+  /* 2-up grid that mirrors the booking-detail modal: Edit | Reschedule on
+     top, Check in | Mark complete on row 2, Cancel booking spanning full
+     width below. Same visual hierarchy admin sees in the modal. */
   .booking-card-actions {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
-    justify-content: stretch;
   }
   .booking-card-btn {
-    flex: 1 1 100%;
     width: 100%;
     min-width: 0;
     min-height: 48px;
     font-size: 14px;
     padding: 12px 10px;
+    margin: 0;
   }
-  /* Mobile order: Edit on top, then Confirm, then Decline. */
-  .booking-card-actions .booking-card-btn[onclick*="askEdit"] { order: 1; }
-  .booking-card-actions .booking-card-btn[onclick*="askConfirm"] { order: 2; }
-  .booking-card-actions .booking-card-btn[onclick*="askDecline"] { order: 3; }
-  /* Primary actions (Check in / Check out / Mark complete) take full
-     width and read clearly at arm's length. */
-  .booking-card-btn[style*="background:#3b82a8"],
-  .booking-card-btn[style*="background:var(--sage)"] {
-    flex: 1 1 100%;
-    font-size: 16px;
-    font-weight: 600;
-    min-height: 54px;
+  /* Destructive / large-scope actions take a full row so they stand apart. */
+  .booking-card-actions .booking-card-btn[onclick*="askOwnerCancel"],
+  .booking-card-actions .booking-card-btn[onclick*="askDecline"] {
+    grid-column: 1 / -1;
   }
 }
 
