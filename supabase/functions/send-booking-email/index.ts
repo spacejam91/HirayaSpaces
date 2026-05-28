@@ -885,9 +885,18 @@ Deno.serve(async (req) => {
             <tr><td style="padding:12px 0 6px;border-top:1px solid #d4e2d8;font-weight:700;font-size:15px">Total due</td><td style="padding:12px 0 6px;border-top:1px solid #d4e2d8;text-align:right;font-weight:700;color:#1e4d2b;font-size:18px">${escapeHtml(subtotalDisplay)}</td></tr>
           </table>
 
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px">
+            <tr><td align="center" style="padding:0 0 14px">
+              <a href="${SUPABASE_URL}/functions/v1/pay-invoice?n=${encodeURIComponent(invoiceNumber!)}"
+                 style="display:inline-block;background:#1e4d2b;color:#fff;font-weight:700;font-size:15px;letter-spacing:0.5px;text-decoration:none;padding:14px 32px;border-radius:30px">
+                Pay invoice online &rarr;
+              </a>
+            </td></tr>
+          </table>
+
           <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fffbeb;border:1px solid #e5d3a0;border-radius:12px;margin-bottom:14px">
             <tr><td style="padding:16px 20px">
-              <div style="font-size:11px;font-weight:700;color:#5a4318;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">How to pay</div>
+              <div style="font-size:11px;font-weight:700;color:#5a4318;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Other ways to pay</div>
               <div style="font-size:13px;color:#3d2c0d;line-height:1.7">
                 <strong>Cash:</strong> on arrival.<br>
                 <strong>E-transfer:</strong> <a href="mailto:hirayaspaces@gmail.com" style="color:#1e4d2b;font-weight:600">hirayaspaces@gmail.com</a> — reference <strong>${escapeHtml(invoiceNumber!)}</strong>.

@@ -252,7 +252,7 @@
   let activePanel = 'pending';
 
   // Tabs that share the All-Bookings panel DOM but pre-apply a status filter.
-  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all', cancelled: 'all', thisweek: 'all' };
+  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all', cancelled: 'all', thisweek: 'all', today: 'all' };
 
   function switchPanel(name) {
     activePanel = name;
@@ -270,7 +270,7 @@
       $('decline-view').style.display = 'none';
       // Edit modal lives at top level now — closes on cancel, not on tab switch.
       refreshPending();
-    } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed' || name === 'cancelled' || name === 'thisweek') {
+    } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed' || name === 'cancelled' || name === 'thisweek' || name === 'today') {
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
       const completeView = $('complete-view');
@@ -288,6 +288,7 @@
           : name === 'completed' ? 'Completed bookings'
           : name === 'cancelled' ? 'Cancelled bookings'
           : name === 'thisweek' ? "This week's jobs"
+          : name === 'today' ? "Today's jobs"
           : 'All bookings';
       }
       refreshAll();
@@ -416,6 +417,13 @@
     return { start: fmt(monday), end: fmt(sunday) };
   }
 
+  // Today's date as YYYY-MM-DD in the user's local timezone (Aaron/Anne are
+  // both in Eastern). Used by the Today's-jobs panel to match preferred_date.
+  function todayInToronto() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   function currentMonthRange() {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -515,7 +523,15 @@
       }
     }
 
-    // Tab count chips for Confirmed / In progress / Completed.
+    // Tab count chips. Today shows the live count of today's active jobs so
+    // the cleaner knows at a glance what's on her plate before tapping in.
+    const tabToday = $('tab-count-today');
+    if (tabToday) {
+      const today = todayInToronto();
+      tabToday.textContent = allBookings.filter(b =>
+        b.preferred_date === today && ACTIVE_STATUSES.includes(b.status)
+      ).length;
+    }
     const tabConfirmed = $('tab-count-confirmed');
     if (tabConfirmed) {
       tabConfirmed.textContent = allBookings.filter(b => b.status === 'confirmed').length;
@@ -575,6 +591,12 @@
       const { start: weekStart, end: weekEnd } = currentWeekRange();
       filtered = filtered.filter(b =>
         b.preferred_date && b.preferred_date >= weekStart && b.preferred_date <= weekEnd &&
+        ACTIVE_STATUSES.includes(b.status)
+      );
+    } else if (activePanel === 'today') {
+      const today = todayInToronto();
+      filtered = filtered.filter(b =>
+        b.preferred_date === today &&
         ACTIVE_STATUSES.includes(b.status)
       );
     }
