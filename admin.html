@@ -251,6 +251,22 @@
     justify-content: center;
     border-bottom: 1px solid var(--border);
     margin-bottom: 1.5rem;
+    background: var(--cream, #f8faf8);
+  }
+  /* Sticky tab bar on mobile — scroll past stats and you can still switch
+     tabs without scrolling back to the top. */
+  @media (max-width: 880px) {
+    .admin-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      padding: 6px 8px;
+      margin-left: -8px;
+      margin-right: -8px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      background: rgba(248, 250, 248, 0.94);
+    }
   }
   .admin-tab {
     background: none; border: none;
@@ -879,7 +895,6 @@
 
     <div class="admin-hero">
       <h1>Welcome <em id="admin-first-name">back</em></h1>
-      <p id="admin-hero-sub">Review pending requests, manage active bookings, and keep an eye on the schedule.</p>
     </div>
 
     <!-- Stats stubs (Phase 2) -->
@@ -903,16 +918,6 @@
         <div class="stat-card-label">Revenue MTD</div>
         <div class="stat-card-value" id="stat-revenue">—</div>
         <div class="stat-card-sub" id="stat-revenue-sub">This month</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-label">Revenue YTD</div>
-        <div class="stat-card-value" id="stat-revenue-ytd">—</div>
-        <div class="stat-card-sub" id="stat-revenue-ytd-sub">Year to date</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-label">Pipeline</div>
-        <div class="stat-card-value" id="stat-pipeline">—</div>
-        <div class="stat-card-sub" id="stat-pipeline-sub">Confirmed, not yet done</div>
       </div>
     </div>
 
@@ -940,7 +945,6 @@
       <button class="admin-tab" data-panel="calendar" onclick="HirayaAdmin.switchPanel('calendar')">Calendar</button>
       <button class="admin-tab" data-panel="customers" onclick="HirayaAdmin.switchPanel('customers')">Customers</button>
       <button class="admin-tab" data-panel="invoices" onclick="HirayaAdmin.switchPanel('invoices')">Invoices</button>
-      <button class="admin-tab" data-panel="paid" onclick="HirayaAdmin.switchPanel('paid')">Paid</button>
     </div>
 
     <!-- ── PENDING PANEL ── -->
@@ -1607,7 +1611,8 @@
     min-height: 46px;
   }
   #detail-actions .booking-card-btn[onclick*="askOwnerCancel"],
-  #detail-actions .booking-card-btn[onclick*="markBookingPaid"] {
+  #detail-actions .booking-card-btn[onclick*="markBookingPaid"],
+  #detail-actions .booking-card-btn[onclick*="bookAgain"] {
     grid-column: 1 / -1;
   }
   /* Cancel the mobile "Edit goes last" order rule inside the detail modal —

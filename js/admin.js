@@ -252,7 +252,7 @@
   let activePanel = 'pending';
 
   // Tabs that share the All-Bookings panel DOM but pre-apply a status filter.
-  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all', cancelled: 'all', thisweek: 'all', today: 'all', paid: 'invoices' };
+  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all', cancelled: 'all', thisweek: 'all', today: 'all' };
 
   function switchPanel(name) {
     activePanel = name;
@@ -322,14 +322,6 @@
       renderCustomers();
       refreshAll();
     } else if (name === 'invoices') {
-      // Coming back to the full Invoices view — clear the paid pre-filter.
-      const invStatusEl = $('inv-status-filter');
-      if (invStatusEl) invStatusEl.value = '';
-      refreshInvoices();
-    } else if (name === 'paid') {
-      // Shortcut tab that opens Invoices pre-filtered to paid only.
-      const invStatusEl = $('inv-status-filter');
-      if (invStatusEl) invStatusEl.value = 'paid';
       refreshInvoices();
     }
   }
@@ -712,6 +704,9 @@
         }
         // Post-completion: invoice actions.
         if (canInvoice) {
+          // Book again is the most actionable next step after a complete clean
+          // (sets up the customer's next visit). Put it at the top, full-width.
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.bookAgain('${b.id}')">+ Book again</button>`);
           // Resend invoice only shows after the first send (auto-send on
           // Mark Complete creates the invoice row, or the admin used Mark
           // as paid which also creates one). Before that, no button — the
@@ -720,8 +715,11 @@
             parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.sendInvoice('${b.id}')">↻ Resend invoice</button>`);
           }
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
-          parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
-          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.bookAgain('${b.id}')">+ Book again</button>`);
+          if (b.invoice?.status === 'paid') {
+            parts.push(`<button class="booking-card-btn" style="color:#9a6a16;border-color:#e6cfa3" onclick="HirayaAdmin.askRefundBooking('${b.id}')">↩ Refund</button>`);
+          } else {
+            parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
+          }
         }
         if (ownerCancellable) {
           parts.push(`<button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
@@ -2641,6 +2639,34 @@ Hiraya Spaces`
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
+  }
+
+  // One-click refund from the booking card (when invoice is paid). Flips
+  // invoice status to refunded — the booking row stays as-is. Counterpart
+  // to markBookingPaid.
+  async function askRefundBooking(id) {
+    if (!sb() || !isOwner) return;
+    const b = allBookings.find(x => x.id === id);
+    const label = b ? `${b.customer_name || 'Customer'}'s booking on ${formatBookingDate(b.preferred_date)}` : 'this booking';
+    if (!b?.invoice?.id) {
+      showToast('No invoice found to refund.', 'error');
+      return;
+    }
+    if (!window.confirm(`Refund ${label}?\n\nThe invoice will be marked refunded. The amount stays on record for history.`)) return;
+    try {
+      const { error } = await sb().rpc('admin_set_invoice_status', {
+        p_invoice_id: b.invoice.id,
+        p_status: 'refunded',
+      });
+      if (error) throw error;
+      showToast('Invoice marked refunded.', 'success');
+      closeBookingDetail();
+      await refreshAll();
+      refreshPending();
+    } catch (err) {
+      console.error('askRefundBooking failed:', err);
+      showToast('Could not refund: ' + (err?.message || String(err)), 'error');
+    }
   }
 
   // Open the New Booking modal pre-populated with this booking's customer.
