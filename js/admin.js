@@ -504,7 +504,7 @@
     const statRevenueSub = $('stat-revenue-sub');
 
     if (statConfirmed) {
-      const upcoming = allBookings.filter(b => b.status === 'confirmed' || b.status === 'in_progress').length;
+      const upcoming = allBookings.filter(b => b.status === 'confirmed').length;
       statConfirmed.textContent = upcoming;
     }
 
