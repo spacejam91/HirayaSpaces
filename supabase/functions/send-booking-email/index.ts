@@ -887,7 +887,7 @@ Deno.serve(async (req) => {
 
           <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px">
             <tr><td align="center" style="padding:0 0 14px">
-              <a href="${SUPABASE_URL}/functions/v1/pay-invoice?n=${encodeURIComponent(invoiceNumber!)}"
+              <a href="${supabaseUrl}/functions/v1/pay-invoice?n=${encodeURIComponent(invoiceNumber!)}"
                  style="display:inline-block;background:#1e4d2b;color:#fff;font-weight:700;font-size:15px;letter-spacing:0.5px;text-decoration:none;padding:14px 32px;border-radius:30px">
                 Pay invoice online &rarr;
               </a>

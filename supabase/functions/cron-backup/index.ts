@@ -135,11 +135,13 @@ Deno.serve(async (req) => {
     },
   });
 
+  // BACKUP_TO can be a single email or comma-separated list (e.g. all 3 admins).
+  const recipients = BACKUP_TO.split(",").map((s) => s.trim()).filter(Boolean);
   let sendErr: unknown = null;
   try {
     await client.send({
       from: Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!,
-      to: BACKUP_TO,
+      to: recipients.length === 1 ? recipients[0] : recipients,
       subject: `Hiraya backup ${dateStr} — ${totalRows} rows across ${attachments.length} tables`,
       html: summaryHtml,
       attachments,
