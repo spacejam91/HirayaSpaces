@@ -380,7 +380,7 @@
   @media (min-width: 880px) {
     .booking-grid > .booking-card {
       display: grid;
-      grid-template-columns: minmax(260px, 1.1fr) 2.4fr auto;
+      grid-template-columns: minmax(260px, 1.1fr) 2.4fr;
       gap: 2.5rem;
       align-items: start;
       padding: 1rem 2rem;
@@ -1623,21 +1623,21 @@
      priority body rows so the card stays scannable at a glance — the
      modal shows everything when tapped. */
   .booking-card-detail-link {
-    display: none;
-    background: none;
-    border: none;
-    border-top: 1px dashed var(--border);
-    width: 100%;
-    padding: 10px 0;
-    margin-top: 8px;
+    display: inline-block;
+    background: var(--sage);
+    color: white;
+    border: 1px solid var(--sage);
+    border-radius: 30px;
+    padding: 10px 22px;
+    margin-top: 12px;
     text-align: center;
     font-family: inherit;
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    color: var(--sage);
+    font-size: 13px;
+    letter-spacing: 0.3px;
     font-weight: 600;
-    cursor: pointer;
   }
+  .booking-card-detail-link:hover { background: #2b5a3d; border-color: #2b5a3d; }
+  .booking-card-detail-link:active { transform: scale(.97); transition: transform .08s; }
   /* Mark refunded is a rare admin action — hide on phones to keep the
      invoice modal compact. Still accessible from desktop. */
   @media (max-width: 640px) {

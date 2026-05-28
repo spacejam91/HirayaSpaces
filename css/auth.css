@@ -656,3 +656,9 @@
   .addr-card-actions { flex-direction: row; align-self: flex-start; }
   .modal-field-grid { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* Cards stay info-only — the only visible action is the "View Booking →"
+   detail link. All other action buttons live in the booking-detail popup
+   that opens when you click the card or that link. The action buttons stay
+   in the DOM so the modal can mirror them; they're just hidden on the card. */
+.booking-card .booking-card-actions { display: none !important; }
