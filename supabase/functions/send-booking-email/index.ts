@@ -608,7 +608,7 @@ Deno.serve(async (req) => {
       ? `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:14px 0 0">
           <tr><td align="center">
             <div style="display:inline-block;background:#e4f0e9;color:#1e4d2b;font-size:13px;font-weight:600;padding:8px 16px;border-radius:20px;letter-spacing:0.3px">
-              &#128257; Recurring clean &mdash; ${escapeHtml(freqLabel)}${booking.recurring_discount_pct ? ` &middot; ${booking.recurring_discount_pct}% off` : ""}
+              &#128257; Recurring clean &mdash; ${escapeHtml(freqLabel)}
             </div>
           </td></tr>
         </table>`
