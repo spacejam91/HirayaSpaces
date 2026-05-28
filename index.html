@@ -521,7 +521,7 @@
   /* ── STATS STRIP ── */
   .stats-strip {
     background: #0f2e18; padding: 2rem 8vw;
-    display: grid; grid-template-columns: repeat(3, 1fr);
+    display: grid; grid-template-columns: repeat(2, 1fr);
     gap: 0;
   }
   .stat-item { text-align: center; padding: 1rem; }
@@ -1190,9 +1190,6 @@
     .reviews-grid { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
     .stats-strip { grid-template-columns: repeat(2, 1fr); }
-    /* With 3 items in a 2-col grid, the 3rd wraps onto row 2 alone — span
-       both columns so it centers under the pair above. */
-    .stats-strip .stat-item:nth-child(3) { grid-column: 1 / -1; }
     .nav-links { display: none; }
     .nav-hamburger { display: flex; }
     .nav-call-icon { display: none !important; }
@@ -1379,7 +1376,6 @@
 <div class="stats-strip">
   <div class="stat-item"><div class="stat-n">100+</div><div class="stat-l">Happy clients</div></div>
   <div class="stat-item"><div class="stat-n">1 yr</div><div class="stat-l">In business</div></div>
-  <div class="stat-item"><div class="stat-n">100%</div><div class="stat-l">Satisfaction guaranteed</div></div>
 </div>
 
 <!-- TRUST STRIP -->
