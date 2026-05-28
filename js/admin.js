@@ -2437,7 +2437,10 @@ Hiraya Spaces`
       if (error) throw error;
       const inv = Array.isArray(data) ? data[0] : data;
       if (!inv) {
-        $('invoice-empty').style.display = 'block';
+        // DRAFT preview: no invoices row yet, so show what the invoice WILL
+        // look like based on the booking + add-ons. Admin can review and then
+        // hit "Send invoice" to actually create + email it.
+        renderInvoiceDraft(b);
         return;
       }
       viewingInvoice = inv;
@@ -2475,12 +2478,23 @@ Hiraya Spaces`
       const paidBtn = $('invoice-paid-btn');
       if (paidBtn) {
         paidBtn.textContent = inv.status === 'paid' ? 'Mark as unpaid' : 'Mark as paid';
+        paidBtn.disabled = false;
+        paidBtn.style.display = '';
       }
       const refundBtn = $('invoice-refund-btn');
       if (refundBtn) {
         refundBtn.textContent = inv.status === 'refunded' ? '↩ Reverse refund' : '↩ Mark refunded';
         refundBtn.disabled = false;
+        refundBtn.style.display = '';
       }
+      // Belt-and-suspenders: re-enable the secondary action buttons too.
+      const pdfBtn = $('invoice-pdf-btn');
+      if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.style.display = ''; }
+      const resendBtn = $('invoice-resend-btn');
+      if (resendBtn) { resendBtn.disabled = false; resendBtn.style.display = ''; }
+      // Real invoice exists — hide the Send-invoice button (it's only for drafts).
+      const sendBtn = $('invoice-send-btn');
+      if (sendBtn) sendBtn.style.display = 'none';
       $('invoice-body').style.display = 'block';
     } catch (err) {
       console.error('admin_get_invoice_for_booking failed:', err);
@@ -2492,6 +2506,51 @@ Hiraya Spaces`
       }
       $('invoice-body').style.display = 'block';
     }
+  }
+
+  // Render the invoice modal as a DRAFT (no invoices row exists yet). Same
+  // line-item layout as a real invoice; the Mark Paid / Refund / Resend / PDF
+  // buttons are hidden and a single "Send invoice" button is shown.
+  function renderInvoiceDraft(b) {
+    $('invoice-num').textContent = 'DRAFT';
+    $('invoice-status').textContent = 'DRAFT';
+    $('invoice-status').style.color = 'var(--muted)';
+    const totalCents = b.final_price_cents ?? b.estimated_price_cents ?? 0;
+    $('invoice-total').textContent = '$' + Math.round(totalCents / 100);
+    $('invoice-issued').textContent = 'Not yet sent';
+    $('invoice-paid-at-wrap').style.display = 'none';
+
+    const linesEl = $('invoice-lines');
+    if (linesEl) {
+      const addonItems = b.addon_items || [];
+      const addonsSum = addonItems.reduce((s, a) => s + (a.price_cents || 0), 0);
+      const svcPrice = Math.max(0, totalCents - addonsSum);
+      const rows = [];
+      rows.push(`<div style="display:flex;justify-content:space-between"><span>${escapeHtml(b.service_name || 'Cleaning service')}</span><strong>$${Math.round(svcPrice / 100)}</strong></div>`);
+      addonItems.forEach(a => {
+        rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
+      });
+      rows.push(`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--sage);font-size:16px"><span><strong>Total</strong></span><strong>$${Math.round(totalCents / 100)}</strong></div>`);
+      linesEl.innerHTML = rows.join('');
+    }
+
+    // Hide the post-send action buttons; show the Send button instead.
+    const paidBtn = $('invoice-paid-btn'); if (paidBtn) paidBtn.style.display = 'none';
+    const refundBtn = $('invoice-refund-btn'); if (refundBtn) refundBtn.style.display = 'none';
+    const resendBtn = $('invoice-resend-btn'); if (resendBtn) resendBtn.style.display = 'none';
+    const pdfBtn = $('invoice-pdf-btn'); if (pdfBtn) pdfBtn.style.display = 'none';
+    const sendBtn = $('invoice-send-btn');
+    if (sendBtn) { sendBtn.style.display = ''; sendBtn.disabled = false; sendBtn.textContent = '📧 Send invoice'; }
+
+    $('invoice-body').style.display = 'block';
+  }
+
+  // Wired to the in-modal Send button (only visible on a draft preview).
+  function sendInvoiceFromModal() {
+    if (!viewingInvoiceBookingId) return;
+    const bookingId = viewingInvoiceBookingId;
+    closeInvoiceView();
+    sendInvoice(bookingId);
   }
 
   function closeInvoiceView() {
@@ -3380,6 +3439,7 @@ Hiraya Spaces`
     addEditExtra,
     sendInvoice,
     viewInvoice,
+    sendInvoiceFromModal,
     closeInvoiceView,
     closeInvoiceIfBackdrop,
     toggleInvoicePaid,

@@ -101,11 +101,11 @@ async function buildInvoicePdf(opts: {
       width: logoDims.width,
       height: logoDims.height,
     });
-    drawRight("Waterloo, ON - hirayaspaces.ca", logoTop - logoDims.height / 2 - 4, font, 10, muted);
+    drawRight("Kitchener, ON - hirayaspaces.ca", logoTop - logoDims.height / 2 - 4, font, 10, muted);
     headerBottomY = logoTop - logoDims.height - 12;
   } catch (_logoErr) {
     drawAt("HIRAYA SPACES", left, y, bold, 14, sage);
-    drawRight("Waterloo, ON - hirayaspaces.ca", y, font, 10, muted);
+    drawRight("Kitchener, ON - hirayaspaces.ca", y, font, 10, muted);
     y -= 14;
     drawAt("Turning homes into dream spaces", left, y, font, 9, muted);
     headerBottomY = y - 16;
@@ -643,7 +643,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -718,7 +718,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -894,7 +894,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1012,7 +1012,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1086,7 +1086,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1178,7 +1178,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1256,7 +1256,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1324,7 +1324,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1403,7 +1403,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1571,7 +1571,7 @@ Deno.serve(async (req) => {
           </p>
         </td></tr>
         <tr><td style="background:#f0f5f1;padding:18px 30px;text-align:center;font-size:11px;color:#6a7d6e;border-top:1px solid #d4e2d8">
-          Hiraya Spaces · Waterloo, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
+          Hiraya Spaces · Kitchener, ON · <a href="https://hirayaspaces.ca" style="color:#1e4d2b;text-decoration:none">hirayaspaces.ca</a>
         </td></tr>
       </table>
     </td></tr>
