@@ -383,7 +383,26 @@
     }
     // Attach add-on names to each booking so the card can list them inline.
     await attachAddonsToBookings(allBookings);
+    // Attach invoice presence so cards can show "Resend" only when an
+    // invoice has been sent / created already.
+    await attachInvoicesToBookings(allBookings);
     renderAll();
+  }
+
+  async function attachInvoicesToBookings(bookings) {
+    if (!bookings || !bookings.length || !sb()) return;
+    const ids = bookings.map(b => b.id);
+    const { data, error } = await sb()
+      .from('invoices')
+      .select('booking_id, id, invoice_number, status, paid_at')
+      .in('booking_id', ids);
+    if (error) {
+      console.warn('invoices fetch failed:', error.message);
+      return;
+    }
+    const byBooking = new Map();
+    (data || []).forEach(row => byBooking.set(row.booking_id, row));
+    bookings.forEach(b => { b.invoice = byBooking.get(b.id) || null; });
   }
 
   async function attachAddonsToBookings(bookings) {
@@ -644,7 +663,13 @@
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.askComplete('${b.id}')">Mark complete</button>`);
         }
         if (canInvoice) {
-          parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.sendInvoice('${b.id}')">Send invoice</button>`);
+          // Resend invoice only shows after the first send (auto-send on
+          // Mark Complete creates the invoice row, or the admin used Mark
+          // as paid which also creates one). Before that, no button — the
+          // user goes through the Mark Complete flow with auto-send on.
+          if (b.invoice) {
+            parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.sendInvoice('${b.id}')">↻ Resend invoice</button>`);
+          }
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
           parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
         }
