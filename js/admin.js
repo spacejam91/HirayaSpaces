@@ -2124,6 +2124,10 @@ Hiraya Spaces`
     // never accidentally fire payment emails for unpaid jobs.
     const paidOnsite = $('complete-paid-onsite');
     if (paidOnsite) paidOnsite.checked = false;
+    // Auto-send invoice defaults ON — the typical post-completion flow is
+    // "send the invoice next." Admin can untick if they want to delay.
+    const autoInv = $('complete-auto-invoice');
+    if (autoInv) autoInv.checked = true;
     hideErr('complete-err');
     $('all-list-view').style.display = 'none';
     $('owner-cancel-view').style.display = 'none';
@@ -2210,6 +2214,26 @@ Hiraya Spaces`
       if (data === false) {
         showErr('complete-err', 'Booking is no longer eligible — refresh and try again.');
       } else {
+        // Auto-send the invoice email (create row + email PDF) if the
+        // checkbox is on AND we didn't already do the paid-on-site flow.
+        // Fire-and-forget so a slow SMTP doesn't block the modal.
+        const wantAutoInvoice = $('complete-auto-invoice')?.checked && !paidOnSite;
+        if (wantAutoInvoice) {
+          sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'invoice' } })
+            .then(({ data: d, error: e }) => {
+              const debug = d?.debug || d?.error || '';
+              if (e || debug) {
+                console.warn('auto-send invoice warning:', e?.message || debug || e);
+                showToast('Marked complete. Invoice email returned a warning — verify in Invoices tab.', 'error');
+              } else {
+                showToast('Invoice emailed to customer. ✓', 'success');
+              }
+            })
+            .catch(err => {
+              console.warn('auto-send invoice failed:', err);
+              showToast('Marked complete, but auto-send invoice failed: ' + (err?.message || err), 'error');
+            });
+        }
         // Auto-create the next recurring visit if the checkbox is checked.
         // Done before the thank-you email so a failure here surfaces clearly,
         // not buried under the email status toast.
