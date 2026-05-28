@@ -637,6 +637,7 @@
         if (canInvoice) {
           parts.push(`<button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.sendInvoice('${b.id}')">Send invoice</button>`);
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
+          parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
         }
         if (editable) {
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
@@ -1245,6 +1246,18 @@ Hiraya Spaces`
     $('nb-customer-search-wrap').style.display = 'none';
     $('nb-selected-name').textContent = c.name;
     $('nb-selected-email').textContent = c.email + (c.phone ? ' · ' + c.phone : '');
+    // Surface the last-visit info so admin can predict the discount tier
+    // before they even pick a date.
+    const lastVisitEl = $('nb-last-visit');
+    if (lastVisitEl) {
+      if (c.last_completed) {
+        const days = c.days_since_last;
+        const dateLabel = formatBookingDate(c.last_completed);
+        lastVisitEl.textContent = `Last visit: ${dateLabel}${days != null ? ` (${days} day${days === 1 ? '' : 's'} ago)` : ''}`;
+      } else {
+        lastVisitEl.textContent = 'First-time customer — no prior visits.';
+      }
+    }
     $('nb-customer-selected').style.display = 'flex';
 
     // Pull this customer's saved addresses via the admin RPC.
@@ -1312,17 +1325,31 @@ Hiraya Spaces`
     return svc?.starting_price_cents || 0;
   }
 
-  // Mirror the customer flow's recurring discount policy in the admin form:
-  // weekly/biweekly/monthly only apply their 20/15/10% off once the customer
-  // has at least one COMPLETED booking on file.
-  const NB_FREQUENCY_DISCOUNTS = { one_time: 0, weekly: 20, biweekly: 15, monthly: 10 };
+  // Cadence-based recurring discount. We measure the gap between the
+  // customer's most recent completed visit (nbSelectedCustomer.last_completed)
+  // and the new booking's preferred_date, then award the matching tier.
+  // The frequency picker stays purely for scheduling preference / future
+  // auto-create intervals — it no longer drives the discount.
+  function discountPctFromGap(daysGap) {
+    if (!Number.isFinite(daysGap) || daysGap <= 0) return 0;
+    if (daysGap <= 8) return 20;   // weekly cadence (+1d buffer)
+    if (daysGap <= 15) return 15;  // biweekly
+    if (daysGap <= 30) return 10;  // monthly
+    return 0;
+  }
+
+  function nbCadenceInfo() {
+    const lastDate = nbSelectedCustomer?.last_completed || null;
+    const newDate = $('nb-date')?.value || null;
+    if (!lastDate || !newDate) return { pct: 0, daysGap: null, lastDate };
+    const last = new Date(lastDate + 'T12:00:00');
+    const next = new Date(newDate + 'T12:00:00');
+    const daysGap = Math.round((next - last) / 86400000);
+    return { pct: discountPctFromGap(daysGap), daysGap, lastDate };
+  }
 
   function nbAppliedDiscountPct() {
-    const freq = $('nb-frequency')?.value || 'one_time';
-    const declared = NB_FREQUENCY_DISCOUNTS[freq] || 0;
-    if (!declared) return 0;
-    const earned = nbSelectedCustomer?.earned_count || 0;
-    return earned > 0 ? declared : 0;
+    return nbCadenceInfo().pct;
   }
 
   function recalcNbPrice() {
@@ -1353,20 +1380,24 @@ Hiraya Spaces`
       }
     }
 
-    // Discount eligibility hint — explains WHY the discount is or isn't
-    // applied, so it's obvious that the customer's history is being checked.
+    // Discount eligibility hint — explains the cadence + tier so the admin
+    // can see exactly which discount tier the customer landed in (and why).
     const dHint = $('nb-discount-hint');
     if (dHint) {
-      const freq = $('nb-frequency')?.value || 'one_time';
-      const declared = NB_FREQUENCY_DISCOUNTS[freq] || 0;
+      const { pct, daysGap, lastDate } = nbCadenceInfo();
       if (!nbSelectedCustomer) {
         dHint.textContent = '';
-      } else if (freq === 'one_time') {
-        dHint.textContent = '';
-      } else if (appliedPct > 0) {
-        dHint.textContent = `↻ ${declared}% recurring discount applied (customer has ${nbSelectedCustomer.earned_count} completed clean${nbSelectedCustomer.earned_count === 1 ? '' : 's'}).`;
+      } else if (!lastDate) {
+        dHint.textContent = 'First-time customer — full price.';
+      } else if (!$('nb-date')?.value) {
+        dHint.textContent = 'Pick a date to see the cadence-based discount.';
+      } else if (pct > 0) {
+        const tier = pct === 20 ? 'weekly' : pct === 15 ? 'biweekly' : 'monthly';
+        dHint.textContent = `↻ ${pct}% ${tier} cadence discount — ${daysGap} day${daysGap === 1 ? '' : 's'} since last visit.`;
+      } else if (daysGap !== null && daysGap > 30) {
+        dHint.textContent = `Last visit was ${daysGap} days ago (>30) — no recurring discount this visit.`;
       } else {
-        dHint.textContent = `Discount holds until customer has 1 completed clean. Full price for this visit.`;
+        dHint.textContent = 'No discount applied.';
       }
     }
 
@@ -1595,12 +1626,21 @@ Hiraya Spaces`
   // ── MANUAL EDIT (admin can adjust any pending/active booking) ──────────
   let editingId = null;
 
+  // The booking being edited's customer's most recent completed visit. Used
+  // by recalcEditPrice to apply the cadence-based recurring discount.
+  let editingCustomerLastCompleted = null;
+
   async function askEdit(id) {
     // Source of truth is allBookings (which has joined service_name etc).
     // Pending bookings come from pendingBookings, so fall back if needed.
     const b = allBookings.find(x => x.id === id) || pendingBookings.find(x => x.id === id);
     if (!b) return;
     editingId = id;
+
+    // Snapshot the customer's last completed visit so the recalc can apply
+    // the cadence discount when admin changes service / date / add-ons.
+    const customer = aggregateCustomers().find(c => c.user_id === b.user_id);
+    editingCustomerLastCompleted = customer?.last_completed || null;
 
     // Make sure caches are loaded — the modal may be opened before the
     // user has navigated to anything that triggered loadServicesCache.
@@ -1705,7 +1745,28 @@ Hiraya Spaces`
         const v = priceInput ? Number(priceInput.value) : 0;
         return sum + (Number.isFinite(v) ? Math.round(v * 100) : 0);
       }, 0);
-    const totalDollars = Math.round((baseCents + addonsCents + extrasCents) / 100);
+    const subtotalCents = baseCents + addonsCents + extrasCents;
+
+    // Cadence discount — mirror the booking + new-booking flows. Computed
+    // from the gap between the customer's most recent completed visit and
+    // the new edited date.
+    let discountPct = 0;
+    const newDate = $('edit-date')?.value;
+    if (editingCustomerLastCompleted && newDate) {
+      const last = new Date(editingCustomerLastCompleted + 'T12:00:00');
+      const next = new Date(newDate + 'T12:00:00');
+      const daysGap = Math.round((next - last) / 86400000);
+      if (daysGap > 0) {
+        if (daysGap <= 8) discountPct = 20;
+        else if (daysGap <= 15) discountPct = 15;
+        else if (daysGap <= 30) discountPct = 10;
+      }
+    }
+    const totalCents = discountPct > 0
+      ? Math.round(subtotalCents * (1 - discountPct / 100))
+      : subtotalCents;
+
+    const totalDollars = Math.round(totalCents / 100);
     const priceEl = $('edit-price');
     if (priceEl) priceEl.value = totalDollars;
   }
@@ -2329,6 +2390,45 @@ Hiraya Spaces`
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
+  }
+
+  // One-click "Mark this booking paid" — convenience for the cleaner on-site
+  // or admin wrapping up after the customer pays. Same orchestration as the
+  // paid-on-site checkbox: ensures an invoice exists, stamps it paid, fires
+  // the receipt email. Idempotent — safe to click on an already-paid booking.
+  async function markBookingPaid(id) {
+    if (!sb() || !isOwner) return;
+    const b = allBookings.find(x => x.id === id);
+    const label = b ? `${b.customer_name || 'Customer'}'s booking on ${formatBookingDate(b.preferred_date)}` : 'this booking';
+    if (!window.confirm(`Mark ${label} as paid?\n\nIf no invoice exists yet, one will be created. The customer will get a "Payment received" email with the PAID invoice attached.`)) return;
+    try {
+      const { data, error } = await sb().rpc('admin_complete_and_collect', {
+        p_booking_id: id,
+        p_final_cents: null,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      const invNum = row?.invoice_number || '';
+      showToast(`Marked paid${invNum ? ' (' + invNum + ')' : ''}. Sending receipt…`, 'success');
+      sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'payment_received' } })
+        .then(({ error: e }) => {
+          if (e) {
+            console.warn('payment_received email failed:', e);
+            showToast('Marked paid, but receipt email failed — verify with customer.', 'error');
+          }
+        });
+      closeBookingDetail();
+      await refreshAll();
+      refreshPending();
+    } catch (err) {
+      console.error('markBookingPaid failed:', err);
+      const msg = err?.message || String(err);
+      if (/does not exist|not found/i.test(msg)) {
+        showToast('Mark paid needs the admin_complete_and_collect SQL migration.', 'error');
+      } else {
+        showToast('Could not mark paid: ' + msg, 'error');
+      }
+    }
   }
 
   // Owner hard-delete a booking. Two-step confirm so it's not a single
@@ -3410,7 +3510,14 @@ Hiraya Spaces`
     // modal matches the card layout.
     const detailAddonsSumCents = (b.addon_items || []).reduce((s, a) => s + (a.price_cents || 0), 0);
     const detailTotalCents = b.final_price_cents ?? b.estimated_price_cents;
-    const detailSvcCents = (detailTotalCents != null) ? Math.max(0, detailTotalCents - detailAddonsSumCents) : null;
+    const detailDiscountPct = b.recurring_discount_pct || 0;
+    // Reverse-engineer the pre-discount subtotal so the SERVICE line reflects
+    // the full catalog rate (e.g. $120), not the post-discount amount.
+    let detailSubtotalCents = detailTotalCents;
+    if (detailTotalCents != null && detailDiscountPct > 0) {
+      detailSubtotalCents = Math.round(detailTotalCents / (1 - detailDiscountPct / 100));
+    }
+    const detailSvcCents = (detailSubtotalCents != null) ? Math.max(0, detailSubtotalCents - detailAddonsSumCents) : null;
     const detailSvcPriceStr = (detailSvcCents != null && detailSvcCents > 0) ? ` — <strong>$${Math.round(detailSvcCents / 100)}</strong>` : '';
     // Recurring badge — mirror the card so the modal shows the schedule too.
     const detailFreqLabels = { weekly: 'Weekly · 20% off', biweekly: 'Every 2 weeks · 15% off', monthly: 'Monthly · 10% off' };
@@ -3456,7 +3563,24 @@ Hiraya Spaces`
       internalWrap.style.display = 'none';
     }
 
-    $('detail-price').innerHTML = `<strong style="font-size:18px">${escapeHtml(total)}</strong>`;
+    // Price section: when a recurring discount was applied, surface it as
+    // its own line so the customer/admin can see exactly what came off.
+    if (detailDiscountPct > 0 && detailTotalCents != null && detailSubtotalCents != null) {
+      const discountAmount = detailSubtotalCents - detailTotalCents;
+      $('detail-price').innerHTML = `
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:2px 0">
+          <span>Subtotal</span><span>$${Math.round(detailSubtotalCents / 100)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--sage);padding:2px 0">
+          <span>↻ Recurring discount (${detailDiscountPct}% off)</span><span>-$${Math.round(discountAmount / 100)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:8px 0 0;border-top:1px solid var(--border);margin-top:6px">
+          <span>Total</span><span>$${Math.round(detailTotalCents / 100)}</span>
+        </div>
+      `;
+    } else {
+      $('detail-price').innerHTML = `<strong style="font-size:18px">${escapeHtml(total)}</strong>`;
+    }
 
     // Mirror the card's action buttons inside the modal so the admin/cleaner
     // can act without closing the modal first.
@@ -3535,6 +3659,7 @@ Hiraya Spaces`
     addNbExtra,
     recalcNbPrice,
     askDeleteBooking,
+    markBookingPaid,
     downloadInvoicePdf,
     refreshInvoices,
     renderInvoices,

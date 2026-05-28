@@ -462,30 +462,39 @@
         ? Math.round(f.estimated_total_dollars * 100)
         : null;
 
-      // Recurring discount policy: 20%/15%/10% only applies once the customer
-      // has at least one COMPLETED clean. Their first visit (and anything
-      // booked before that first clean is finished) is full price; the
-      // discount kicks in on bookings made after a completed visit. The client
-      // sends full price; here we check completed history and apply if eligible.
+      // Recurring discount policy: cadence-based. We measure the gap between
+      // the customer's most recent COMPLETED visit and this booking's date,
+      // then award the tier they actually hit:
+      //   ≤  8 days  → 20% (weekly cadence)
+      //   ≤ 15 days  → 15% (biweekly)
+      //   ≤ 30 days  → 10% (monthly)
+      //   beyond     → 0%  (treated as fresh)
+      // First-time customers (no completed visits) always pay full price.
       let appliedDiscountPct = 0;
-      const declaredPct = f.recurring_discount_pct || 0;
-      if (declaredPct > 0) {
-        try {
-          const { count: completedCount } = await sb()
-            .from('bookings')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id)
-            .eq('status', 'completed');
-          if (completedCount && completedCount > 0) {
-            // Customer has a completed visit — apply the recurring discount.
-            appliedDiscountPct = declaredPct;
-            if (clientTotalCents != null) {
-              clientTotalCents = Math.round(clientTotalCents * (1 - declaredPct / 100));
-            }
+      try {
+        const { data: lastBooking } = await sb()
+          .from('bookings')
+          .select('preferred_date')
+          .eq('user_id', user.id)
+          .eq('status', 'completed')
+          .order('preferred_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastBooking?.preferred_date && f.preferred_date) {
+          const last = new Date(lastBooking.preferred_date + 'T12:00:00');
+          const next = new Date(f.preferred_date + 'T12:00:00');
+          const daysGap = Math.round((next - last) / 86400000);
+          if (daysGap > 0) {
+            if (daysGap <= 8) appliedDiscountPct = 20;
+            else if (daysGap <= 15) appliedDiscountPct = 15;
+            else if (daysGap <= 30) appliedDiscountPct = 10;
           }
-        } catch (countErr) {
-          console.warn('completed booking count failed:', countErr.message || countErr);
         }
+      } catch (lookupErr) {
+        console.warn('cadence lookup failed:', lookupErr.message || lookupErr);
+      }
+      if (appliedDiscountPct > 0 && clientTotalCents != null) {
+        clientTotalCents = Math.round(clientTotalCents * (1 - appliedDiscountPct / 100));
       }
 
       const totalCents = clientTotalCents ?? (

@@ -1255,6 +1255,7 @@
         <div>
           <div style="font-weight:600" id="nb-selected-name"></div>
           <div style="font-size:12px;color:var(--muted)" id="nb-selected-email"></div>
+          <div id="nb-last-visit" style="font-size:12px;color:var(--sage);margin-top:4px;font-weight:500"></div>
         </div>
         <button type="button" onclick="HirayaAdmin.clearCustomer()">Change</button>
       </div>
@@ -1371,7 +1372,7 @@
     <div class="nb-section" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div>
         <div class="nb-section-label">Date</div>
-        <input type="date" id="edit-date" class="nb-input">
+        <input type="date" id="edit-date" class="nb-input" onchange="HirayaAdmin.recalcEditPrice()">
       </div>
       <div>
         <div class="nb-section-label">Time slot</div>
