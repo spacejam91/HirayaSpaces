@@ -1324,13 +1324,38 @@ Hiraya Spaces`
     $('nb-customer-search-wrap').style.display = 'none';
     $('nb-selected-name').textContent = c.name;
     $('nb-selected-email').textContent = c.email + (c.phone ? ' · ' + c.phone : '');
+    // Fresh DB lookup of the customer's most recent COMPLETED visit. We use
+    // this instead of the cached aggregateCustomers value because the cache
+    // can lag behind (e.g. after a SQL wipe / manual edit) — and a stale
+    // last_completed silently applies the wrong cadence discount.
+    try {
+      const { data: lastB } = await sb()
+        .from('bookings')
+        .select('preferred_date')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .order('preferred_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      nbSelectedCustomer.last_completed = lastB?.preferred_date || null;
+      if (nbSelectedCustomer.last_completed) {
+        const last = new Date(nbSelectedCustomer.last_completed + 'T12:00:00');
+        const today = new Date();
+        nbSelectedCustomer.days_since_last = Math.round((today - last) / 86400000);
+      } else {
+        nbSelectedCustomer.days_since_last = null;
+      }
+    } catch (lookupErr) {
+      console.warn('fresh last_completed lookup failed:', lookupErr);
+    }
+
     // Surface the last-visit info so admin can predict the discount tier
     // before they even pick a date.
     const lastVisitEl = $('nb-last-visit');
     if (lastVisitEl) {
-      if (c.last_completed) {
-        const days = c.days_since_last;
-        const dateLabel = formatBookingDate(c.last_completed);
+      if (nbSelectedCustomer.last_completed) {
+        const days = nbSelectedCustomer.days_since_last;
+        const dateLabel = formatBookingDate(nbSelectedCustomer.last_completed);
         lastVisitEl.textContent = `Last visit: ${dateLabel}${days != null ? ` (${days} day${days === 1 ? '' : 's'} ago)` : ''}`;
       } else {
         lastVisitEl.textContent = 'First-time customer — no prior visits.';
