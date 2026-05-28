@@ -211,7 +211,21 @@
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 1rem 1.1rem;
+    text-align: left;
   }
+  /* Normalise button-flavoured stat cards so they render identically to the
+     div ones on iOS / Android (default button styling adds inner shadows,
+     centered text, and a system font). */
+  button.stat-card {
+    -webkit-appearance: none;
+    appearance: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    width: 100%;
+    -webkit-tap-highlight-color: rgba(30,77,43,0.08);
+  }
+  .stat-card-clickable:active { transform: scale(.98); transition: transform .08s; }
   .stat-card-label {
     font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
     color: var(--muted); font-weight: 500;
