@@ -721,6 +721,7 @@
           }
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
           parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.bookAgain('${b.id}')">+ Book again</button>`);
         }
         if (ownerCancellable) {
           parts.push(`<button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
@@ -2617,6 +2618,21 @@ Hiraya Spaces`
     showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
   }
 
+  // Open the New Booking modal pre-populated with this booking's customer.
+  // Admin then picks a date/time/service for the next visit — saves the
+  // search-then-pick step for repeat customers.
+  function bookAgain(id) {
+    if (!isOwner) return;
+    const b = allBookings.find(x => x.id === id);
+    if (!b) return;
+    openNewBooking();
+    // Give the modal a tick to render + reset state, then pre-pick the
+    // customer. pickCustomer is async (loads their saved addresses).
+    setTimeout(() => {
+      try { pickCustomer(b.user_id); } catch (e) { console.warn('bookAgain pickCustomer failed:', e); }
+    }, 50);
+  }
+
   // One-click "Mark this booking paid" — convenience for the cleaner on-site
   // or admin wrapping up after the customer pays. Same orchestration as the
   // paid-on-site checkbox: ensures an invoice exists, stamps it paid, fires
@@ -3885,6 +3901,7 @@ Hiraya Spaces`
     recalcNbPrice,
     askDeleteBooking,
     markBookingPaid,
+    bookAgain,
     refreshCompleteAddonHint,
     refreshAllClear,
     downloadInvoicePdf,
