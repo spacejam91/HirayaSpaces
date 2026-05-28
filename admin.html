@@ -1657,7 +1657,13 @@
        any row past the customer name & address. The price stays (always
        last child) for at-a-glance reference. */
     .booking-card-body > div:nth-child(n+5):not(:last-child) { display: none; }
-    .booking-card-detail-link { display: block; }
+    .booking-card-detail-link {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 14px 22px;
+      font-size: 14px;
+    }
   }
 </style>
 
