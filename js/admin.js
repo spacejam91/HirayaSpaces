@@ -2364,6 +2364,31 @@ Hiraya Spaces`
             console.warn('payment_received email failed:', err);
             showToast('Marked paid, but the receipt email failed: ' + (err?.message || err), 'error');
           });
+        const wantStartRecurringOnsite = $('complete-start-recurring-wrap')?.style.display !== 'none' && $('complete-start-recurring')?.checked;
+        if (wantStartRecurringOnsite) {
+          const newFreq = $('complete-start-recurring-freq')?.value || 'biweekly';
+          try {
+            const { error: freqErr } = await sb().rpc('admin_set_booking_frequency', {
+              p_booking_id: id,
+              p_frequency: newFreq,
+            });
+            if (freqErr) throw freqErr;
+            const { data: nextId, error: nextErr } = await sb().rpc('admin_create_next_recurring', { p_booking_id: id });
+            if (nextErr) throw nextErr;
+            if (nextId) {
+              const tierLabel = newFreq === 'weekly' ? 'Weekly' : newFreq === 'biweekly' ? 'Every 2 weeks' : 'Monthly';
+              showToast(`Recurring schedule started (${tierLabel}). Next visit booked. ✓`, 'success');
+            }
+          } catch (startErr) {
+            console.warn('start recurring (paid on-site) failed:', startErr);
+            const msg = startErr?.message || String(startErr);
+            if (/does not exist|not found/i.test(msg)) {
+              showToast('Start-recurring needs the admin_set_booking_frequency SQL migration.', 'error');
+            } else {
+              showToast('Marked paid, but starting recurring failed: ' + msg, 'error');
+            }
+          }
+        }
         const wantNextOnsite = $('complete-next-wrap')?.style.display !== 'none' && $('complete-next')?.checked;
         if (wantNextOnsite) {
           try {
