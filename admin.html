@@ -1039,17 +1039,17 @@
           <input type="number" id="complete-amount" min="0" step="1" placeholder="0" style="flex:1;font-family:'Jost',sans-serif;font-size:16px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none">
         </div>
         <p style="font-size:12px;color:var(--muted);margin-top:6px" id="complete-est-hint"></p>
-        <label id="complete-next-wrap" style="display:none;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:var(--sage-light);border-radius:10px;font-size:13px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:var(--sage-light);border-radius:10px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="complete-auto-invoice" checked>
+          <span><strong>Auto-send invoice</strong> — email the customer their invoice (with PDF attached) right after marking complete.</span>
+        </label>
+        <label id="complete-next-wrap" style="display:none;align-items:center;gap:8px;margin-top:8px;padding:10px 12px;background:var(--sage-light);border-radius:10px;font-size:13px;cursor:pointer">
           <input type="checkbox" id="complete-next" checked>
           <span id="complete-next-label">Auto-create the next recurring visit</span>
         </label>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:10px 12px;background:#fffbeb;border:1px solid #e5d3a0;border-radius:10px;font-size:13px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:20px;padding:10px 12px;background:#fffbeb;border:1px solid #e5d3a0;border-radius:10px;font-size:13px;cursor:pointer">
           <input type="checkbox" id="complete-paid-onsite">
           <span><strong>Customer paid on-site</strong> — also create invoice, mark paid, and email the receipt.</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:20px;padding:10px 12px;background:var(--sage-light);border-radius:10px;font-size:13px;cursor:pointer">
-          <input type="checkbox" id="complete-auto-invoice" checked>
-          <span><strong>Auto-send invoice</strong> — email the customer their invoice (with PDF attached) right after marking complete.</span>
         </label>
         <div id="complete-err" class="form-err"></div>
         <div class="overlay-actions">
