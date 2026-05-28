@@ -199,12 +199,15 @@
   /* ── STATS ROW ── */
   .stats-row {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 0.75rem;
     margin-bottom: 2rem;
+    max-width: 920px;
+    margin-left: auto;
+    margin-right: auto;
   }
   @media (max-width: 1100px) {
-    .stats-row { grid-template-columns: repeat(3, 1fr); }
+    .stats-row { grid-template-columns: repeat(2, 1fr); max-width: 560px; }
   }
   .stat-card {
     background: white;
@@ -1610,9 +1613,7 @@
     margin: 0;
     min-height: 46px;
   }
-  #detail-actions .booking-card-btn[onclick*="askOwnerCancel"],
-  #detail-actions .booking-card-btn[onclick*="markBookingPaid"],
-  #detail-actions .booking-card-btn[onclick*="bookAgain"] {
+  #detail-actions .booking-card-btn[onclick*="askOwnerCancel"] {
     grid-column: 1 / -1;
   }
   /* Cancel the mobile "Edit goes last" order rule inside the detail modal —

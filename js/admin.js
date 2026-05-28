@@ -704,9 +704,6 @@
         }
         // Post-completion: invoice actions.
         if (canInvoice) {
-          // Book again is the most actionable next step after a complete clean
-          // (sets up the customer's next visit). Put it at the top, full-width.
-          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.bookAgain('${b.id}')">+ Book again</button>`);
           // Resend invoice only shows after the first send (auto-send on
           // Mark Complete creates the invoice row, or the admin used Mark
           // as paid which also creates one). Before that, no button — the
@@ -715,11 +712,15 @@
             parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.sendInvoice('${b.id}')">↻ Resend invoice</button>`);
           }
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
+          // Mark as paid + Book again sit side-by-side as the two main
+          // follow-up actions on a completed booking. Mark as paid first
+          // (left), Book again second (right).
           if (b.invoice?.status === 'paid') {
             parts.push(`<button class="booking-card-btn" style="color:#9a6a16;border-color:#e6cfa3" onclick="HirayaAdmin.askRefundBooking('${b.id}')">↩ Refund</button>`);
           } else {
             parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
           }
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.bookAgain('${b.id}')">+ Book again</button>`);
         }
         if (ownerCancellable) {
           parts.push(`<button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
@@ -2641,9 +2642,11 @@ Hiraya Spaces`
     showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
   }
 
-  // One-click refund from the booking card (when invoice is paid). Flips
-  // invoice status to refunded — the booking row stays as-is. Counterpart
-  // to markBookingPaid.
+  // One-click "reverse the payment" from the booking card. Flips the
+  // invoice status back to unpaid so the Mark as paid button reappears (in
+  // case admin marked paid by mistake or actually issued a refund). The
+  // separate "Mark refunded" button in the invoice modal keeps the explicit
+  // refunded state for genuine returned-money tracking.
   async function askRefundBooking(id) {
     if (!sb() || !isOwner) return;
     const b = allBookings.find(x => x.id === id);
@@ -2652,20 +2655,20 @@ Hiraya Spaces`
       showToast('No invoice found to refund.', 'error');
       return;
     }
-    if (!window.confirm(`Refund ${label}?\n\nThe invoice will be marked refunded. The amount stays on record for history.`)) return;
+    if (!window.confirm(`Reverse payment on ${label}?\n\nThe invoice flips back to unpaid. You'll see the Mark as paid button again if you need to re-collect.`)) return;
     try {
       const { error } = await sb().rpc('admin_set_invoice_status', {
         p_invoice_id: b.invoice.id,
-        p_status: 'refunded',
+        p_status: 'unpaid',
       });
       if (error) throw error;
-      showToast('Invoice marked refunded.', 'success');
+      showToast('Payment reversed — invoice is unpaid again.', 'success');
       closeBookingDetail();
       await refreshAll();
       refreshPending();
     } catch (err) {
       console.error('askRefundBooking failed:', err);
-      showToast('Could not refund: ' + (err?.message || String(err)), 'error');
+      showToast('Could not reverse payment: ' + (err?.message || String(err)), 'error');
     }
   }
 
