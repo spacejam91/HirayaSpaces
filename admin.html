@@ -200,14 +200,11 @@
   .stats-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
+    gap: 1rem;
     margin-bottom: 2rem;
-    max-width: 720px;
-    margin-left: auto;
-    margin-right: auto;
   }
   @media (max-width: 1100px) {
-    .stats-row { grid-template-columns: repeat(2, 1fr); max-width: 460px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
   }
   .stat-card {
     background: white;

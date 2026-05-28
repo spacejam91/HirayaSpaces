@@ -126,7 +126,7 @@
     if (b.status === 'cancelled' || b.status === 'no_show') classes.push('is-cancelled');
     if (['pending_review', 'awaiting_quote', 'confirmed'].includes(b.status)) classes.push('is-upcoming');
 
-    const detailLink = `<button type="button" class="booking-card-detail-link" onclick="event.stopPropagation(); HirayaAdmin.openBookingDetail('${b.id}')">Tap for full details →</button>`;
+    const detailLink = `<button type="button" class="booking-card-detail-link" onclick="event.stopPropagation(); HirayaAdmin.openBookingDetail('${b.id}')">View Booking →</button>`;
     return `
       <div class="${classes.join(' ')}" data-id="${b.id}" onclick="HirayaAdmin.openBookingDetail('${b.id}', event)">
         <div class="booking-card-head">
@@ -3965,6 +3965,7 @@ Hiraya Spaces`
     recalcNbPrice,
     askDeleteBooking,
     markBookingPaid,
+    askRefundBooking,
     bookAgain,
     refreshCompleteAddonHint,
     refreshAllClear,
