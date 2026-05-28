@@ -966,6 +966,7 @@
         <div class="panel-header">
           <h2>All bookings</h2>
           <div class="panel-controls">
+            <input type="search" id="all-search" placeholder="Search name, email, address, or ref…" oninput="HirayaAdmin.renderAll()" style="min-width:240px">
             <select id="all-sort" onchange="HirayaAdmin.renderAll()">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
@@ -1034,6 +1035,10 @@
           <input type="number" id="complete-amount" min="0" step="1" placeholder="0" style="flex:1;font-family:'Jost',sans-serif;font-size:16px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none">
         </div>
         <p style="font-size:12px;color:var(--muted);margin-top:6px" id="complete-est-hint"></p>
+        <label id="complete-next-wrap" style="display:none;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:var(--sage-light);border-radius:10px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="complete-next" checked>
+          <span id="complete-next-label">Auto-create the next recurring visit</span>
+        </label>
         <div id="complete-err" class="form-err"></div>
         <div class="overlay-actions">
           <button class="btn-ghost" onclick="HirayaAdmin.cancelComplete()">Back</button>

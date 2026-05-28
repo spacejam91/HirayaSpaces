@@ -86,10 +86,13 @@ async function buildInvoicePdf(opts: {
   // if the fetch fails so the invoice still renders.
   let headerBottomY = y - 30;
   try {
-    const logoResp = await fetch("https://hirayaspaces.ca/logo-horizontal.jpg");
+    // Cleaner B&W mark for the invoice. Emails still use the colour logo via
+    // their own <img src>. If the PNG isn't deployed yet (or fetch fails), the
+    // catch falls back to the text wordmark below.
+    const logoResp = await fetch("https://hirayaspaces.ca/logo-horizontal-bw.png");
     if (!logoResp.ok) throw new Error(`logo fetch ${logoResp.status}`);
     const logoBytes = new Uint8Array(await logoResp.arrayBuffer());
-    const logo = await pdf.embedJpg(logoBytes);
+    const logo = await pdf.embedPng(logoBytes);
     const logoDims = logo.scaleToFit(180, 80);
     const logoTop = 770;
     page.drawImage(logo, {

@@ -541,6 +541,20 @@
     return byPanel[activePanel] || '';
   }
 
+  // Free-text search across customer name/email, address, and the 8-char ref.
+  // Empty query matches everything. Called from renderAll + exportBookingsCsv
+  // so each tab's list AND its CSV export respect the active search.
+  function bookingMatchesSearch(b, q) {
+    if (!q) return true;
+    const ref = (b.id || '').slice(0, 8).toLowerCase();
+    const hay = [
+      b.customer_name, b.customer_email, b.customer_phone,
+      b.street_address, b.unit, b.city, b.postal_code,
+      b.service_name, ref,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  }
+
   function renderAll() {
     const list = $('all-list');
     const empty = $('all-empty');
@@ -554,7 +568,9 @@
 
     const filter = currentStatusFilter();
     const sortDir = ($('all-sort')?.value || 'newest');
-    const filtered = filter ? allBookings.filter(b => b.status === filter) : allBookings.slice();
+    const query = ($('all-search')?.value || '').trim().toLowerCase();
+    const filtered = (filter ? allBookings.filter(b => b.status === filter) : allBookings.slice())
+      .filter(b => bookingMatchesSearch(b, query));
     const rows = filtered.sort((a, b) => {
       const da = new Date(a.preferred_date || a.created_at || 0).getTime();
       const db = new Date(b.preferred_date || b.created_at || 0).getTime();
@@ -1937,6 +1953,18 @@ Hiraya Spaces`
     $('complete-est-hint').textContent = b.estimated_price_cents != null
       ? `Estimate was $${estDollars}`
       : 'No estimate on file.';
+    // Recurring auto-create checkbox: only relevant when the booking has a
+    // recurring frequency. Hidden for one-time bookings.
+    const nextWrap = $('complete-next-wrap');
+    const nextLabel = $('complete-next-label');
+    const freqText = ({ weekly: '7 days from now', biweekly: '2 weeks from now', monthly: '4 weeks from now' })[b.frequency];
+    if (nextWrap && b.frequency && b.frequency !== 'one_time' && freqText) {
+      nextWrap.style.display = 'flex';
+      $('complete-next').checked = true;
+      if (nextLabel) nextLabel.textContent = `Auto-create the next visit (${freqText})`;
+    } else if (nextWrap) {
+      nextWrap.style.display = 'none';
+    }
     hideErr('complete-err');
     $('all-list-view').style.display = 'none';
     $('owner-cancel-view').style.display = 'none';
@@ -1972,6 +2000,29 @@ Hiraya Spaces`
       if (data === false) {
         showErr('complete-err', 'Booking is no longer eligible — refresh and try again.');
       } else {
+        // Auto-create the next recurring visit if the checkbox is checked.
+        // Done before the thank-you email so a failure here surfaces clearly,
+        // not buried under the email status toast.
+        const wantNext = $('complete-next-wrap')?.style.display !== 'none' && $('complete-next')?.checked;
+        if (wantNext) {
+          try {
+            const { data: nextId, error: nextErr } = await sb().rpc('admin_create_next_recurring', { p_booking_id: id });
+            if (nextErr) throw nextErr;
+            if (nextId) {
+              showToast('Next visit auto-created. ✓', 'success');
+            } else {
+              showToast('Marked complete (no next visit — booking is not recurring).', 'success');
+            }
+          } catch (nextE) {
+            console.warn('admin_create_next_recurring failed:', nextE);
+            const msg = nextE?.message || String(nextE);
+            if (/does not exist|not found/i.test(msg)) {
+              showToast('Marked complete, but next visit failed — run admin_create_next_recurring() SQL migration.', 'error');
+            } else {
+              showToast('Marked complete, but next visit failed: ' + msg, 'error');
+            }
+          }
+        }
         showToast('Booking marked complete. Sending thank-you email…', 'success');
         // Surface email failures to admin instead of silent console.warn —
         // the customer not getting a thank-you is something Aaron needs to know.
@@ -2077,7 +2128,9 @@ Hiraya Spaces`
   // status filter so each tab (Confirmed / Completed / All) exports its slice.
   function exportBookingsCsv() {
     const filter = currentStatusFilter();
-    const rows = filter ? allBookings.filter(b => b.status === filter) : allBookings;
+    const query = ($('all-search')?.value || '').trim().toLowerCase();
+    const rows = (filter ? allBookings.filter(b => b.status === filter) : allBookings)
+      .filter(b => bookingMatchesSearch(b, query));
     if (!rows.length) {
       showToast('Nothing to export.', 'error');
       return;
@@ -2136,6 +2189,38 @@ Hiraya Spaces`
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast(`Exported ${rows.length} booking${rows.length === 1 ? '' : 's'}.`, 'success');
+  }
+
+  // Owner hard-delete a booking. Two-step confirm so it's not a single
+  // click. Cascades drop the invoice + add-ons + extra services with the row.
+  async function askDeleteBooking(id) {
+    if (!sb() || !isOwner) return;
+    const b = allBookings.find(x => x.id === id) || pendingBookings.find(x => x.id === id);
+    const label = b
+      ? `${b.customer_name || 'Customer'} — ${b.service_name || 'Booking'} (${formatBookingDate(b.preferred_date)})`
+      : 'this booking';
+    const ok = window.confirm(`Permanently delete ${label}?\n\nThis also removes its invoice, add-ons, and extra services. The customer is NOT notified. Use Cancel booking instead if you want to keep the record.`);
+    if (!ok) return;
+    try {
+      const { data, error } = await sb().rpc('admin_delete_booking', { p_booking_id: id });
+      if (error) throw error;
+      if (data === false) {
+        showToast('Booking already gone.', 'error');
+      } else {
+        showToast('Booking deleted.', 'success');
+      }
+      closeBookingDetail();
+      await refreshAll();
+      refreshPending();
+    } catch (err) {
+      console.error('admin_delete_booking failed:', err);
+      const msg = err?.message || String(err);
+      if (/does not exist|not found/i.test(msg)) {
+        showToast('Delete needs a SQL migration — run admin_delete_booking() in Supabase.', 'error');
+      } else {
+        showToast('Could not delete: ' + msg, 'error');
+      }
+    }
   }
 
   // ── INVOICES TABLE ─────────────────────────────────────────────────────
@@ -3065,7 +3150,12 @@ Hiraya Spaces`
     const detailTotalCents = b.final_price_cents ?? b.estimated_price_cents;
     const detailSvcCents = (detailTotalCents != null) ? Math.max(0, detailTotalCents - detailAddonsSumCents) : null;
     const detailSvcPriceStr = (detailSvcCents != null && detailSvcCents > 0) ? ` — <strong>$${Math.round(detailSvcCents / 100)}</strong>` : '';
-    $('detail-service').innerHTML = escapeHtml(b.service_name || 'Cleaning service') + detailSvcPriceStr;
+    // Recurring badge — mirror the card so the modal shows the schedule too.
+    const detailFreqLabels = { weekly: 'Weekly · 20% off', biweekly: 'Every 2 weeks · 15% off', monthly: 'Monthly · 10% off' };
+    const detailFreqBadge = (b.frequency && b.frequency !== 'one_time' && detailFreqLabels[b.frequency])
+      ? ` <span style="display:inline-block;font-size:10px;font-weight:600;letter-spacing:0.5px;background:var(--sage-light);color:var(--sage);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle">↻ ${escapeHtml(detailFreqLabels[b.frequency])}</span>`
+      : '';
+    $('detail-service').innerHTML = escapeHtml(b.service_name || 'Cleaning service') + detailSvcPriceStr + detailFreqBadge;
     $('detail-when').innerHTML = `<strong>${escapeHtml(dateStr)}</strong>${escapeHtml(timeStr)}`;
 
     const addonItems = b.addon_items || [];
@@ -3112,9 +3202,20 @@ Hiraya Spaces`
     const actionsEl = $('detail-actions');
     if (actionsEl) {
       actionsEl.innerHTML = card ? card.innerHTML : '';
+      // Owner-only hard delete — distinct from Cancel (which keeps the row).
+      // Lives below the normal actions, spans full width, deeper red so it
+      // doesn't get confused with the Cancel button. Appended dynamically so
+      // it shows on every booking opened from the dashboard.
+      const delBtn = document.createElement('button');
+      delBtn.className = 'booking-card-btn';
+      delBtn.style.cssText = 'background:#7a1a1a;color:white;border-color:#7a1a1a;grid-column:1 / -1';
+      delBtn.textContent = 'Permanently delete';
+      delBtn.onclick = (ev) => { ev.stopPropagation(); askDeleteBooking(b.id); };
+      actionsEl.appendChild(delBtn);
       // After tapping any action button, close the modal so the workflow
       // (askEdit, askConfirm, etc.) can take focus cleanly.
       actionsEl.querySelectorAll('button').forEach(btn => {
+        if (btn === delBtn) return; // delete handles its own close via confirm flow
         btn.addEventListener('click', () => setTimeout(closeBookingDetail, 50));
       });
     }
@@ -3169,6 +3270,7 @@ Hiraya Spaces`
     resendInvoice,
     addNbExtra,
     recalcNbPrice,
+    askDeleteBooking,
     downloadInvoicePdf,
     refreshInvoices,
     renderInvoices,
