@@ -3811,13 +3811,14 @@ Hiraya Spaces`
     const detailAddonsSumCents = (b.addon_items || []).reduce((s, a) => s + (a.price_cents || 0), 0);
     const detailTotalCents = b.final_price_cents ?? b.estimated_price_cents;
     const detailDiscountPct = b.recurring_discount_pct || 0;
-    // Reverse-engineer the pre-discount subtotal so the SERVICE line reflects
-    // the full catalog rate (e.g. $120), not the post-discount amount.
-    let detailSubtotalCents = detailTotalCents;
-    if (detailTotalCents != null && detailDiscountPct > 0) {
-      detailSubtotalCents = Math.round(detailTotalCents / (1 - detailDiscountPct / 100));
-    }
-    const detailSvcCents = (detailSubtotalCents != null) ? Math.max(0, detailSubtotalCents - detailAddonsSumCents) : null;
+    // Service catalog is the source of truth for the subtotal — never reverse-
+    // engineer from stored total + pct (gives a phantom number when the two
+    // are out of sync, which they can be for historical / cloned bookings).
+    const detailSvcMatch = servicesCache.find(s => s.name === b.service_name) || null;
+    const detailSvcCents = detailSvcMatch?.starting_price_cents ?? null;
+    const detailSubtotalCents = (detailSvcCents != null)
+      ? detailSvcCents + detailAddonsSumCents
+      : detailTotalCents;
     const detailSvcPriceStr = (detailSvcCents != null && detailSvcCents > 0) ? ` — <strong>$${Math.round(detailSvcCents / 100)}</strong>` : '';
     // Recurring badge — mirror the card so the modal shows the schedule too.
     const detailFreqLabels = { weekly: 'Weekly · 20% off', biweekly: 'Every 2 weeks · 15% off', monthly: 'Monthly · 10% off' };
@@ -3863,16 +3864,20 @@ Hiraya Spaces`
       internalWrap.style.display = 'none';
     }
 
-    // Price section: when a recurring discount was applied, surface it as
-    // its own line so the customer/admin can see exactly what came off.
-    if (detailDiscountPct > 0 && detailTotalCents != null && detailSubtotalCents != null) {
-      const discountAmount = detailSubtotalCents - detailTotalCents;
+    // Price section: only break out a discount line when there's a REAL gap
+    // between the catalog subtotal and the stored total (i.e. the discount
+    // was actually applied to the price). Avoids the phantom "subtotal $259"
+    // when stored data is inconsistent (price=full but discount_pct>0).
+    const detailDiscountAmount = (detailSubtotalCents != null && detailTotalCents != null)
+      ? detailSubtotalCents - detailTotalCents
+      : 0;
+    if (detailDiscountPct > 0 && detailDiscountAmount > 0 && detailSubtotalCents != null && detailTotalCents != null) {
       $('detail-price').innerHTML = `
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:2px 0">
           <span>Subtotal</span><span>$${Math.round(detailSubtotalCents / 100)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--sage);padding:2px 0">
-          <span>↻ Recurring discount (${detailDiscountPct}% off)</span><span>-$${Math.round(discountAmount / 100)}</span>
+          <span>↻ Recurring discount (${detailDiscountPct}% off)</span><span>-$${Math.round(detailDiscountAmount / 100)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:8px 0 0;border-top:1px solid var(--border);margin-top:6px">
           <span>Total</span><span>$${Math.round(detailTotalCents / 100)}</span>
