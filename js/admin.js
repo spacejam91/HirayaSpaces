@@ -252,7 +252,7 @@
   let activePanel = 'pending';
 
   // Tabs that share the All-Bookings panel DOM but pre-apply a status filter.
-  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all', cancelled: 'all', thisweek: 'all', today: 'all' };
+  const PANEL_ALIAS = { confirmed: 'all', in_progress: 'all', completed: 'all', cancelled: 'all', thisweek: 'all', today: 'all', paid: 'invoices' };
 
   function switchPanel(name) {
     activePanel = name;
@@ -271,14 +271,22 @@
       // Edit modal lives at top level now — closes on cancel, not on tab switch.
       refreshPending();
     } else if (name === 'all' || name === 'confirmed' || name === 'in_progress' || name === 'completed' || name === 'cancelled' || name === 'thisweek' || name === 'today') {
-      // Search box only makes sense on tabs where you're looking through
-      // historical/long lists. Hide on the short-list tabs (today's jobs,
-      // confirmed, in-progress, this-week).
+      // Search box + date range filter only show on the long-list tabs
+      // (Completed / Cancelled / All bookings). The short-list tabs (Today,
+      // Pending, Confirmed, In progress, This week) don't need them.
+      const showFilters = (name === 'completed' || name === 'cancelled' || name === 'all');
       const searchEl = $('all-search');
       if (searchEl) {
-        const showSearch = (name === 'completed' || name === 'cancelled' || name === 'all');
-        searchEl.style.display = showSearch ? '' : 'none';
-        if (!showSearch && searchEl.value) searchEl.value = ''; // clear stale query
+        searchEl.style.display = showFilters ? '' : 'none';
+        if (!showFilters && searchEl.value) searchEl.value = '';
+      }
+      const dateRangeEl = $('all-daterange');
+      if (dateRangeEl) dateRangeEl.style.display = showFilters ? 'flex' : 'none';
+      const fromDateEl = $('all-from-date');
+      const toDateEl = $('all-to-date');
+      if (!showFilters) {
+        if (fromDateEl?.value) fromDateEl.value = '';
+        if (toDateEl?.value) toDateEl.value = '';
       }
       $('all-list-view').style.display = 'block';
       $('owner-cancel-view').style.display = 'none';
@@ -314,6 +322,14 @@
       renderCustomers();
       refreshAll();
     } else if (name === 'invoices') {
+      // Coming back to the full Invoices view — clear the paid pre-filter.
+      const invStatusEl = $('inv-status-filter');
+      if (invStatusEl) invStatusEl.value = '';
+      refreshInvoices();
+    } else if (name === 'paid') {
+      // Shortcut tab that opens Invoices pre-filtered to paid only.
+      const invStatusEl = $('inv-status-filter');
+      if (invStatusEl) invStatusEl.value = 'paid';
       refreshInvoices();
     }
   }
@@ -628,6 +644,17 @@
         ACTIVE_STATUSES.includes(b.status)
       );
     }
+    // Date range filter (Completed / Cancelled / All bookings tabs).
+    const fromDate = ($('all-from-date')?.value || '').trim();
+    const toDate = ($('all-to-date')?.value || '').trim();
+    if (fromDate || toDate) {
+      filtered = filtered.filter(b => {
+        if (!b.preferred_date) return false;
+        if (fromDate && b.preferred_date < fromDate) return false;
+        if (toDate && b.preferred_date > toDate) return false;
+        return true;
+      });
+    }
     filtered = filtered.filter(b => bookingMatchesSearch(b, query));
     const rows = filtered.sort((a, b) => {
       const da = new Date(a.preferred_date || a.created_at || 0).getTime();
@@ -673,11 +700,11 @@
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.viewInvoice('${b.id}')">View invoice</button>`);
           parts.push(`<button class="booking-card-btn" style="background:#1e4d2b;color:white;border-color:#1e4d2b" onclick="HirayaAdmin.markBookingPaid('${b.id}')">$ Mark as paid</button>`);
         }
-        if (editable) {
-          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
-        }
         if (reschedulable) {
           parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askReschedule('${b.id}')">Reschedule</button>`);
+        }
+        if (editable) {
+          parts.push(`<button class="booking-card-btn" onclick="HirayaAdmin.askEdit('${b.id}')">Edit</button>`);
         }
         if (ownerCancellable) {
           parts.push(`<button class="booking-card-btn" style="background:#c0392b;color:white;border-color:#c0392b" onclick="HirayaAdmin.askOwnerCancel('${b.id}')">Cancel booking</button>`);
@@ -2388,7 +2415,16 @@ Hiraya Spaces`
   function exportBookingsCsv() {
     const filter = currentStatusFilter();
     const query = ($('all-search')?.value || '').trim().toLowerCase();
+    const fromDate = ($('all-from-date')?.value || '').trim();
+    const toDate = ($('all-to-date')?.value || '').trim();
     const rows = (filter ? allBookings.filter(b => b.status === filter) : allBookings)
+      .filter(b => {
+        if (!fromDate && !toDate) return true;
+        if (!b.preferred_date) return false;
+        if (fromDate && b.preferred_date < fromDate) return false;
+        if (toDate && b.preferred_date > toDate) return false;
+        return true;
+      })
       .filter(b => bookingMatchesSearch(b, query));
     if (!rows.length) {
       showToast('Nothing to export.', 'error');

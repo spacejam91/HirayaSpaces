@@ -926,6 +926,7 @@
       <button class="admin-tab" data-panel="calendar" onclick="HirayaAdmin.switchPanel('calendar')">Calendar</button>
       <button class="admin-tab" data-panel="customers" onclick="HirayaAdmin.switchPanel('customers')">Customers</button>
       <button class="admin-tab" data-panel="invoices" onclick="HirayaAdmin.switchPanel('invoices')">Invoices</button>
+      <button class="admin-tab" data-panel="paid" onclick="HirayaAdmin.switchPanel('paid')">Paid</button>
     </div>
 
     <!-- ── PENDING PANEL ── -->
@@ -979,6 +980,12 @@
           <h2>All bookings</h2>
           <div class="panel-controls">
             <input type="search" id="all-search" placeholder="Search name, email, address, or ref…" oninput="HirayaAdmin.renderAll()" style="min-width:240px">
+            <div id="all-daterange" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+              <span>From</span>
+              <input type="date" id="all-from-date" onchange="HirayaAdmin.renderAll()" style="width:140px">
+              <span>To</span>
+              <input type="date" id="all-to-date" onchange="HirayaAdmin.renderAll()" style="width:140px">
+            </div>
             <select id="all-sort" onchange="HirayaAdmin.renderAll()">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
@@ -1047,6 +1054,13 @@
           <input type="number" id="complete-amount" min="0" step="1" placeholder="0" style="flex:1;font-family:'Jost',sans-serif;font-size:16px;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;outline:none">
         </div>
         <p style="font-size:12px;color:var(--muted);margin-top:6px" id="complete-est-hint"></p>
+
+        <div style="margin-top:16px">
+          <div class="nb-section-label" style="margin-bottom:8px">Add-ons performed (optional)</div>
+          <div id="complete-addons" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px 14px"></div>
+          <div id="complete-addons-hint" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+        </div>
+
         <label style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:var(--sage-light);border-radius:10px;font-size:13px;cursor:pointer">
           <input type="checkbox" id="complete-auto-invoice" checked>
           <span><strong>Auto-send invoice</strong> — email the customer their invoice (with PDF attached) right after marking complete.</span>
@@ -1568,8 +1582,15 @@
     min-height: 46px;
   }
   #detail-actions .booking-card-btn[onclick*="askOwnerCancel"],
-  #detail-actions .booking-card-btn[onclick*="markBookingPaid"] {
+  #detail-actions .booking-card-btn[onclick*="markBookingPaid"],
+  #detail-actions .booking-card-btn[onclick*="askComplete"] {
     grid-column: 1 / -1;
+  }
+  /* Cancel the mobile "Edit goes last" order rule inside the detail modal —
+     it was meant for the Pending card flow, not for the booking-detail
+     modal where it pushes Edit awkwardly to the bottom. */
+  @media (max-width: 640px) {
+    #detail-actions .booking-card-btn { order: 0 !important; }
   }
   /* Mobile: compact card. Tap to open the detail modal. Hide the lower-
      priority body rows so the card stays scannable at a glance — the
