@@ -2216,6 +2216,20 @@ Hiraya Spaces`
     } else if (nextWrap) {
       nextWrap.style.display = 'none';
     }
+    // Start-recurring section: only shown for one-off bookings — gives admin
+    // the option to convert this clean into the start of a recurring series.
+    const startRecWrap = $('complete-start-recurring-wrap');
+    const startRecCb = $('complete-start-recurring');
+    const startRecFreq = $('complete-start-recurring-freq');
+    if (startRecWrap) {
+      if (!b.frequency || b.frequency === 'one_time') {
+        startRecWrap.style.display = 'block';
+        if (startRecCb) startRecCb.checked = false;
+        if (startRecFreq) startRecFreq.value = 'biweekly';
+      } else {
+        startRecWrap.style.display = 'none';
+      }
+    }
     // "Paid on-site" defaults to unchecked — admin opts in explicitly so we
     // never accidentally fire payment emails for unpaid jobs.
     const paidOnsite = $('complete-paid-onsite');
@@ -2335,6 +2349,38 @@ Hiraya Spaces`
         // reflects last-minute additions (e.g. customer asked for Inside
         // Oven during the clean).
         await syncCompleteAddons();
+
+        // Start-recurring conversion: customer signed up for a one-off but
+        // wants to go recurring at the end of the visit. Update this
+        // booking's frequency, then auto-create the next visit at the new
+        // interval. Done after Mark Complete so the source IS the first
+        // "completed" visit in the new series.
+        const wantStartRecurring = $('complete-start-recurring-wrap')?.style.display !== 'none' && $('complete-start-recurring')?.checked;
+        if (wantStartRecurring) {
+          const newFreq = $('complete-start-recurring-freq')?.value || 'biweekly';
+          try {
+            const { error: freqErr } = await sb().rpc('admin_set_booking_frequency', {
+              p_booking_id: id,
+              p_frequency: newFreq,
+            });
+            if (freqErr) throw freqErr;
+            const { data: nextId, error: nextErr } = await sb().rpc('admin_create_next_recurring', { p_booking_id: id });
+            if (nextErr) throw nextErr;
+            if (nextId) {
+              const tierLabel = newFreq === 'weekly' ? 'Weekly' : newFreq === 'biweekly' ? 'Every 2 weeks' : 'Monthly';
+              showToast(`Recurring schedule started (${tierLabel}). Next visit booked. ✓`, 'success');
+            }
+          } catch (startErr) {
+            console.warn('start recurring failed:', startErr);
+            const msg = startErr?.message || String(startErr);
+            if (/does not exist|not found/i.test(msg)) {
+              showToast('Start-recurring needs the admin_set_booking_frequency SQL migration.', 'error');
+            } else {
+              showToast('Marked complete, but starting recurring failed: ' + msg, 'error');
+            }
+          }
+        }
+
         // Auto-send the invoice email (create row + email PDF) if the
         // checkbox is on AND we didn't already do the paid-on-site flow.
         // Fire-and-forget so a slow SMTP doesn't block the modal.

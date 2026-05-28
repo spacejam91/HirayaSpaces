@@ -1069,6 +1069,17 @@
           <input type="checkbox" id="complete-next" checked>
           <span id="complete-next-label">Auto-create the next recurring visit</span>
         </label>
+        <div id="complete-start-recurring-wrap" style="display:none;margin-top:8px;padding:12px;background:var(--sage-light);border-radius:10px;font-size:13px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="complete-start-recurring">
+            <span><strong>Start a recurring schedule</strong> — convert this one-off to recurring, then auto-create the first visit.</span>
+          </label>
+          <select id="complete-start-recurring-freq" class="nb-input" style="margin-top:8px;font-size:13px">
+            <option value="weekly">Weekly · 20% off (every 7 days)</option>
+            <option value="biweekly" selected>Every 2 weeks · 15% off</option>
+            <option value="monthly">Monthly · 10% off (every 28 days)</option>
+          </select>
+        </div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:20px;padding:10px 12px;background:#fffbeb;border:1px solid #e5d3a0;border-radius:10px;font-size:13px;cursor:pointer">
           <input type="checkbox" id="complete-paid-onsite">
           <span><strong>Customer paid on-site</strong> — also create invoice, mark paid, and email the receipt.</span>
