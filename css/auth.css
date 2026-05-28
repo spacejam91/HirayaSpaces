@@ -559,11 +559,6 @@
 /* Larger, more thumb-friendly action buttons on mobile so cleaners can
    tap them on the job without misfiring. Stacks full-width when only
    one action fits per row. */
-/* Cards stay clean — info only — on ALL sizes. Action buttons live in
-   the booking-detail popup that opens on tap. We hide only the version
-   INSIDE a booking-card; the modal's #detail-actions also carries the
-   class .booking-card-actions and must remain visible. */
-.booking-card .booking-card-actions { display: none !important; }
 
 .addr-list {
   display: flex;
