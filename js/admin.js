@@ -1101,23 +1101,12 @@ Hiraya Spaces`
     $('customer-stat-mix').style.fontWeight = '500';
     $('customer-stat-mix').style.fontFamily = "'Jost', sans-serif";
 
-    // Addresses
-    const addrEl = $('customer-addresses');
-    if (!c.addresses.size) {
-      addrEl.innerHTML = `<div class="customer-no-addresses">No saved addresses yet.</div>`;
-    } else {
-      addrEl.innerHTML = Array.from(c.addresses.values()).map(a => {
-        const street = [a.street_address, a.unit].filter(Boolean).join(', ');
-        const cityLine = [a.city, a.postal_code].filter(Boolean).join(' ');
-        const full = [street, cityLine].filter(Boolean).join(' · ');
-        return `
-          <div class="customer-address">
-            <div class="customer-address-street">${escapeHtml(street)}</div>
-            ${cityLine ? `<div class="customer-address-line">${escapeHtml(cityLine)}</div>` : ''}
-            ${full ? `<a class="customer-address-maps" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}" target="_blank" rel="noopener">🗺 Open in Maps →</a>` : ''}
-          </div>`;
-      }).join('');
-    }
+    // Addresses — pulled from the real addresses table (with IDs) so admins
+    // can edit/delete. Bookings-derived addresses are merged in for cases
+    // where the customer paid as a guest without saving an address.
+    currentCustomerUserId = c.user_id;
+    closeAddressEditor();
+    renderCustomerAddresses(c.user_id);
 
     // Bookings — newest first (preferred_date desc, then created_at desc)
     const sortedBookings = [...c.bookings].sort((a, b) => {
@@ -1149,6 +1138,189 @@ Hiraya Spaces`
   function closeCustomerDetail() {
     $('customer-detail-view').style.display = 'none';
     $('customers-list-view').style.display = 'block';
+  }
+
+  // ── Admin address management ─────────────────────────────────────────
+  // Track which customer the editor is operating on, and which address (if
+  // any) is being edited vs. created.
+  let currentCustomerUserId = null;
+  let editingAddressId = null;
+
+  async function renderCustomerAddresses(userId) {
+    const addrEl = $('customer-addresses');
+    if (!addrEl) return;
+    addrEl.innerHTML = '<div style="color:var(--muted);font-size:13px">Loading addresses…</div>';
+    let rows = [];
+    try {
+      const { data, error } = await sb().rpc('admin_list_addresses_full', { p_user_id: userId });
+      if (error) throw error;
+      rows = data || [];
+    } catch (e) {
+      console.warn('admin_list_addresses_full failed:', e?.message || e);
+      const msg = e?.message || String(e);
+      if (/does not exist|not found/i.test(msg)) {
+        addrEl.innerHTML = '<div style="color:var(--rose);font-size:13px">Address editor needs the admin_list_addresses_full SQL migration.</div>';
+        return;
+      }
+      addrEl.innerHTML = '<div style="color:var(--rose);font-size:13px">Could not load addresses: ' + escapeHtml(msg) + '</div>';
+      return;
+    }
+    if (!rows.length) {
+      addrEl.innerHTML = `<div class="customer-no-addresses">No saved addresses yet — click + Add address to create one.</div>`;
+      return;
+    }
+    addrEl.innerHTML = rows.map(a => {
+      const street = [a.street_address, a.unit].filter(Boolean).join(', ');
+      const cityLine = [a.city, a.postal_code].filter(Boolean).join(' ');
+      const full = [street, cityLine].filter(Boolean).join(' · ');
+      const dims = [
+        a.bedrooms ? `${a.bedrooms} bd` : null,
+        a.bathrooms ? `${a.bathrooms} ba` : null,
+        a.square_feet ? `${a.square_feet} sqft` : null,
+      ].filter(Boolean).join(' · ');
+      const labelChip = a.label ? `<span style="display:inline-block;background:#e4f0e9;color:#1e4d2b;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-right:6px">${escapeHtml(a.label)}</span>` : '';
+      const defaultChip = a.is_default ? `<span style="display:inline-block;background:#fff3cd;color:#7a5a00;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-right:6px">Default</span>` : '';
+      return `
+        <div class="customer-address">
+          <div style="margin-bottom:4px">${defaultChip}${labelChip}</div>
+          <div class="customer-address-street">${escapeHtml(street)}</div>
+          ${cityLine ? `<div class="customer-address-line">${escapeHtml(cityLine)}</div>` : ''}
+          ${dims ? `<div class="customer-address-line">${escapeHtml(dims)}</div>` : ''}
+          ${a.notes ? `<div class="customer-address-line" style="margin-top:4px;font-style:italic">${escapeHtml(a.notes)}</div>` : ''}
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            ${full ? `<a class="customer-address-maps" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}" target="_blank" rel="noopener">🗺 Maps</a>` : ''}
+            <button class="booking-card-btn" style="padding:4px 12px;font-size:12px" onclick="HirayaAdmin.openAddressEditor('${a.id}')">Edit</button>
+            <button class="booking-card-btn" style="padding:4px 12px;font-size:12px;color:var(--rose)" onclick="HirayaAdmin.deleteCustomerAddress('${a.id}')">Delete</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function openAddressEditor(addressId) {
+    const editor = $('customer-address-editor');
+    if (!editor) return;
+    editingAddressId = addressId || null;
+    // Pre-fill or reset the form.
+    const fields = {
+      'addr-label': '',
+      'addr-street': '',
+      'addr-unit': '',
+      'addr-city': '',
+      'addr-province': 'ON',
+      'addr-postal': '',
+      'addr-bedrooms': '',
+      'addr-bathrooms': '',
+      'addr-sqft': '',
+      'addr-notes': '',
+    };
+    if (addressId && currentCustomerUserId) {
+      try {
+        const { data } = await sb().rpc('admin_list_addresses_full', { p_user_id: currentCustomerUserId });
+        const a = (data || []).find(r => r.id === addressId);
+        if (a) {
+          fields['addr-label'] = a.label || '';
+          fields['addr-street'] = a.street_address || '';
+          fields['addr-unit'] = a.unit || '';
+          fields['addr-city'] = a.city || '';
+          fields['addr-province'] = a.province || 'ON';
+          fields['addr-postal'] = a.postal_code || '';
+          fields['addr-bedrooms'] = a.bedrooms ?? '';
+          fields['addr-bathrooms'] = a.bathrooms ?? '';
+          fields['addr-sqft'] = a.square_feet ?? '';
+          fields['addr-notes'] = a.notes || '';
+          const defEl = $('addr-default');
+          if (defEl) defEl.checked = !!a.is_default;
+        }
+      } catch (e) {
+        console.warn('load address for edit failed:', e);
+      }
+    } else {
+      const defEl = $('addr-default');
+      if (defEl) defEl.checked = false;
+    }
+    for (const [id, val] of Object.entries(fields)) {
+      const el = $(id);
+      if (el) el.value = val;
+    }
+    const errEl = $('addr-err');
+    if (errEl) errEl.style.display = 'none';
+    editor.style.display = 'block';
+    editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function closeAddressEditor() {
+    const editor = $('customer-address-editor');
+    if (editor) editor.style.display = 'none';
+    editingAddressId = null;
+  }
+
+  async function saveCustomerAddress() {
+    if (!currentCustomerUserId) return;
+    const street = $('addr-street').value.trim();
+    const city = $('addr-city').value.trim();
+    const errEl = $('addr-err');
+    if (!street || !city) {
+      if (errEl) {
+        errEl.textContent = 'Street address and city are required.';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+    const numOrNull = (raw) => {
+      const s = (raw || '').toString().trim();
+      if (s === '') return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    };
+    const params = {
+      p_user_id: currentCustomerUserId,
+      p_address_id: editingAddressId,
+      p_label: $('addr-label').value.trim() || null,
+      p_street: street,
+      p_unit: $('addr-unit').value.trim() || null,
+      p_city: city,
+      p_province: $('addr-province').value.trim() || 'ON',
+      p_postal: $('addr-postal').value.trim() || null,
+      p_bedrooms: numOrNull($('addr-bedrooms').value),
+      p_bathrooms: numOrNull($('addr-bathrooms').value),
+      p_square_feet: numOrNull($('addr-sqft').value),
+      p_notes: $('addr-notes').value.trim() || null,
+      p_is_default: !!$('addr-default')?.checked,
+    };
+    const btn = $('addr-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { error } = await sb().rpc('admin_upsert_customer_address', params);
+      if (error) throw error;
+      showToast(editingAddressId ? 'Address updated. ✓' : 'Address saved. ✓', 'success');
+      closeAddressEditor();
+      await renderCustomerAddresses(currentCustomerUserId);
+    } catch (e) {
+      console.warn('admin_upsert_customer_address failed:', e);
+      const msg = e?.message || String(e);
+      if (errEl) {
+        errEl.textContent = /does not exist|not found/i.test(msg)
+          ? 'Run the admin_upsert_customer_address SQL migration first.'
+          : 'Save failed: ' + msg;
+        errEl.style.display = 'block';
+      }
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save address';
+    }
+  }
+
+  async function deleteCustomerAddress(addressId) {
+    if (!addressId) return;
+    if (!confirm('Delete this address? This cannot be undone.')) return;
+    try {
+      const { error } = await sb().rpc('admin_delete_customer_address', { p_address_id: addressId });
+      if (error) throw error;
+      showToast('Address deleted.', 'success');
+      if (currentCustomerUserId) await renderCustomerAddresses(currentCustomerUserId);
+    } catch (e) {
+      console.warn('admin_delete_customer_address failed:', e);
+      showToast('Delete failed: ' + (e?.message || e), 'error');
+    }
   }
 
   function saveCustomerMetaFromForm() {
@@ -1458,7 +1630,11 @@ Hiraya Spaces`
     const slug = $('nb-service').value;
     const addonsCents = Array.from(document.querySelectorAll('.nb-addon-cb'))
       .filter(cb => cb.checked)
-      .reduce((sum, cb) => sum + (parseInt(cb.dataset.price, 10) || 0), 0);
+      .reduce((sum, cb) => {
+        const qtyEl = cb.closest('label')?.querySelector('.nb-addon-qty');
+        const qty = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
+        return sum + (parseInt(cb.dataset.price, 10) || 0) * qty;
+      }, 0);
     const extrasCents = Array.from(document.querySelectorAll('.nb-extra-row'))
       .reduce((sum, row) => {
         const priceInput = row.querySelector('.nb-extra-price');
@@ -1513,7 +1689,8 @@ Hiraya Spaces`
       const priceLabel = a.price_cents ? ` (+$${Math.round(a.price_cents / 100)})` : '';
       return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
         <input type="checkbox" class="nb-addon-cb" value="${a.id}" data-price="${a.price_cents || 0}" onchange="HirayaAdmin.recalcNbPrice()">
-        <span>${escapeHtml(a.name)}${priceLabel}</span>
+        <span style="flex:1">${escapeHtml(a.name)}${priceLabel}</span>
+        <input type="number" class="nb-addon-qty" min="1" step="1" value="1" onchange="HirayaAdmin.recalcNbPrice()" oninput="HirayaAdmin.recalcNbPrice()" style="width:54px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center" title="Quantity">
       </label>`;
     }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
   }
@@ -1619,10 +1796,15 @@ Hiraya Spaces`
     const priceCents = recalcNbPrice();
     const frequency = $('nb-frequency')?.value || 'one_time';
     const appliedDiscountPct = nbAppliedDiscountPct();
-    const addonIds = Array.from(document.querySelectorAll('.nb-addon-cb'))
+    const addonItems = Array.from(document.querySelectorAll('.nb-addon-cb'))
       .filter(cb => cb.checked)
-      .map(cb => parseInt(cb.value, 10))
-      .filter(n => Number.isFinite(n));
+      .map(cb => {
+        const idn = parseInt(cb.value, 10);
+        const qtyEl = cb.closest('label')?.querySelector('.nb-addon-qty');
+        const qty = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
+        return { id: idn, qty };
+      })
+      .filter(x => Number.isFinite(x.id));
     const extras = collectNbExtras();
 
     const btn = $('nb-submit');
@@ -1645,12 +1827,12 @@ Hiraya Spaces`
       const newBookingId = data; // admin_create_booking returns the new uuid
 
       // Attach add-ons + additional services (same RPCs the Edit modal uses).
-      if (newBookingId && addonIds.length) {
-        const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
+      if (newBookingId && addonItems.length) {
+        const { error: addonErr } = await sb().rpc('admin_set_booking_addons_qty', {
           p_booking_id: newBookingId,
-          p_addon_ids: addonIds,
+          p_items: addonItems,
         });
-        if (addonErr) console.warn('admin_set_booking_addons failed:', addonErr.message || addonErr);
+        if (addonErr) console.warn('admin_set_booking_addons_qty failed:', addonErr.message || addonErr);
       }
       if (newBookingId && extras.length) {
         const { error: bsErr } = await sb().rpc('admin_set_booking_services', {
@@ -1765,12 +1947,14 @@ Hiraya Spaces`
 
     // Fetch this booking's current addons so we can pre-check them.
     let currentAddonIds = new Set();
+    let currentEditAddonQty = new Map();
     try {
       const { data: addonRows } = await sb()
         .from('booking_addons')
-        .select('addon_id')
+        .select('addon_id, quantity')
         .eq('booking_id', id);
       currentAddonIds = new Set((addonRows || []).map(r => r.addon_id));
+      (addonRows || []).forEach(r => currentEditAddonQty.set(r.addon_id, r.quantity || 1));
     } catch (e) {
       console.warn('booking_addons fetch failed:', e);
     }
@@ -1787,15 +1971,19 @@ Hiraya Spaces`
     }
     renderEditExtras(currentExtras);
 
-    // Render addon checkboxes. Each is a labeled checkbox with the price hint.
+    // Render addon checkboxes. Each is a labeled checkbox with the price hint
+    // and a qty input ("3 windows" / "2 loads of laundry").
     const addonsEl = $('edit-addons');
     if (addonsEl) {
       addonsEl.innerHTML = addonsCache.map(a => {
-        const checked = currentAddonIds.has(a.id) ? 'checked' : '';
+        const isChecked = currentAddonIds.has(a.id);
+        const checked = isChecked ? 'checked' : '';
+        const qty = isChecked ? (currentEditAddonQty.get(a.id) || 1) : 1;
         const priceLabel = a.price_cents ? ` (+$${Math.round(a.price_cents / 100)})` : '';
         return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
           <input type="checkbox" class="edit-addon-cb" value="${a.id}" data-price="${a.price_cents || 0}" ${checked} onchange="HirayaAdmin.recalcEditPrice()">
-          <span>${escapeHtml(a.name)}${priceLabel}</span>
+          <span style="flex:1">${escapeHtml(a.name)}${priceLabel}</span>
+          <input type="number" class="edit-addon-qty" min="1" step="1" value="${qty}" onchange="HirayaAdmin.recalcEditPrice()" oninput="HirayaAdmin.recalcEditPrice()" style="width:54px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center" title="Quantity">
         </label>`;
       }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
     }
@@ -1840,7 +2028,11 @@ Hiraya Spaces`
     const baseCents = svc?.starting_price_cents || 0;
     const addonsCents = Array.from(document.querySelectorAll('.edit-addon-cb'))
       .filter(cb => cb.checked)
-      .reduce((sum, cb) => sum + (parseInt(cb.dataset.price, 10) || 0), 0);
+      .reduce((sum, cb) => {
+        const qtyEl = cb.closest('label')?.querySelector('.edit-addon-qty');
+        const qty = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
+        return sum + (parseInt(cb.dataset.price, 10) || 0) * qty;
+      }, 0);
     const extrasCents = Array.from(document.querySelectorAll('.edit-extra-row'))
       .reduce((sum, row) => {
         const priceInput = row.querySelector('.edit-extra-price');
@@ -1998,11 +2190,16 @@ Hiraya Spaces`
     const customerNotes = $('edit-customer-notes').value.trim() || null;
     const internalNotes = $('edit-internal-notes').value.trim() || null;
 
-    // Collect the currently-checked addon IDs.
-    const addonIds = Array.from(document.querySelectorAll('.edit-addon-cb'))
+    // Collect the currently-checked addons with their quantities.
+    const addonItems = Array.from(document.querySelectorAll('.edit-addon-cb'))
       .filter(cb => cb.checked)
-      .map(cb => parseInt(cb.value, 10))
-      .filter(n => Number.isFinite(n));
+      .map(cb => {
+        const idn = parseInt(cb.value, 10);
+        const qtyEl = cb.closest('label')?.querySelector('.edit-addon-qty');
+        const qty = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
+        return { id: idn, qty };
+      })
+      .filter(x => Number.isFinite(x.id));
 
     const btn = $('edit-btn');
     btn.disabled = true; btn.textContent = 'Saving…';
@@ -2024,14 +2221,14 @@ Hiraya Spaces`
       // Sync addons in a second call. Booking_addons get fully replaced with
       // whatever was checked in the modal. If the function doesn't exist yet
       // (SQL migration not run), show a clear hint instead of just dying.
-      const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
+      const { error: addonErr } = await sb().rpc('admin_set_booking_addons_qty', {
         p_booking_id: id,
-        p_addon_ids: addonIds,
+        p_items: addonItems,
       });
       if (addonErr) {
         const msg = addonErr.message || String(addonErr);
         if (/does not exist|not found/i.test(msg)) {
-          showErr('edit-err', 'Booking saved, but add-ons could not sync — admin_set_booking_addons SQL function is missing. Paste the latest migration into Supabase SQL editor.');
+          showErr('edit-err', 'Booking saved, but add-ons could not sync — admin_set_booking_addons_qty SQL function is missing. Paste the latest migration into Supabase SQL editor.');
         } else {
           showErr('edit-err', 'Booking saved, but add-ons failed: ' + msg);
         }
@@ -2201,7 +2398,10 @@ Hiraya Spaces`
       hint.textContent = 'Tick any add-ons performed during the visit.';
       return;
     }
-    const cents = checked.reduce((s, cb) => s + (parseInt(cb.dataset.price, 10) || 0), 0);
+    const cents = checked.reduce((s, cb) => {
+      const qty = parseInt(cb.closest('label')?.querySelector('.complete-addon-qty')?.value, 10) || 1;
+      return s + (parseInt(cb.dataset.price, 10) || 0) * Math.max(1, qty);
+    }, 0);
     hint.textContent = `${checked.length} add-on${checked.length === 1 ? '' : 's'} selected · subtotal $${Math.round(cents / 100)}.`;
   }
 
@@ -2234,13 +2434,28 @@ Hiraya Spaces`
       console.warn('booking_addons fetch for complete failed:', e);
     }
     const addonsEl = $('complete-addons');
+    // Per-addon qty map from existing booking_addons so re-opening shows the
+    // qty the cleaner entered last time.
+    let currentAddonQty = new Map();
+    try {
+      const { data: addonRowsQty } = await sb()
+        .from('booking_addons')
+        .select('addon_id, quantity')
+        .eq('booking_id', id);
+      (addonRowsQty || []).forEach(r => currentAddonQty.set(r.addon_id, r.quantity || 1));
+    } catch (e) {
+      console.warn('booking_addons qty fetch failed:', e);
+    }
     if (addonsEl) {
       addonsEl.innerHTML = addonsCache.map(a => {
-        const checked = currentAddonIds.has(a.id) ? 'checked' : '';
+        const isChecked = currentAddonIds.has(a.id);
+        const checked = isChecked ? 'checked' : '';
+        const qty = isChecked ? (currentAddonQty.get(a.id) || 1) : 1;
         const priceLabel = a.price_cents ? ` (+$${Math.round(a.price_cents / 100)})` : '';
-        return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
           <input type="checkbox" class="complete-addon-cb" value="${a.id}" data-price="${a.price_cents || 0}" ${checked} onchange="HirayaAdmin.refreshCompleteAddonHint()">
-          <span>${escapeHtml(a.name)}${priceLabel}</span>
+          <span style="flex:1">${escapeHtml(a.name)}${priceLabel}</span>
+          <input type="number" class="complete-addon-qty" min="1" step="1" value="${qty}" onchange="HirayaAdmin.refreshCompleteAddonHint()" oninput="HirayaAdmin.refreshCompleteAddonHint()" style="width:54px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center" title="Quantity">
         </label>`;
       }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
     }
@@ -2308,21 +2523,31 @@ Hiraya Spaces`
     }
     const paidOnSite = !!$('complete-paid-onsite')?.checked;
 
-    // Collect the add-on selection up front so we can sync it in BOTH paths
-    // (paid-on-site receipt + regular invoice email both read this).
-    const completeAddonIds = Array.from(document.querySelectorAll('.complete-addon-cb'))
+    // Collect the add-on selection (with quantities) up front so we can sync
+    // it in BOTH paths (paid-on-site receipt + regular invoice email read it).
+    const completeAddonItems = Array.from(document.querySelectorAll('.complete-addon-cb'))
       .filter(cb => cb.checked)
-      .map(cb => parseInt(cb.value, 10))
-      .filter(n => Number.isFinite(n));
+      .map(cb => {
+        const id = parseInt(cb.value, 10);
+        const qtyEl = cb.closest('label')?.querySelector('.complete-addon-qty');
+        const qty = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
+        return { id, qty };
+      })
+      .filter(x => Number.isFinite(x.id));
     const syncCompleteAddons = async () => {
       try {
-        const { error: addonErr } = await sb().rpc('admin_set_booking_addons', {
+        const { error: addonErr } = await sb().rpc('admin_set_booking_addons_qty', {
           p_booking_id: id,
-          p_addon_ids: completeAddonIds,
+          p_items: completeAddonItems,
         });
-        if (addonErr) console.warn('admin_set_booking_addons (complete) failed:', addonErr.message || addonErr);
+        if (addonErr) {
+          console.warn('admin_set_booking_addons_qty (complete) failed:', addonErr.message || addonErr);
+          if (/does not exist|not found/i.test(addonErr.message || '')) {
+            showToast('Add-on qty sync needs the admin_set_booking_addons_qty SQL migration.', 'error');
+          }
+        }
       } catch (addonE) {
-        console.warn('admin_set_booking_addons (complete) threw:', addonE);
+        console.warn('admin_set_booking_addons_qty (complete) threw:', addonE);
       }
     };
 
@@ -2330,9 +2555,9 @@ Hiraya Spaces`
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
       if (paidOnSite) {
-        // ON-SITE PATH: one atomic SQL call completes the booking AND stamps
-        // the invoice paid. Then JS fires the customer's "payment received"
-        // email + (optionally) the next recurring visit.
+        // ON-SITE PATH: sync add-ons FIRST so admin_complete_and_collect sees
+        // them when stamping the invoice. Then the atomic complete+collect.
+        await syncCompleteAddons();
         const { data: rows, error: collectErr } = await sb().rpc('admin_complete_and_collect', {
           p_booking_id: id,
           p_final_cents: finalCents,
@@ -2348,9 +2573,6 @@ Hiraya Spaces`
         }
         const collected = Array.isArray(rows) ? rows[0] : rows;
         const invNum = collected?.invoice_number || '';
-        // Sync any add-on changes BEFORE the receipt email fires so the PDF
-        // reflects the latest add-on list.
-        await syncCompleteAddons();
         showToast(`Marked complete & paid${invNum ? ' (' + invNum + ')' : ''}. Sending receipt…`, 'success');
         // Fire the payment_received email + auto-recurring (if applicable).
         sb().functions.invoke('send-booking-email', { body: { booking_id: id, mode: 'payment_received' } })
@@ -2406,15 +2628,15 @@ Hiraya Spaces`
         return;
       }
 
+      // Sync add-ons BEFORE marking complete so the invoice picks them up
+      // (admin_set_booking_addons_qty would otherwise reject once status flips
+      // to "completed").
+      await syncCompleteAddons();
       const { data, error } = await sb().rpc('complete_booking', { booking_id: id, final_cents: finalCents });
       if (error) throw error;
       if (data === false) {
         showErr('complete-err', 'Booking is no longer eligible — refresh and try again.');
       } else {
-        // Sync any add-on changes BEFORE the invoice fires so the PDF
-        // reflects last-minute additions (e.g. customer asked for Inside
-        // Oven during the clean).
-        await syncCompleteAddons();
 
         // Start-recurring conversion: customer signed up for a one-off but
         // wants to go recurring at the end of the visit. Update this
@@ -4021,6 +4243,10 @@ Hiraya Spaces`
     openCustomerDetail,
     closeCustomerDetail,
     saveCustomerMetaFromForm,
+    openAddressEditor,
+    closeAddressEditor,
+    saveCustomerAddress,
+    deleteCustomerAddress,
     // Booking detail modal
     openBookingDetail,
     closeBookingDetail,

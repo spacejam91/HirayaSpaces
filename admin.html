@@ -1243,8 +1243,53 @@
         </div>
 
         <div class="customer-section">
-          <h3>Addresses</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+            <h3 style="margin:0">Addresses</h3>
+            <button class="btn-ghost" style="font-size:13px;padding:6px 14px;border-radius:20px" onclick="HirayaAdmin.openAddressEditor()">+ Add address</button>
+          </div>
           <div id="customer-addresses" class="customer-addresses"></div>
+          <div id="customer-address-editor" style="display:none;margin-top:14px;padding:16px;background:#f8faf8;border:1.5px solid var(--border);border-radius:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <label style="grid-column:1/-1;font-size:12px;color:var(--muted)">Label (optional)
+                <input id="addr-label" type="text" placeholder="Home, Cottage, Mom's…" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="grid-column:1/-1;font-size:12px;color:var(--muted)">Street address *
+                <input id="addr-street" type="text" placeholder="125 Devonglen Drive" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="font-size:12px;color:var(--muted)">Unit
+                <input id="addr-unit" type="text" placeholder="Apt 204" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="font-size:12px;color:var(--muted)">City *
+                <input id="addr-city" type="text" placeholder="Kitchener" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="font-size:12px;color:var(--muted)">Province
+                <input id="addr-province" type="text" value="ON" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="font-size:12px;color:var(--muted)">Postal code
+                <input id="addr-postal" type="text" placeholder="N2E 1Z7" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="font-size:12px;color:var(--muted)">Bedrooms
+                <input id="addr-bedrooms" type="number" min="0" step="1" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="font-size:12px;color:var(--muted)">Bathrooms
+                <input id="addr-bathrooms" type="number" min="0" step="0.5" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="font-size:12px;color:var(--muted)">Square feet
+                <input id="addr-sqft" type="number" min="0" step="1" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px">
+              </label>
+              <label style="grid-column:1/-1;font-size:12px;color:var(--muted)">Property notes (keys, gate codes, pets, parking…)
+                <textarea id="addr-notes" rows="2" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-top:4px;resize:vertical"></textarea>
+              </label>
+              <label style="grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-top:4px">
+                <input id="addr-default" type="checkbox"> Make this the default address
+              </label>
+            </div>
+            <div id="addr-err" style="display:none;color:var(--rose);font-size:13px;margin-top:10px"></div>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn-primary" id="addr-save-btn" onclick="HirayaAdmin.saveCustomerAddress()">Save address</button>
+              <button class="btn-ghost" onclick="HirayaAdmin.closeAddressEditor()">Cancel</button>
+            </div>
+          </div>
         </div>
 
         <div class="customer-section">
