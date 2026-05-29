@@ -133,7 +133,7 @@
           <div>
             <div class="booking-card-date">${escapeHtml(dateStr)}${timeStr}</div>
             <div class="booking-card-svc">${svc}${svcPriceStr ? ` — <strong>${svcPriceStr}</strong>` : ''}${freqBadge}</div>
-            ${(b.addon_items && b.addon_items.length) ? `<div class="booking-card-addons">${b.addon_items.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
+            ${(b.addon_items && b.addon_items.length) ? `<div class="booking-card-addons">${b.addon_items.map(a => `<div>✨ ${escapeHtml(a.name)}${a.quantity > 1 ? ` × ${a.quantity}` : ''}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
             <div class="booking-card-total"><strong>Total: ${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
             <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>${b.invoice?.status === 'paid' ? `<span class="booking-status paid" style="background:#1e4d2b;color:white;margin-left:6px">$ PAID</span>` : ''}
           </div>
@@ -431,7 +431,7 @@
     const ids = bookings.map(b => b.id);
     const { data, error } = await sb()
       .from('booking_addons')
-      .select('booking_id, addon_id')
+      .select('booking_id, addon_id, quantity, price_cents')
       .in('booking_id', ids);
     if (error) {
       console.warn('booking_addons fetch failed:', error.message);
@@ -440,15 +440,26 @@
     const addonInfoById = new Map(addonsCache.map(a => [a.id, { name: a.name, price_cents: a.price_cents }]));
     const byBooking = new Map();
     (data || []).forEach(row => {
-      const info = addonInfoById.get(row.addon_id);
-      if (!info) return;
+      const cat = addonInfoById.get(row.addon_id);
+      if (!cat) return;
+      const qty = row.quantity || 1;
+      const unitCents = row.price_cents != null ? row.price_cents : cat.price_cents;
+      // line_cents = total for this add-on row (unit price × qty). UI reads
+      // `price_cents` for the displayed dollar value, so set it to the line
+      // total; keep the unit price separate for any future detail rendering.
+      const lineCents = unitCents != null ? unitCents * qty : null;
       if (!byBooking.has(row.booking_id)) byBooking.set(row.booking_id, []);
-      byBooking.get(row.booking_id).push(info);
+      byBooking.get(row.booking_id).push({
+        name: cat.name,
+        price_cents: lineCents,
+        unit_price_cents: unitCents,
+        quantity: qty,
+      });
     });
     bookings.forEach(b => {
       const items = byBooking.get(b.id) || [];
       b.addon_items = items;
-      b.addon_names = items.map(i => i.name);
+      b.addon_names = items.map(i => i.quantity > 1 ? `${i.name} × ${i.quantity}` : i.name);
     });
   }
 
@@ -3189,7 +3200,8 @@ Hiraya Spaces`
         const rows = [];
         rows.push(`<div style="display:flex;justify-content:space-between"><span>${escapeHtml(b.service_name || 'Cleaning service')}</span><strong>$${Math.round(svcPrice / 100)}</strong></div>`);
         addonItems.forEach(a => {
-          rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
+          const qtyLabel = a.quantity > 1 ? ` × ${a.quantity}` : '';
+          rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}${qtyLabel}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
         });
         rows.push(`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--sage);font-size:16px"><span><strong>Total</strong></span><strong>$${Math.round(invoiceTotal / 100)}</strong></div>`);
         linesEl.innerHTML = rows.join('');
@@ -3247,7 +3259,8 @@ Hiraya Spaces`
       const rows = [];
       rows.push(`<div style="display:flex;justify-content:space-between"><span>${escapeHtml(b.service_name || 'Cleaning service')}</span><strong>$${Math.round(svcPrice / 100)}</strong></div>`);
       addonItems.forEach(a => {
-        rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
+        const qtyLabel = a.quantity > 1 ? ` × ${a.quantity}` : '';
+        rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}${qtyLabel}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
       });
       rows.push(`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--sage);font-size:16px"><span><strong>Total</strong></span><strong>$${Math.round(totalCents / 100)}</strong></div>`);
       linesEl.innerHTML = rows.join('');
@@ -4077,7 +4090,7 @@ Hiraya Spaces`
 
     const addonItems = b.addon_items || [];
     $('detail-addons').innerHTML = addonItems.length
-      ? addonItems.map(a => `<div>✨ ${escapeHtml(a.name)}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')
+      ? addonItems.map(a => `<div>✨ ${escapeHtml(a.name)}${a.quantity > 1 ? ` × ${a.quantity}` : ''}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')
       : '<span style="color:var(--muted)">No add-ons</span>';
 
     const phoneLink = b.customer_phone ? `<a href="tel:${escapeHtml(b.customer_phone.replace(/[^\d+]/g, ''))}">${escapeHtml(b.customer_phone)}</a>` : '';
