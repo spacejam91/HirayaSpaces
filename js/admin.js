@@ -3454,6 +3454,20 @@ Hiraya Spaces`
     blockedDates = new Map((data || []).map(r => [r.date, { reason: r.reason || '' }]));
   }
 
+  // Mobile-friendly helper: read the date picker and toggle its blocked
+  // state. Lets admins block any day even when the desktop grid is hidden.
+  async function blockPickedDate() {
+    const input = $('cal-block-date-input');
+    if (!input) return;
+    const dateStr = input.value;
+    if (!dateStr) {
+      showToast('Pick a date first.', 'error');
+      return;
+    }
+    await toggleBlockedDate(dateStr);
+    input.value = '';
+  }
+
   async function toggleBlockedDate(dateStr) {
     if (!sb() || !isOwner) return;
     const already = blockedDates.has(dateStr);
@@ -3571,11 +3585,15 @@ Hiraya Spaces`
         </div>
       `);
 
-      // Agenda: only days in the current month, only days with events
-      if (inMonth && events.length) {
+      // Agenda: days in the current month that EITHER have events OR are
+      // blocked. Blocked-but-empty days must show up so mobile admins can
+      // tap them to unblock.
+      if (inMonth && (events.length || isBlocked)) {
+        const blockedTag = isBlocked ? '<div class="cal-event cancelled">🚫 Blocked</div>' : '';
         agendaItems.push(`
           <div class="cal-agenda-day ${isToday ? 'is-today' : ''}" onclick="HirayaAdmin.openDayDetail('${key}')">
             <div class="cal-agenda-date">${escapeHtml(d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }))}${isToday ? ' · Today' : ''}</div>
+            ${blockedTag}
             ${events.map(b => `<div class="cal-event ${escapeHtml(b.status)}">${escapeHtml(calEventLabel(b))} — ${escapeHtml(statusLabel(b.status))}</div>`).join('')}
           </div>
         `);
@@ -4249,6 +4267,7 @@ Hiraya Spaces`
     jumpToPending,
     jumpToAllAndCancel,
     toggleBlockedDate,
+    blockPickedDate,
     printDay,
     emailDailySummary,
     // Customers

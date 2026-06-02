@@ -1149,6 +1149,16 @@
       <!-- Mobile agenda (alternative layout) -->
       <div class="cal-agenda" id="cal-agenda"></div>
 
+      <!-- Block-a-specific-date picker (always visible, works on mobile too).
+           On the desktop grid you can just tap any day; on mobile the agenda
+           only lists days with bookings, so this gives admins a way to block
+           an empty day without scrolling for it. -->
+      <div class="cal-block-picker" style="margin-top:1.25rem;background:white;border:1px solid var(--border);border-radius:14px;padding:1rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="font-size:13px;color:var(--muted);font-weight:500">Block a specific date:</div>
+        <input type="date" id="cal-block-date-input" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;flex:1;min-width:140px">
+        <button class="btn-primary" style="padding:8px 18px" onclick="HirayaAdmin.blockPickedDate()">Block / unblock</button>
+      </div>
+
       <!-- Day detail drawer -->
       <div class="cal-day-detail" id="cal-day-detail" style="display:none">
         <div class="cal-day-detail-head">
