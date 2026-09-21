@@ -321,7 +321,7 @@
   border: 1px solid var(--border);
 }
 .reset-card .modal-logo {
-  font-family: 'Cinzel', serif;
+  font-family: 'Cormorant Garamond', serif;
   letter-spacing: 2px;
   font-size: 16px;
   color: var(--sage);
@@ -509,7 +509,7 @@
 .booking-status.awaiting_quote { background: #b08c4a; }
 .booking-status.confirmed { background: var(--sage); }
 .booking-status.in_progress { background: #3b82a8; }
-.booking-status.completed { background: #6a7d6e; }
+.booking-status.completed { background: #566853; }
 .booking-status.cancelled { background: var(--rose); }
 .booking-status.no_show { background: var(--rose); }
 

@@ -11,25 +11,24 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Admin Dashboard | Hiraya Spaces</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&family=Cinzel:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/auth.css">
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --rose: #2d5a3d;
-    --rose-light: #eaf2ec;
-    --rose-mid: #7aaa8a;
+    --forest-soft: #2d5a3d;
+    --mist-warm: #eaf2ec;
+    --forest-pale: #7aaa8a;
     --sage: #1e4d2b;
     --sage-light: #e4f0e9;
     --sage-mid: #5a9470;
     --cream: #f8faf8;
     --warm: #f0f5f1;
     --text: #1a2e1e;
-    --muted: #6a7d6e;
+    --muted: #566853;
     --border: #d4e2d8;
-    --gold: #8faa6a;
   }
 
   body {
@@ -51,7 +50,7 @@
     height: 68px;
   }
   .admin-brand {
-    font-family: 'Cinzel', serif;
+    font-family: 'Cormorant Garamond', serif;
     font-size: 17px; font-weight: 500; letter-spacing: 2.5px;
     color: var(--sage); text-decoration: none;
     text-transform: uppercase;
@@ -359,7 +358,7 @@
     text-transform: uppercase; padding: 3px 10px; border-radius: 20px;
   }
   .inv-badge.unpaid { background: #fdeaea; color: #c0392b; }
-  .inv-badge.paid { background: var(--rose-light); color: var(--sage); }
+  .inv-badge.paid { background: var(--mist-warm); color: var(--sage); }
   .inv-badge.refunded { background: #fff4e0; color: #9a6a16; }
   .inv-badge.cancelled { background: #eee; color: #777; }
   .inv-muted { color: var(--muted); }
@@ -458,7 +457,7 @@
   }
   .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
   .btn-danger {
-    background: var(--rose); color: white; border: none;
+    background: var(--forest-soft); color: white; border: none;
     padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600;
     cursor: pointer; font-family: 'Jost', sans-serif;
   }
@@ -559,19 +558,19 @@
   .cal-event.pending_review,
   .cal-event.awaiting_quote { background: #fbf3df; color: #7a5a18; border-left-color: #b08c4a; }
   .cal-event.in_progress { background: #e0eef7; color: #2b5a73; border-left-color: #3b82a8; }
-  .cal-event.completed { background: #eef0ee; color: #4a5d4e; border-left-color: #6a7d6e; }
+  .cal-event.completed { background: #eef0ee; color: #4a5d4e; border-left-color: #566853; }
   .cal-event.cancelled,
-  .cal-event.no_show { background: #f6e6e6; color: #7a3a3a; border-left-color: var(--rose); text-decoration: line-through; }
+  .cal-event.no_show { background: #f6e6e6; color: #7a3a3a; border-left-color: var(--forest-soft); text-decoration: line-through; }
   .cal-overflow {
     font-size: 10px; color: var(--muted); padding: 2px 6px;
   }
   .cal-cell.is-blocked { background: repeating-linear-gradient(45deg, #f6e6e6, #f6e6e6 6px, #fbf0f0 6px, #fbf0f0 12px); }
-  .cal-cell.is-blocked .cal-cell-date { color: var(--rose); }
+  .cal-cell.is-blocked .cal-cell-date { color: var(--forest-soft); }
   .cal-blocked-tag {
     font-size: 9px; font-weight: 600; letter-spacing: 0.5px;
-    text-transform: uppercase; color: var(--rose);
+    text-transform: uppercase; color: var(--forest-soft);
     background: white; padding: 1px 6px; border-radius: 8px;
-    border: 1px solid var(--rose); display: inline-block;
+    border: 1px solid var(--forest-soft); display: inline-block;
     align-self: flex-start;
   }
   .cal-availability {
@@ -598,8 +597,8 @@
   }
   .cal-legend i.cal-dot.confirmed { background: var(--sage); }
   .cal-legend i.cal-dot.pending_review { background: #b08c4a; }
-  .cal-legend i.cal-dot.completed { background: #6a7d6e; }
-  .cal-legend i.cal-dot.cancelled { background: var(--rose); }
+  .cal-legend i.cal-dot.completed { background: #566853; }
+  .cal-legend i.cal-dot.cancelled { background: var(--forest-soft); }
 
   /* Mobile agenda */
   .cal-agenda { display: none; }
@@ -1294,7 +1293,7 @@
                 <input id="addr-default" type="checkbox"> Make this the default address
               </label>
             </div>
-            <div id="addr-err" style="display:none;color:var(--rose);font-size:13px;margin-top:10px"></div>
+            <div id="addr-err" style="display:none;color:var(--forest-soft);font-size:13px;margin-top:10px"></div>
             <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
               <button class="btn-primary" id="addr-save-btn" onclick="HirayaAdmin.saveCustomerAddress()">Save address</button>
               <button class="btn-ghost" onclick="HirayaAdmin.closeAddressEditor()">Cancel</button>
@@ -1384,7 +1383,7 @@
         <option value="">Pick a service…</option>
       </select>
       <div id="nb-hourly-wrap" style="display:none;margin-top:10px">
-        <div class="nb-section-label">Hours (3–8, $50/hr)</div>
+        <div class="nb-section-label">Hours (3–8, $40/hr)</div>
         <input type="number" id="nb-hours" class="nb-input" min="3" max="8" value="3" oninput="HirayaAdmin.updatePriceHint()">
       </div>
       <div style="margin-top:6px;font-size:12px;color:var(--muted)" id="nb-price-hint"></div>

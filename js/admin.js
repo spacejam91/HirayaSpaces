@@ -1427,7 +1427,7 @@ Hiraya Spaces`
     sel.innerHTML = '<option value="">Pick a service…</option>'
       + items.map(s => {
           const price = s.slug === 'hourly-flexible'
-            ? '$50/hr'
+            ? '$40/hr'
             : (s.starting_price_cents != null ? '$' + Math.round(s.starting_price_cents / 100) : '');
           return `<option value="${escapeHtml(s.slug)}" data-price="${s.starting_price_cents ?? ''}">${escapeHtml(s.name)}${price ? ' — ' + price : ''}</option>`;
         }).join('');

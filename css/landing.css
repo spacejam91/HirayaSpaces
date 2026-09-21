@@ -2,18 +2,17 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --rose: #2d5a3d;
-  --rose-light: #eaf2ec;
-  --rose-mid: #7aaa8a;
+  --forest-soft: #2d5a3d;
+  --mist-warm: #eaf2ec;
+  --forest-pale: #7aaa8a;
   --sage: #1e4d2b;
   --sage-light: #e4f0e9;
   --sage-mid: #5a9470;
   --cream: #f8faf8;
   --warm: #f0f5f1;
   --text: #1a2e1e;
-  --muted: #6a7d6e;
+  --muted: #566853;
   --border: #d4e2d8;
-  --gold: #8faa6a;
 }
 
 html { scroll-behavior: smooth; }
@@ -36,7 +35,7 @@ body {
   height: 68px;
 }
 .lnd-brand {
-  font-family: 'Cinzel', serif;
+  font-family: 'Cormorant Garamond', serif;
   font-size: 17px; font-weight: 500; letter-spacing: 2.5px;
   color: var(--sage); text-decoration: none;
   text-transform: uppercase;
