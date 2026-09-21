@@ -71,7 +71,12 @@
     const email = $('f-email').value.trim().toLowerCase();
     const street = $('f-street').value.trim();
     const unit = $('f-unit').value.trim();
-    const city = $('f-city').value.trim();
+    // #f-city is a zone picker now, so its value is a zone id ('cambridge'),
+    // not free text. Resolve it to the display name and the per-visit fee.
+    const zoneId = $('f-city').value.trim();
+    const zone = (window.zoneById ? window.zoneById(zoneId) : null);
+    const city = zone ? zone.label : '';
+    const travelFee = zone ? zone.fee : 0;
     const postal = $('f-postal').value.trim().toUpperCase();
     const savedAddrSel = $('f-saved-addr');
     const savedAddressId = (savedAddrSel && savedAddrSel.value && savedAddrSel.value !== '__new__')
@@ -166,7 +171,10 @@
     const frequency = frequencyEl ? frequencyEl.value : 'one_time';
     const discountPct = ({ one_time: 0, weekly: 20, biweekly: 15, monthly: 10 })[frequency] || 0;
     const discountAmount = 0;
-    const total = subtotal;
+    // Travel fee is per visit, on top of the clean. Kept separate from
+    // subtotal so it can be stored in its own column — the account and admin
+    // views derive the service price as (total - addons - travel).
+    const total = subtotal + travelFee;
 
     // Entry method — defaults to "home" so customers who skip the picker
     // (e.g. on an older cached page load) don't break submission.
@@ -213,6 +221,8 @@
         // booking_services after the bookings row is created.
         extraServiceLines,
         estimated_total_dollars: total,
+        travel_fee_dollars: travelFee,
+        travel_zone: zoneId || null,
         // New: entry method + frequency
         entry_method: entryMethod,
         entry_instructions: entryInstructions || null,
@@ -220,6 +230,7 @@
         recurring_discount_pct: discountPct,
       },
       display: {
+        travelLabel: zone ? zone.label : '',
         dateLabel,
         serviceIcon: svc?.icon || '🧹',
         basePrice,
@@ -284,6 +295,15 @@
       svcLinesEl.innerHTML = lines
         .map(l => `<div class="br-line"><span>${escapeHtml(l.label)}</span><span>${escapeHtml(l.price)}</span></div>`)
         .join('');
+    }
+
+    // Travel fee gets its own line so the customer sees what the extra covers.
+    const travelEl = $('br-travel');
+    if (travelEl) {
+      const tf = f.travel_fee_dollars || 0;
+      travelEl.innerHTML = tf > 0
+        ? `<div class="br-line"><span>Travel \u2014 ${escapeHtml(d.travelLabel || 'out of region')}</span><span>$${tf}</span></div>`
+        : '';
     }
 
     $('br-total').textContent = f.estimated_total_dollars ? '$' + f.estimated_total_dollars : 'Quote on request';
@@ -526,6 +546,7 @@
           entry_instructions: f.entry_instructions || null,
           frequency: f.frequency || 'one_time',
           recurring_discount_pct: appliedDiscountPct,
+          travel_fee_cents: Math.round((f.travel_fee_dollars || 0) * 100),
         })
         .select()
         .single();
@@ -676,7 +697,10 @@
       if (addr) {
         $('f-street').value = addr.street_address || '';
         $('f-unit').value = addr.unit || '';
-        $('f-city').value = addr.city || '';
+          // Saved addresses hold free text ("Galt"); map it onto a zone.
+          const savedZone = window.zoneFromCityText ? window.zoneFromCityText(addr.city) : null;
+          $('f-city').value = savedZone ? savedZone.id : '';
+          if (window.onZoneChange) window.onZoneChange(savedZone ? savedZone.id : '');
         $('f-postal').value = addr.postal_code || '';
         setAddressFieldsLocked(true);
       }
@@ -685,6 +709,7 @@
       $('f-street').value = '';
       $('f-unit').value = '';
       $('f-city').value = '';
+      if (window.onZoneChange) window.onZoneChange('');
       $('f-postal').value = '';
       setAddressFieldsLocked(false);
       setTimeout(() => { const s = $('f-street'); if (s) s.focus(); }, 30);

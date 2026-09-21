@@ -586,6 +586,16 @@ Deno.serve(async (req) => {
         `<td style="padding:6px 0;text-align:right;color:#1a2e1e;font-weight:600">${priceLabel}</td></tr>`
       );
     }
+    // Out-of-region travel fee, charged per visit. Its own line so the
+    // customer sees exactly what the extra covers.
+    const travelCents = booking.travel_fee_cents || 0;
+    if (travelCents > 0) {
+      const zoneLabel = booking.addresses?.city ? escapeHtml(booking.addresses.city) : "out of region";
+      lineRows.push(
+        `<tr><td style="padding:6px 0;color:#1a2e1e">Travel &mdash; ${zoneLabel}</td>` +
+        `<td style="padding:6px 0;text-align:right;color:#1a2e1e;font-weight:600">${dollars(travelCents)}</td></tr>`
+      );
+    }
     const lineItemsHtml = lineRows.join("");
 
     // Prefer the charged price once it's known (set during Mark complete).
@@ -840,6 +850,13 @@ Deno.serve(async (req) => {
         const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
         lineItems.push({ name: baseName + qty, priceLabel: dollars(lineTotal) });
       }
+      const travelCentsInv = booking.travel_fee_cents || 0;
+      if (travelCentsInv > 0) {
+        lineItems.push({
+          name: "Travel — " + (booking.addresses?.city || "out of region"),
+          priceLabel: dollars(travelCentsInv),
+        });
+      }
       if (additionalCents > 0) {
         lineItems.push({ name: "Additional services provided", priceLabel: dollars(additionalCents) });
       } else if (additionalCents < 0) {
@@ -1035,6 +1052,13 @@ Deno.serve(async (req) => {
         const qty = ba.quantity > 1 ? ` × ${ba.quantity}` : "";
         const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
         lineItems.push({ name: baseName + qty, priceLabel: dollars(lineTotal) });
+      }
+      const travelCentsInv = booking.travel_fee_cents || 0;
+      if (travelCentsInv > 0) {
+        lineItems.push({
+          name: "Travel — " + (booking.addresses?.city || "out of region"),
+          priceLabel: dollars(travelCentsInv),
+        });
       }
       if (additionalCents > 0) {
         lineItems.push({ name: "Additional services provided", priceLabel: dollars(additionalCents) });

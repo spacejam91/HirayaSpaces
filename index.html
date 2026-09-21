@@ -411,6 +411,7 @@
   }
   .quote-total-box.visible { display: block; }
   .quote-total-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--sage); margin-bottom: 0.75rem; }
+  .form-hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
   .quote-line { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   .quote-line.total { font-size: 17px; font-weight: 700; color: var(--text); border-top: 1px solid var(--sage-mid); margin-top: 8px; padding-top: 10px; }
   .quote-line.total span:last-child { color: var(--sage); }
@@ -1381,7 +1382,7 @@
         <span class="amt">$40</span>
         <span class="per">per hour</span>
       </div>
-      <p class="hero-price-note">Three-hour minimum, so a visit starts at <strong>$120</strong>. No subscription and no call-out fee &mdash; you pay for the hours you book.</p>
+      <p class="hero-price-note">Three-hour minimum, so a visit starts at <strong>$120</strong>. No subscription &mdash; you pay for the hours you book. Free travel in Kitchener and Waterloo.</p>
     </div>
 
     <div class="hero-card-rule"></div>
@@ -1559,7 +1560,7 @@
         <div class="form-group full"><label>Street address <span style="color:var(--forest-soft)">*</span></label><input type="text" id="f-street" autocomplete="street-address"></div>
         <div class="form-group"><label>Unit <span class="form-optional">(optional)</span></label><input type="text" id="f-unit" autocomplete="address-line2"></div>
         <div class="form-group"><label>Postal code <span style="color:var(--forest-soft)">*</span></label><input type="text" id="f-postal" autocomplete="postal-code" maxlength="7"></div>
-        <div class="form-group full"><label>City <span style="color:var(--forest-soft)">*</span></label><input type="text" id="f-city" autocomplete="address-level2"></div>
+        <div class="form-group full"><label for="f-city">City <span style="color:var(--forest-soft)">*</span></label><select id="f-city" autocomplete="address-level2" onchange="onZoneChange(this.value)"></select><div class="form-hint" id="f-city-hint">Kitchener and Waterloo have no travel fee.</div></div>
 
         <!-- Save-to-account checkbox (shown only when logged in and entering a new address) -->
         <div class="form-group full form-check-row" id="f-save-addr-group" style="display:none">
@@ -1981,6 +1982,56 @@ function getSelectedServiceLines() {
 // picked). When selHourly is true, selSvc='hourly' and selTier is synthesized
 // from the hour count so the existing review/submit pipeline keeps working.
 const HOURLY_RATE = 40;
+
+// ── TRAVEL ZONES ──────────────────────────────────────────────────────────
+// Charged per visit, on top of the clean. Kitchener and Waterloo are the core
+// service area and are free; everything else covers the drive.
+// Mirrored server-side by bookings.travel_fee_cents (migration 20260920215500).
+const TRAVEL_ZONES = [
+  { id: 'waterloo',  label: 'Waterloo',            fee: 0  },
+  { id: 'kitchener', label: 'Kitchener',           fee: 0  },
+  { id: 'cambridge', label: 'Cambridge',           fee: 25 },
+  { id: 'guelph',    label: 'Guelph',              fee: 50 },
+  { id: 'other',     label: 'Elsewhere nearby',    fee: 50 },
+];
+
+// Free-text cities people already have saved, plus the neighbourhoods folks
+// actually type. Galt/Preston/Hespeler ARE Cambridge — without this they would
+// be charged nothing.
+const CITY_ALIASES = {
+  waterloo: 'waterloo', kitchener: 'kitchener', kw: 'kitchener',
+  'kitchener-waterloo': 'kitchener', 'kitchener waterloo': 'kitchener',
+  cambridge: 'cambridge', galt: 'cambridge', preston: 'cambridge',
+  hespeler: 'cambridge', blair: 'cambridge',
+  guelph: 'guelph',
+};
+
+function zoneById(id) { return TRAVEL_ZONES.find(z => z.id === id) || null; }
+
+// Best-effort match for a free-text city already saved on an account. Returns
+// null when we cannot be sure — the customer then picks, rather than us
+// guessing at their money.
+function zoneFromCityText(text) {
+  const key = String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!key) return null;
+  const id = CITY_ALIASES[key];
+  return id ? zoneById(id) : null;
+}
+
+function travelFeeOf(zoneId) { return zoneById(zoneId)?.fee || 0; }
+
+function zoneOptionsHtml(selectedId) {
+  return ['<option value="">Select your city…</option>'].concat(
+    TRAVEL_ZONES.map(z => {
+      const note = z.fee ? ` (+$${z.fee} travel)` : '';
+      const sel = z.id === selectedId ? ' selected' : '';
+      return `<option value="${z.id}"${sel}>${z.label}${note}</option>`;
+    })
+  ).join('');
+}
+
+// The city the customer is currently booking for, as a zone id.
+let selZone = '';
 const HOURLY_MIN = 3;
 const HOURLY_MAX = 8;
 let selHours = HOURLY_MIN;
@@ -2329,6 +2380,40 @@ function onFrequencyChange() {
   updateSummary();
 }
 
+// Fill both city pickers and wire the fee into the running estimate.
+function initZonePickers() {
+  const co = document.getElementById('f-city');
+  if (co && !co.options.length) co.innerHTML = zoneOptionsHtml(selZone);
+  const am = document.getElementById('addr-city');
+  if (am && !am.options.length) am.innerHTML = zoneOptionsHtml('');
+}
+
+function onZoneChange(zoneId) {
+  selZone = zoneId || '';
+  const hint = document.getElementById('f-city-hint');
+  if (hint) {
+    const z = zoneById(selZone);
+    hint.textContent = !z
+      ? 'Kitchener and Waterloo have no travel fee.'
+      : z.fee
+        ? `${z.label} is outside our core area \u2014 a $${z.fee} travel fee is added to each visit.`
+        : `${z.label} is in our core service area \u2014 no travel fee.`;
+  }
+  updateSummary();
+}
+
+// A saved address stores its city as free text. Match it to a zone when we can;
+// leave the picker empty when we cannot, so nobody is charged on a guess.
+function applySavedCityToPicker(cityText) {
+  const z = zoneFromCityText(cityText);
+  const co = document.getElementById('f-city');
+  if (co) co.value = z ? z.id : '';
+  onZoneChange(z ? z.id : '');
+  return z;
+}
+
+window.addEventListener('DOMContentLoaded', initZonePickers);
+
 function updateSummary(){
   const lines = getSelectedServiceLines();
   let label;
@@ -2406,6 +2491,12 @@ function updateQuote(svcLines, addons) {
   const freqEl = document.getElementById('f-frequency');
   const freq = freqEl ? freqEl.value : 'one_time';
   const pct = FREQUENCY_DISCOUNTS[freq] || 0;
+
+  const travelZone = zoneById(selZone);
+  if (travelZone && travelZone.fee > 0) {
+    html += `<div class="quote-line"><span>Travel \u2014 ${travelZone.label}</span><span>$${travelZone.fee}</span></div>`;
+    total += travelZone.fee;
+  }
 
   html += `<div class="quote-line total"><span>Estimated total</span><span>$${total}+</span></div>`;
   if (pct > 0) {
@@ -2778,6 +2869,7 @@ loadBlockedDates();
     <div class="br-total-box">
       <div id="br-svc-lines"></div>
       <div id="br-addons"></div>
+      <div id="br-travel"></div>
       <div class="br-line br-total"><span>Estimated total</span><span id="br-total"></span></div>
       <div class="br-note">Final price confirmed after walkthrough. No cancellations within 24 hours of your booking.</div>
     </div>
@@ -2899,7 +2991,7 @@ loadBlockedDates();
       </div>
       <div class="modal-field">
         <label for="addr-city">City</label>
-        <input type="text" id="addr-city" autocomplete="address-level2">
+        <select id="addr-city" autocomplete="address-level2"></select>
       </div>
 
       <label class="form-check-label" style="margin:0.75rem 0 1.25rem">

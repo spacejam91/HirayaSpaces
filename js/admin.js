@@ -67,7 +67,9 @@
     // booking total. Shown inline next to the service name.
     const addonsSumCents = (b.addon_items || []).reduce((s, a) => s + (a.price_cents || 0), 0);
     const totalForSvcCents = b.final_price_cents ?? b.estimated_price_cents;
-    const svcPriceCents = (totalForSvcCents != null) ? Math.max(0, totalForSvcCents - addonsSumCents) : null;
+    // Travel fee is part of the stored total but is not part of the service.
+    const travelCents = b.travel_fee_cents || 0;
+    const svcPriceCents = (totalForSvcCents != null) ? Math.max(0, totalForSvcCents - addonsSumCents - travelCents) : null;
     const svcPriceStr = (svcPriceCents != null && svcPriceCents > 0) ? `$${Math.round(svcPriceCents / 100)}` : '';
     const svcParts = rawSvc.split(' · ');
     const svc = svcParts.length > 1
@@ -1134,7 +1136,7 @@ Hiraya Spaces`
       if (isPending) {
         actions = `
           <div class="booking-card-actions">
-            <button class="booking-card-btn" style="color:var(--rose)" onclick="event.stopPropagation(); HirayaAdmin.jumpToPending('${b.id}','decline')">Decline</button>
+            <button class="booking-card-btn" style="color:var(--forest-soft)" onclick="event.stopPropagation(); HirayaAdmin.jumpToPending('${b.id}','decline')">Decline</button>
             <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="event.stopPropagation(); HirayaAdmin.jumpToPending('${b.id}','confirm')">Confirm</button>
           </div>`;
       } else if (ownerCancellable) {
@@ -1170,10 +1172,10 @@ Hiraya Spaces`
       console.warn('admin_list_addresses_full failed:', e?.message || e);
       const msg = e?.message || String(e);
       if (/does not exist|not found/i.test(msg)) {
-        addrEl.innerHTML = '<div style="color:var(--rose);font-size:13px">Address editor needs the admin_list_addresses_full SQL migration.</div>';
+        addrEl.innerHTML = '<div style="color:var(--forest-soft);font-size:13px">Address editor needs the admin_list_addresses_full SQL migration.</div>';
         return;
       }
-      addrEl.innerHTML = '<div style="color:var(--rose);font-size:13px">Could not load addresses: ' + escapeHtml(msg) + '</div>';
+      addrEl.innerHTML = '<div style="color:var(--forest-soft);font-size:13px">Could not load addresses: ' + escapeHtml(msg) + '</div>';
       return;
     }
     if (!rows.length) {
@@ -1201,7 +1203,7 @@ Hiraya Spaces`
           <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
             ${full ? `<a class="customer-address-maps" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}" target="_blank" rel="noopener">🗺 Maps</a>` : ''}
             <button class="booking-card-btn" style="padding:4px 12px;font-size:12px" onclick="HirayaAdmin.openAddressEditor('${a.id}')">Edit</button>
-            <button class="booking-card-btn" style="padding:4px 12px;font-size:12px;color:var(--rose)" onclick="HirayaAdmin.deleteCustomerAddress('${a.id}')">Delete</button>
+            <button class="booking-card-btn" style="padding:4px 12px;font-size:12px;color:var(--forest-soft)" onclick="HirayaAdmin.deleteCustomerAddress('${a.id}')">Delete</button>
           </div>
         </div>`;
     }).join('');
@@ -2121,7 +2123,7 @@ Hiraya Spaces`
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn-ghost';
-    removeBtn.style.cssText = 'padding:6px 10px;color:var(--rose);font-size:18px;line-height:1';
+    removeBtn.style.cssText = 'padding:6px 10px;color:var(--forest-soft);font-size:18px;line-height:1';
     removeBtn.title = 'Remove this service';
     removeBtn.textContent = '×';
     removeBtn.onclick = () => { row.remove(); recalcEditPrice(); maybeShowExtrasEmpty(); };
@@ -3149,6 +3151,55 @@ Hiraya Spaces`
   let viewingInvoiceBookingId = null;
   let viewingInvoice = null; // populated row from admin_get_invoice_for_booking
 
+  // Set the total on an invoice that has already been issued — a goodwill
+  // discount or a correction, without cancelling and re-raising it.
+  async function saveInvoiceOverride() {
+    const msg = $('invoice-adjust-msg');
+    const btn = $('invoice-adjust-save');
+    if (!viewingInvoice) {
+      if (msg) { msg.style.color = 'var(--forest-soft)'; msg.textContent = 'No invoice open.'; }
+      return;
+    }
+    const raw = ($('invoice-adjust-amount').value || '').trim();
+    const dollars = Number(raw);
+    if (raw === '' || !Number.isFinite(dollars) || dollars < 0) {
+      msg.style.color = 'var(--forest-soft)';
+      msg.textContent = 'Enter an amount of zero or more.';
+      return;
+    }
+    const cents = Math.round(dollars * 100);
+    const before = viewingInvoice.total_cents || 0;
+    if (cents === before) {
+      msg.style.color = 'var(--muted)';
+      msg.textContent = 'That is already the total.';
+      return;
+    }
+    btn.disabled = true;
+    msg.style.color = 'var(--muted)';
+    msg.textContent = 'Saving…';
+    try {
+      // All three params go explicitly: PostgREST will not match the signature
+      // on name alone when one argument has a default.
+      const { data, error } = await sb().rpc('admin_adjust_invoice_total', {
+        p_invoice_id: viewingInvoice.id,
+        p_total_cents: cents,
+        p_tax_cents: viewingInvoice.tax_cents || 0,
+      });
+      if (error) throw error;
+      if (data === false) throw new Error('Invoice not found.');
+      viewingInvoice.total_cents = cents;
+      $('invoice-total').textContent = '$' + Math.round(cents / 100);
+      msg.style.color = 'var(--sage)';
+      msg.textContent = `Updated from $${Math.round(before / 100)} to $${Math.round(cents / 100)}.`;
+      if (typeof refreshInvoices === 'function') refreshInvoices();
+    } catch (e) {
+      msg.style.color = 'var(--forest-soft)';
+      msg.textContent = e.message || 'Could not update the invoice.';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function viewInvoice(id) {
     if (!sb() || !isOwner) return;
     const b = allBookings.find(x => x.id === id);
@@ -3175,10 +3226,17 @@ Hiraya Spaces`
       }
       viewingInvoice = inv;
       $('invoice-num').textContent = inv.invoice_number || '—';
-      const statusColor = inv.status === 'paid' ? 'var(--sage)' : inv.status === 'unpaid' ? 'var(--text)' : 'var(--rose)';
+      const statusColor = inv.status === 'paid' ? 'var(--sage)' : inv.status === 'unpaid' ? 'var(--text)' : 'var(--forest-soft)';
       $('invoice-status').textContent = inv.status.toUpperCase();
       $('invoice-status').style.color = statusColor;
       $('invoice-total').textContent = '$' + Math.round((inv.total_cents || 0) / 100);
+      // Override control — only meaningful once a real invoice exists.
+      const adjWrap = $('invoice-adjust-wrap');
+      if (adjWrap) {
+        adjWrap.style.display = 'flex';
+        $('invoice-adjust-amount').value = Math.round((inv.total_cents || 0) / 100);
+        $('invoice-adjust-msg').textContent = '';
+      }
       $('invoice-issued').textContent = inv.created_at
         ? new Date(inv.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
         : '—';
@@ -3243,6 +3301,9 @@ Hiraya Spaces`
   // line-item layout as a real invoice; the Mark Paid / Refund / Resend / PDF
   // buttons are hidden and a single "Send invoice" button is shown.
   function renderInvoiceDraft(b) {
+    // A draft has no invoice row yet, so there is nothing to override.
+    const adjWrapDraft = $('invoice-adjust-wrap');
+    if (adjWrapDraft) adjWrapDraft.style.display = 'none';
     $('invoice-num').textContent = 'DRAFT';
     $('invoice-status').textContent = 'DRAFT';
     $('invoice-status').style.color = 'var(--muted)';
@@ -3648,7 +3709,7 @@ Hiraya Spaces`
           if (isPending) {
             actions = `
               <div class="booking-card-actions">
-                <button class="booking-card-btn" style="color:var(--rose)" onclick="HirayaAdmin.jumpToPending('${b.id}','decline')">Decline</button>
+                <button class="booking-card-btn" style="color:var(--forest-soft)" onclick="HirayaAdmin.jumpToPending('${b.id}','decline')">Decline</button>
                 <button class="booking-card-btn" style="background:var(--sage);color:white" onclick="HirayaAdmin.jumpToPending('${b.id}','confirm')">Confirm</button>
               </div>`;
           } else if (ownerCancellable) {
@@ -4252,6 +4313,7 @@ Hiraya Spaces`
     renderInvoices,
     exportInvoicesCsv,
     openInvoiceFromTable,
+    saveInvoiceOverride,
     exportBookingsCsv,
     askReschedule,
     cancelReschedule,

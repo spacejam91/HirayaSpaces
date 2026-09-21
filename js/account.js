@@ -430,7 +430,7 @@
     const { data, error } = await sb()
       .from('bookings')
       .select(`
-        id, preferred_date, preferred_time_slot, status, estimated_price_cents,
+        id, preferred_date, preferred_time_slot, status, estimated_price_cents, travel_fee_cents,
         created_at, customer_notes,
         services ( name, slug ),
         addresses ( street_address, unit, city, postal_code ),
@@ -517,7 +517,10 @@
         .map(ba => ba.addons ? { name: ba.addons.name, price_cents: ba.addons.price_cents } : null)
         .filter(Boolean);
       const addonsSumCents = addonItems.reduce((s, a) => s + (a.price_cents || 0), 0);
-      const svcPriceCents = (b.estimated_price_cents != null) ? Math.max(0, b.estimated_price_cents - addonsSumCents) : null;
+      // The stored total includes the per-visit travel fee, so it has to come
+      // off here too — otherwise the SERVICE shows $25-50 more than it is.
+      const travelCents = b.travel_fee_cents || 0;
+      const svcPriceCents = (b.estimated_price_cents != null) ? Math.max(0, b.estimated_price_cents - addonsSumCents - travelCents) : null;
       const svcPriceStr = (svcPriceCents != null && svcPriceCents > 0) ? `$${Math.round(svcPriceCents / 100)}` : '';
       const classes = ['booking-card'];
       if (isUpcoming(b)) classes.push('is-upcoming');
