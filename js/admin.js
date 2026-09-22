@@ -3177,6 +3177,36 @@ Hiraya Spaces`
   let viewingInvoiceBookingId = null;
   let viewingInvoice = null; // populated row from admin_get_invoice_for_booking
 
+  // Undo an override: put the invoice back on the booking's own price and
+  // clear the manual flag, so it resumes tracking the booking again.
+  async function resetInvoiceOverride() {
+    const msg = $('invoice-adjust-msg');
+    const btn = $('invoice-adjust-reset');
+    if (!viewingInvoice) return;
+    btn.disabled = true;
+    msg.style.color = 'var(--muted)';
+    msg.textContent = 'Resetting…';
+    try {
+      const { data, error } = await sb().rpc('admin_reset_invoice_to_calculated', {
+        p_invoice_id: viewingInvoice.id,
+      });
+      if (error) throw error;
+      if (data === false) throw new Error('Invoice not found.');
+      if (typeof refreshInvoices === 'function') refreshInvoices();
+      if (viewingInvoiceBookingId) await viewInvoice(viewingInvoiceBookingId);
+      const after = $('invoice-adjust-msg');
+      if (after) {
+        after.style.color = 'var(--sage)';
+        after.textContent = 'Reset to the calculated price.';
+      }
+    } catch (e) {
+      msg.style.color = 'var(--forest-soft)';
+      msg.textContent = e.message || 'Could not reset the invoice.';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   // Set the total on an invoice that has already been issued — a goodwill
   // discount or a correction, without cancelling and re-raising it.
   async function saveInvoiceOverride() {
@@ -3272,6 +3302,8 @@ Hiraya Spaces`
         adjWrap.style.display = 'flex';
         $('invoice-adjust-amount').value = Math.round((inv.total_cents || 0) / 100);
         $('invoice-adjust-msg').textContent = '';
+        const resetBtn = $('invoice-adjust-reset');
+        if (resetBtn) resetBtn.style.display = inv.manually_adjusted ? '' : 'none';
       }
       $('invoice-issued').textContent = inv.created_at
         ? new Date(inv.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -4359,6 +4391,7 @@ Hiraya Spaces`
     exportInvoicesCsv,
     openInvoiceFromTable,
     saveInvoiceOverride,
+    resetInvoiceOverride,
     exportBookingsCsv,
     askReschedule,
     cancelReschedule,

@@ -12,7 +12,7 @@
 <title>Admin Dashboard | Hiraya Spaces</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/auth.css?v=202609212122">
+<link rel="stylesheet" href="/css/auth.css?v=202609212128">
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1565,6 +1565,8 @@
                    style="width:110px;padding:6px 8px;font-size:14px">
             <button class="btn-ghost" id="invoice-adjust-save" style="padding:6px 12px;font-size:13px"
                     onclick="HirayaAdmin.saveInvoiceOverride()">Save</button>
+            <button class="btn-ghost" id="invoice-adjust-reset" style="padding:6px 12px;font-size:13px;display:none"
+                    onclick="HirayaAdmin.resetInvoiceOverride()">Reset</button>
           </div>
           <div id="invoice-adjust-msg" style="font-size:12px;margin-top:6px"></div>
         </div>
@@ -1740,8 +1742,8 @@
 <!-- Supabase + admin scripts -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
-<script src="/js/supabase-client.js?v=202609212122"></script>
-<script src="/js/admin.js?v=202609212122"></script>
+<script src="/js/supabase-client.js?v=202609212128"></script>
+<script src="/js/admin.js?v=202609212128"></script>
 
 </body>
 </html>
