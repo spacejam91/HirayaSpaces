@@ -13,6 +13,31 @@
   ];
 
   // ── UTILITIES ──────────────────────────────────────────────────────────
+  // The moment a booking came in: "Sat, Sep 20, 2026, 9:14 p.m."
+  function fmtBookedAt(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '—';
+    return d.toLocaleString('en-CA', {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    });
+  }
+
+  // "3 days ago" — makes a booking left sitting unactioned obvious at a glance.
+  function relativeAge(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs === 1 ? '1 hour ago' : `${hrs} hours ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return days === 1 ? 'yesterday' : `${days} days ago`;
+    const months = Math.floor(days / 30);
+    return months === 1 ? '1 month ago' : `${months} months ago`;
+  }
+
   function escapeHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -137,6 +162,7 @@
             <div class="booking-card-svc">${svc}${svcPriceStr ? ` — <strong>${svcPriceStr}</strong>` : ''}${freqBadge}</div>
             ${(b.addon_items && b.addon_items.length) ? `<div class="booking-card-addons">${b.addon_items.map(a => `<div>✨ ${escapeHtml(a.name)}${a.quantity > 1 ? ` × ${a.quantity}` : ''}${a.price_cents != null ? ` — <strong>$${Math.round(a.price_cents / 100)}</strong>` : ''}</div>`).join('')}</div>` : ''}
             <div class="booking-card-total"><strong>Total: ${escapeHtml(total)}</strong> · Ref ${b.id.slice(0, 8).toUpperCase()}</div>
+            ${b.created_at ? `<div style="margin-top:4px;font-size:11px;color:var(--muted)">Booked ${escapeHtml(relativeAge(b.created_at))} · ${escapeHtml(fmtBookedAt(b.created_at))}</div>` : ''}
             <span class="booking-status ${escapeHtml(b.status || 'pending_review')}">${escapeHtml(statusLabel(b.status))}</span>${b.invoice?.status === 'paid' ? `<span class="booking-status paid" style="background:#1e4d2b;color:white;margin-left:6px">$ PAID</span>` : ''}
           </div>
         </div>
@@ -4166,6 +4192,15 @@ Hiraya Spaces`
       : '';
     $('detail-service').innerHTML = escapeHtml(b.service_name || 'Cleaning service') + detailSvcPriceStr + detailFreqBadge;
     $('detail-when').innerHTML = `<strong>${escapeHtml(dateStr)}</strong>${escapeHtml(timeStr)}`;
+
+    // When the customer actually placed the booking — distinct from "When"
+    // above, which is the date they booked FOR.
+    const bookedEl = $('detail-booked-at');
+    if (bookedEl) {
+      bookedEl.innerHTML = b.created_at
+        ? `${escapeHtml(fmtBookedAt(b.created_at))}<span style="color:var(--muted)"> · ${escapeHtml(relativeAge(b.created_at))}</span>`
+        : '<span style="color:var(--muted)">—</span>';
+    }
 
     const addonItems = b.addon_items || [];
     $('detail-addons').innerHTML = addonItems.length
