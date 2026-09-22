@@ -3213,14 +3213,18 @@ Hiraya Spaces`
       });
       if (error) throw error;
       if (data === false) throw new Error('Invoice not found.');
-      viewingInvoice.total_cents = cents;
-      viewingInvoice.manually_adjusted = true;
-      msg.style.color = 'var(--sage)';
-      msg.textContent = `Updated from $${Math.round(before / 100)} to $${Math.round(cents / 100)}.`;
       if (typeof refreshInvoices === 'function') refreshInvoices();
-      // Re-open from the server so the total, the line items and the adjusted
-      // badge all come from one source instead of being patched piecemeal.
+
+      // Re-read from the server so the total, the line items and the adjusted
+      // marker all come from one source rather than being patched piecemeal.
+      // Must run BEFORE the confirmation is written — the re-render clears it.
       if (viewingInvoiceBookingId) await viewInvoice(viewingInvoiceBookingId);
+
+      const after = $('invoice-adjust-msg');
+      if (after) {
+        after.style.color = 'var(--sage)';
+        after.textContent = `Updated from $${Math.round(before / 100)} to $${Math.round(cents / 100)}.`;
+      }
     } catch (e) {
       msg.style.color = 'var(--forest-soft)';
       msg.textContent = e.message || 'Could not update the invoice.';
@@ -3258,7 +3262,10 @@ Hiraya Spaces`
       const statusColor = inv.status === 'paid' ? 'var(--sage)' : inv.status === 'unpaid' ? 'var(--text)' : 'var(--forest-soft)';
       $('invoice-status').textContent = inv.status.toUpperCase();
       $('invoice-status').style.color = statusColor;
-      $('invoice-total').textContent = '$' + Math.round((inv.total_cents || 0) / 100);
+      $('invoice-total').innerHTML = '$' + Math.round((inv.total_cents || 0) / 100)
+        + (inv.manually_adjusted
+            ? ' <span style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em">· ADJUSTED</span>'
+            : '');
       // Override control — only meaningful once a real invoice exists.
       const adjWrap = $('invoice-adjust-wrap');
       if (adjWrap) {
