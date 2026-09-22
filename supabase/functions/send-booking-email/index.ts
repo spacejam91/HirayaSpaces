@@ -774,7 +774,7 @@ Deno.serve(async (req) => {
       const finalCents = (booking.final_price_cents ?? booking.estimated_price_cents) ?? 0;
       const { data: existingInv } = await sb
         .from("invoices")
-        .select("id, invoice_number, status, total_cents, paid_at")
+        .select("id, invoice_number, status, total_cents, paid_at, manually_adjusted")
         .eq("booking_id", booking_id)
         .maybeSingle();
 
@@ -785,7 +785,11 @@ Deno.serve(async (req) => {
       // If the invoice is still unpaid and the booking's final price has
       // changed since the invoice was first issued, sync the row so the
       // email reflects the current charge.
-      if (existingInv && existingInv.status === "unpaid" && finalCents !== existingInv.total_cents) {
+      // An owner-set total is authoritative — do NOT re-sync it from the
+      // booking price, or the override is silently reverted on the next resend.
+      if (existingInv && existingInv.status === "unpaid"
+          && !existingInv.manually_adjusted
+          && finalCents !== existingInv.total_cents) {
         const { error: updErr } = await sb.from("invoices")
           .update({ amount_cents: finalCents, total_cents: finalCents })
           .eq("id", existingInv.id);

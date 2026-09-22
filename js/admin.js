@@ -3214,10 +3214,13 @@ Hiraya Spaces`
       if (error) throw error;
       if (data === false) throw new Error('Invoice not found.');
       viewingInvoice.total_cents = cents;
-      $('invoice-total').textContent = '$' + Math.round(cents / 100);
+      viewingInvoice.manually_adjusted = true;
       msg.style.color = 'var(--sage)';
       msg.textContent = `Updated from $${Math.round(before / 100)} to $${Math.round(cents / 100)}.`;
       if (typeof refreshInvoices === 'function') refreshInvoices();
+      // Re-open from the server so the total, the line items and the adjusted
+      // badge all come from one source instead of being patched piecemeal.
+      if (viewingInvoiceBookingId) await viewInvoice(viewingInvoiceBookingId);
     } catch (e) {
       msg.style.color = 'var(--forest-soft)';
       msg.textContent = e.message || 'Could not update the invoice.';
