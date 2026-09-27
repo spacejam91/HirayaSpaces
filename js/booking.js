@@ -114,6 +114,11 @@
     if (typeof selDay === 'undefined' || !selDay || !selTime) {
       return { error: 'Please pick a date and time on the calendar.' };
     }
+    // A saved address whose city we couldn't match leaves the picker empty.
+    // The travel fee depends on it, so the customer has to choose.
+    if (!zone) {
+      return { error: 'Please choose your city so we can include any travel fee.' };
+    }
 
     // Normalize postal to "A1A 1A1" with single space
     const normalizedPostal = postal.replace(/[ -]/g, '').replace(/^(.{3})(.{3})$/, '$1 $2');
@@ -131,9 +136,6 @@
 
     // The tier's slug is the authoritative DB service identifier.
     const dbServiceSlug = primary.tier.slug;
-    const dbAddonSlugs = selAddons
-      .map(id => ADDON_SLUG_MAP[id])
-      .filter(Boolean);
 
     if (!dbServiceSlug) {
       return { error: 'This service is not available in our catalog yet. Please pick another.' };
@@ -159,6 +161,17 @@
       }
       return 1;
     };
+
+    // What create_booking needs to price the booking itself: which services
+    // and add-ons, never what they cost. The database looks the prices up.
+    const serviceLines = svcLines.map(l => {
+      const line = { slug: l.tier.slug, tier_name: l.tier.name };
+      if (l.tier.slug === 'hourly-flexible') line.hours = Math.round((l.tier.durationMin || 0) / 60);
+      return line;
+    });
+    const addonLines = selAddons
+      .filter(id => ADDON_SLUG_MAP[id])
+      .map(id => ({ slug: ADDON_SLUG_MAP[id], qty: addonQtyOf(id) }));
     const basePrice = svcLines.reduce((sum, l) => sum + (l.tier.basePrice || 0), 0);
     const addonTotal = addons.reduce((s, a) => s + ((a.addonPrice || 0) * addonQtyOf(a.id)), 0);
     const subtotal = basePrice + addonTotal;
@@ -215,11 +228,12 @@
         addon_qty_map: Object.fromEntries(selAddons.map(id => [id, addonQtyOf(id)])),
         preferred_date: isoDate,
         preferred_time_slot: selTime,
-        dbServiceSlug,
-        dbAddonSlugs,
-        // All non-primary service lines — booking.js inserts these into
-        // booking_services after the bookings row is created.
+        // All non-primary service lines, for the review modal.
         extraServiceLines,
+        service_lines: serviceLines,
+        addon_lines: addonLines,
+        // Shown in the review modal only. The saved price comes from the
+        // database, which also applies any recurring discount.
         estimated_total_dollars: total,
         travel_fee_dollars: travelFee,
         travel_zone: zoneId || null,
@@ -415,6 +429,138 @@
     await saveBookingFor(user, pendingBooking);
   }
 
+  // ── LEGACY SAVE (until migration 20260927200000 is run) ───────────────
+  // The old browser-side save, kept only so the page keeps working in the
+  // window between this code shipping and the database gaining
+  // create_booking(). Used solely when that function does not exist yet.
+  // Delete once the migration is confirmed live.
+  async function saveBookingLegacy(user, f) {
+    const primarySlug = f.service_lines[0].slug;
+    const { data: svcRow, error: svcErr } = await sb()
+      .from('services')
+      .select('id, name, starting_price_cents, requires_quote')
+      .eq('slug', primarySlug)
+      .single();
+    if (svcErr || !svcRow) throw new Error('Service not found in catalog.');
+
+    const addonLines = f.addon_lines || [];
+    let addonRows = [];
+    if (addonLines.length) {
+      const { data, error } = await sb()
+        .from('addons')
+        .select('id, slug, price_cents')
+        .in('slug', addonLines.map(a => a.slug));
+      if (error) throw error;
+      addonRows = data || [];
+    }
+
+    let addressId = f.saved_address_id || null;
+    if (!addressId && f.save_to_account && f.address_parts) {
+      const p = f.address_parts;
+      const { data: addrRow, error: addrErr } = await sb()
+        .from('addresses')
+        .insert({
+          user_id: user.id,
+          label: p.unit ? `${p.street_address}, ${p.unit}` : p.street_address,
+          street_address: p.street_address,
+          unit: p.unit,
+          city: p.city,
+          province: 'ON',
+          postal_code: p.postal_code
+        })
+        .select()
+        .single();
+      if (addrErr) console.warn('addresses insert failed:', addrErr.message);
+      else addressId = addrRow.id;
+    }
+
+    let appliedDiscountPct = 0;
+    try {
+      const { data: lastBooking } = await sb()
+        .from('bookings')
+        .select('preferred_date')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .order('preferred_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastBooking?.preferred_date && f.preferred_date) {
+        const daysGap = Math.round((new Date(f.preferred_date + 'T12:00:00') - new Date(lastBooking.preferred_date + 'T12:00:00')) / 86400000);
+        if (daysGap > 0) {
+          if (daysGap <= 8) appliedDiscountPct = 20;
+          else if (daysGap <= 15) appliedDiscountPct = 15;
+          else if (daysGap <= 30) appliedDiscountPct = 10;
+        }
+      }
+    } catch (lookupErr) {
+      console.warn('cadence lookup failed:', lookupErr.message || lookupErr);
+    }
+
+    // The discount comes off the cleaning only; travel is added after.
+    const travelCents = Math.round((f.travel_fee_dollars || 0) * 100);
+    const cleaningCents = Math.round((f.estimated_total_dollars || 0) * 100) - travelCents;
+    const totalCents = Math.round(cleaningCents * (1 - appliedDiscountPct / 100)) + travelCents;
+
+    const { data: bookingRow, error: bkErr } = await sb()
+      .from('bookings')
+      .insert({
+        user_id: user.id,
+        service_id: svcRow.id,
+        address_id: addressId,
+        preferred_date: f.preferred_date,
+        preferred_time_slot: f.preferred_time_slot,
+        estimated_price_cents: svcRow.requires_quote ? null : totalCents,
+        status: svcRow.requires_quote ? 'awaiting_quote' : 'pending_review',
+        customer_notes: (f.customer_notes && f.customer_notes.trim()) || null,
+        entry_method: f.entry_method || 'home',
+        entry_instructions: f.entry_instructions || null,
+        frequency: f.frequency || 'one_time',
+        recurring_discount_pct: appliedDiscountPct,
+        travel_fee_cents: travelCents,
+      })
+      .select()
+      .single();
+    if (bkErr) throw bkErr;
+
+    if (addonRows.length) {
+      const qtyBySlug = Object.fromEntries(addonLines.map(a => [a.slug, a.qty || 1]));
+      const { error } = await sb().from('booking_addons').insert(addonRows.map(a => ({
+        booking_id: bookingRow.id,
+        addon_id: a.id,
+        quantity: qtyBySlug[a.slug] || 1,
+        price_cents: a.price_cents,
+      })));
+      if (error) console.warn('booking_addons insert failed:', error.message);
+    }
+
+    const extras = Array.isArray(f.extraServiceLines) ? f.extraServiceLines : [];
+    if (extras.length) {
+      const { data: extraSvcRows, error: extraLookupErr } = await sb()
+        .from('services')
+        .select('id, slug')
+        .in('slug', extras.map(e => e.slug).filter(Boolean));
+      if (extraLookupErr) {
+        console.warn('extra services lookup failed:', extraLookupErr.message);
+      } else if (extraSvcRows?.length) {
+        const slugToId = new Map(extraSvcRows.map(r => [r.slug, r.id]));
+        const toInsert = extras.filter(e => slugToId.has(e.slug)).map(e => ({
+          booking_id: bookingRow.id,
+          service_id: slugToId.get(e.slug),
+          tier_slug: e.slug,
+          tier_name: e.tier_name,
+          price_cents: e.price_cents,
+          duration_minutes: e.duration_minutes,
+          quantity: 1,
+        }));
+        if (toInsert.length) {
+          const { error: bsErr } = await sb().from('booking_services').insert(toInsert);
+          if (bsErr) console.warn('booking_services insert failed:', bsErr.message);
+        }
+      }
+    }
+    return bookingRow;
+  }
+
   async function saveBookingFor(user, bookingData) {
     const btn = $('br-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Booking…'; }
@@ -423,194 +569,44 @@
     const d = bookingData.display;
 
     try {
-      // 1. Look up service id + price from DB
-      const { data: svcRow, error: svcErr } = await sb()
-        .from('services')
-        .select('id, name, starting_price_cents, requires_quote')
-        .eq('slug', f.dbServiceSlug)
-        .single();
-      if (svcErr || !svcRow) {
-        throw new Error('Service not found in catalog. Has the database schema been set up?');
+      // A booking saved to localStorage by the previous version of this page
+      // (before an email-confirmation redirect) has no service_lines.
+      if (!Array.isArray(f.service_lines) || !f.service_lines.length) {
+        clearPendingForAuth();
+        throw new Error('Please pick your service again, then confirm.');
       }
 
-      // 2. Look up addon ids + prices (batch)
-      let addonRows = [];
-      if (f.dbAddonSlugs.length) {
-        const { data, error } = await sb()
-          .from('addons')
-          .select('id, slug, name, price_cents')
-          .in('slug', f.dbAddonSlugs);
-        if (error) throw error;
-        addonRows = data || [];
+      // One call does it all, in one transaction: the database prices the
+      // services, add-ons and travel from its own catalog, applies the
+      // recurring discount to the cleaning (never to travel), saves the
+      // address if asked, and writes the booking with its add-ons and extra
+      // services. The browser never supplies a price.
+      let { data: bookingRow, error: bkErr } = await sb().rpc('create_booking', {
+        p_services: f.service_lines,
+        p_addons: f.addon_lines || [],
+        p_travel_zone: f.travel_zone,
+        p_preferred_date: f.preferred_date,
+        p_preferred_time_slot: f.preferred_time_slot,
+        p_address_id: f.saved_address_id || null,
+        p_address: f.saved_address_id ? null : f.address_parts,
+        p_save_address: !!f.save_to_account,
+        p_frequency: f.frequency || 'one_time',
+        p_entry_method: f.entry_method || 'home',
+        p_entry_instructions: f.entry_instructions || null,
+        p_customer_notes: (f.customer_notes && f.customer_notes.trim()) || null,
+      });
+      // PGRST202 = no such function: the database hasn't been migrated yet.
+      if (bkErr && bkErr.code === 'PGRST202') {
+        bookingRow = await saveBookingLegacy(user, f);
+        bkErr = null;
       }
-
-      // 3. Resolve the address:
-      //    a) Saved address picked → use its id directly, no insert.
-      //    b) New address + "save to account" checked → insert into addresses table.
-      //    c) New address + checkbox unchecked → don't pollute saved list; null address_id
-      //       and the address goes into customer_notes for the cleaner to see.
-      let addressId = null;
-      if (f.saved_address_id) {
-        addressId = f.saved_address_id;
-      } else if (f.save_to_account && f.address_parts) {
-        const p = f.address_parts;
-        const { data: addrRow, error: addrErr } = await sb()
-          .from('addresses')
-          .insert({
-            user_id: user.id,
-            label: p.unit ? `${p.street_address}, ${p.unit}` : p.street_address,
-            street_address: p.street_address,
-            unit: p.unit,
-            city: p.city,
-            province: 'ON',
-            postal_code: p.postal_code
-          })
-          .select()
-          .single();
-        if (!addrErr && addrRow) {
-          addressId = addrRow.id;
-        } else if (addrErr) {
-          console.warn('addresses insert failed:', addrErr.message);
-        }
-      }
-
-      // 4. Calculate estimated total in cents.
-      // Prefer the client-side total (already includes all selected services,
-      // addons, and any recurring discount). Fall back to primary + addons
-      // only if the client total is missing for some reason.
-      let clientTotalCents = (typeof f.estimated_total_dollars === 'number')
-        ? Math.round(f.estimated_total_dollars * 100)
-        : null;
-
-      // Recurring discount policy: cadence-based. We measure the gap between
-      // the customer's most recent COMPLETED visit and this booking's date,
-      // then award the tier they actually hit:
-      //   ≤  8 days  → 20% (weekly cadence)
-      //   ≤ 15 days  → 15% (biweekly)
-      //   ≤ 30 days  → 10% (monthly)
-      //   beyond     → 0%  (treated as fresh)
-      // First-time customers (no completed visits) always pay full price.
-      let appliedDiscountPct = 0;
-      try {
-        const { data: lastBooking } = await sb()
-          .from('bookings')
-          .select('preferred_date')
-          .eq('user_id', user.id)
-          .eq('status', 'completed')
-          .order('preferred_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (lastBooking?.preferred_date && f.preferred_date) {
-          const last = new Date(lastBooking.preferred_date + 'T12:00:00');
-          const next = new Date(f.preferred_date + 'T12:00:00');
-          const daysGap = Math.round((next - last) / 86400000);
-          if (daysGap > 0) {
-            if (daysGap <= 8) appliedDiscountPct = 20;
-            else if (daysGap <= 15) appliedDiscountPct = 15;
-            else if (daysGap <= 30) appliedDiscountPct = 10;
-          }
-        }
-      } catch (lookupErr) {
-        console.warn('cadence lookup failed:', lookupErr.message || lookupErr);
-      }
-      if (appliedDiscountPct > 0 && clientTotalCents != null) {
-        clientTotalCents = Math.round(clientTotalCents * (1 - appliedDiscountPct / 100));
-      }
-
-      const totalCents = clientTotalCents ?? (
-        (svcRow.starting_price_cents || 0)
-        + addonRows.reduce((s, a) => s + (a.price_cents || 0), 0)
-      );
-
-      // 5. Insert booking row.
-      // customer_notes is reserved for actual notes the customer types in
-      // the booking flow. Until that input exists, leave it null — the
-      // cleaner sees name/phone/address via the joined customer + address
-      // columns on the admin dashboard.
-      const customerNotes = (f.customer_notes && f.customer_notes.trim()) || null;
-
-      const status = svcRow.requires_quote ? 'awaiting_quote' : 'pending_review';
-
-      const { data: bookingRow, error: bkErr } = await sb()
-        .from('bookings')
-        .insert({
-          user_id: user.id,
-          service_id: svcRow.id,
-          address_id: addressId,
-          preferred_date: f.preferred_date,
-          preferred_time_slot: f.preferred_time_slot,
-          estimated_price_cents: svcRow.requires_quote ? null : totalCents,
-          status,
-          customer_notes: customerNotes,
-          entry_method: f.entry_method || 'home',
-          entry_instructions: f.entry_instructions || null,
-          frequency: f.frequency || 'one_time',
-          recurring_discount_pct: appliedDiscountPct,
-          travel_fee_cents: Math.round((f.travel_fee_dollars || 0) * 100),
-        })
-        .select()
-        .single();
       if (bkErr) throw bkErr;
-
-      // 6. Insert booking_addons rows (best effort — booking is already saved)
-      if (addonRows.length) {
-        // Map slug → page id so we can look up quantities per row.
-        const slugToPageId = Object.fromEntries(
-          Object.entries(ADDON_SLUG_MAP || {}).map(([k, v]) => [v, k])
-        );
-        const qtyMap = f.addon_qty_map || {};
-        const addonsToInsert = addonRows.map(a => {
-          const pageId = slugToPageId[a.slug];
-          const qty = (pageId && qtyMap[pageId]) ? qtyMap[pageId] : 1;
-          return {
-            booking_id: bookingRow.id,
-            addon_id: a.id,
-            quantity: qty,
-            price_cents: a.price_cents,
-          };
-        });
-        const { error: bkAddonErr } = await sb()
-          .from('booking_addons')
-          .insert(addonsToInsert);
-        if (bkAddonErr) console.warn('booking_addons insert failed:', bkAddonErr.message);
-      }
-
-      // 6b. Insert booking_services rows for any extra services the customer
-      // picked beyond the primary one (e.g. Regular + Carpet + Sofa).
-      const extras = Array.isArray(f.extraServiceLines) ? f.extraServiceLines : [];
-      if (extras.length) {
-        const extraSlugs = extras.map(e => e.slug).filter(Boolean);
-        const { data: extraSvcRows, error: extraLookupErr } = await sb()
-          .from('services')
-          .select('id, slug')
-          .in('slug', extraSlugs);
-        if (extraLookupErr) {
-          console.warn('extra services lookup failed:', extraLookupErr.message);
-        } else if (extraSvcRows?.length) {
-          const slugToId = new Map(extraSvcRows.map(r => [r.slug, r.id]));
-          const toInsert = extras
-            .filter(e => slugToId.has(e.slug))
-            .map(e => ({
-              booking_id: bookingRow.id,
-              service_id: slugToId.get(e.slug),
-              tier_slug: e.slug,
-              tier_name: e.tier_name,
-              price_cents: e.price_cents,
-              duration_minutes: e.duration_minutes,
-              quantity: 1,
-            }));
-          if (toInsert.length) {
-            const { error: bsErr } = await sb().from('booking_services').insert(toInsert);
-            if (bsErr) console.warn('booking_services insert failed:', bsErr.message);
-          }
-        }
-      }
 
       // 7. Show confirmation modal
       closeReview();
       openConfirmation(bookingRow, {
         dateLabel: `${d.dateLabel} at ${f.preferred_time_slot}`,
-        serviceName: svcRow.name,
+        serviceName: f.service_name,
         customerEmail: f.customer_email
       });
 

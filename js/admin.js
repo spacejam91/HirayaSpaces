@@ -1415,6 +1415,66 @@ Hiraya Spaces`
   let nbSelectedCustomer = null;
   let nbSelectedAddresses = [];
 
+  // Flexible hourly rate. Same as HOURLY_RATE in index.html and the rate in
+  // the database's create_booking().
+  const HOURLY_RATE_CENTS = 4000;
+
+  // Travel zones — same table as TRAVEL_ZONES in index.html and
+  // travel_fee_cents_for_zone() in the database. Charged per visit, on top
+  // of the clean, and never discounted.
+  const TRAVEL_ZONES = [
+    { id: 'waterloo',  label: 'Waterloo',         cents: 0 },
+    { id: 'kitchener', label: 'Kitchener',        cents: 0 },
+    { id: 'cambridge', label: 'Cambridge',        cents: 2500 },
+    { id: 'guelph',    label: 'Guelph',           cents: 5000 },
+    { id: 'other',     label: 'Elsewhere nearby', cents: 5000 },
+  ];
+  // Saved addresses hold the city as free text. Galt/Preston/Hespeler ARE
+  // Cambridge — without these they would be charged nothing.
+  const CITY_ALIASES = {
+    waterloo: 'waterloo', kitchener: 'kitchener', kw: 'kitchener',
+    'kitchener-waterloo': 'kitchener', 'kitchener waterloo': 'kitchener',
+    cambridge: 'cambridge', galt: 'cambridge', preston: 'cambridge',
+    hespeler: 'cambridge', blair: 'cambridge',
+    guelph: 'guelph', 'elsewhere nearby': 'other',
+  };
+
+  function zoneFromCityText(text) {
+    const key = String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const id = CITY_ALIASES[key];
+    return id ? TRAVEL_ZONES.find(z => z.id === id) : null;
+  }
+
+  function renderNbTravelOptions(selectedId) {
+    const sel = $('nb-travel');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Pick the city…</option>' + TRAVEL_ZONES.map(z => {
+      const fee = z.cents ? ` (+$${z.cents / 100} travel)` : ' (no travel fee)';
+      return `<option value="${z.id}"${z.id === selectedId ? ' selected' : ''}>${z.label}${fee}</option>`;
+    }).join('');
+  }
+
+  function nbTravelCents() {
+    const z = TRAVEL_ZONES.find(x => x.id === $('nb-travel')?.value);
+    return z ? z.cents : 0;
+  }
+
+  // Picking an address sets the travel zone from its city. When the city
+  // doesn't match a zone the picker is left empty so the admin chooses,
+  // rather than us guessing at the customer's money.
+  function onNbAddressPicked() {
+    const a = nbSelectedAddresses.find(x => x.id === $('nb-address')?.value);
+    const z = a ? zoneFromCityText(a.city) : null;
+    renderNbTravelOptions(z ? z.id : '');
+    const hint = $('nb-travel-hint');
+    if (hint) {
+      hint.textContent = !a ? ''
+        : z ? `Set from the address (${a.city}).`
+        : `Couldn't tell the zone from "${a.city || 'no city'}" — pick it.`;
+    }
+    recalcNbPrice();
+  }
+
   async function loadServicesCache() {
     if (servicesCache.length || !sb()) return;
     const { data, error } = await sb()
@@ -1478,6 +1538,8 @@ Hiraya Spaces`
     $('nb-date').value = '';
     $('nb-time').value = '';
     $('nb-address').innerHTML = '<option value="">Select a customer first…</option>';
+    renderNbTravelOptions('');
+    if ($('nb-travel-hint')) $('nb-travel-hint').textContent = '';
     $('nb-customer-notes').value = '';
     $('nb-internal-notes').value = '';
     if ($('nb-frequency')) $('nb-frequency').value = 'one_time';
@@ -1600,8 +1662,9 @@ Hiraya Spaces`
       console.warn('admin_list_addresses failed:', err);
       addrSel.innerHTML = `<option value="">Couldn't load addresses</option>`;
     }
-    // Customer changed — recompute price + discount hint based on their history.
-    recalcNbPrice();
+    // Customer changed — set the travel zone from their address, then
+    // recompute price + discount hint based on their history.
+    onNbAddressPicked();
   }
 
   function clearCustomer() {
@@ -1612,7 +1675,7 @@ Hiraya Spaces`
     $('nb-customer-search').value = '';
     $('nb-customer-search').focus();
     $('nb-address').innerHTML = '<option value="">Select a customer first…</option>';
-    recalcNbPrice();
+    onNbAddressPicked();
   }
 
   function onServicePicked() {
@@ -1632,7 +1695,7 @@ Hiraya Spaces`
     if (!slug) return 0;
     if (slug === 'hourly-flexible') {
       const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
-      return hrs * 5000;
+      return hrs * HOURLY_RATE_CENTS;
     }
     const svc = servicesCache.find(s => s.slug === slug);
     return svc?.starting_price_cents || 0;
@@ -1682,16 +1745,23 @@ Hiraya Spaces`
       }, 0);
     const subtotalCents = nbBaseCents() + addonsCents + extrasCents;
     const appliedPct = nbAppliedDiscountPct();
-    const totalCents = appliedPct > 0
+    // The recurring discount comes off the cleaning only. Travel goes on
+    // after, at full price.
+    const cleaningCents = appliedPct > 0
       ? Math.round(subtotalCents * (1 - appliedPct / 100))
       : subtotalCents;
+    const travelCents = nbTravelCents();
+    const totalCents = cleaningCents + travelCents;
 
     const hint = $('nb-price-hint');
     if (hint) {
+      const travelNote = travelCents ? ` + $${travelCents / 100} travel` : '';
       if (!slug) {
         hint.textContent = '';
       } else if (appliedPct > 0) {
-        hint.textContent = `Estimated price: $${Math.round(totalCents / 100)} (was $${Math.round(subtotalCents / 100)}, -${appliedPct}% recurring discount)`;
+        hint.textContent = `Estimated price: $${Math.round(totalCents / 100)} ($${Math.round(subtotalCents / 100)} cleaning, -${appliedPct}% recurring discount${travelNote})`;
+      } else if (travelCents) {
+        hint.textContent = `Estimated price: $${Math.round(totalCents / 100)} ($${Math.round(subtotalCents / 100)} cleaning${travelNote})`;
       } else {
         hint.textContent = `Estimated price: $${Math.round(totalCents / 100)}`;
       }
@@ -1828,6 +1898,7 @@ Hiraya Spaces`
     if (!time) { showErr('nb-err', 'Pick a time slot.'); return; }
     const addressId = $('nb-address').value;
     if (!addressId) { showErr('nb-err', 'Pick an address.'); return; }
+    if (!$('nb-travel').value) { showErr('nb-err', 'Pick the city for the travel fee.'); return; }
 
     // Price = primary service base + checked add-ons + additional services,
     // minus the recurring discount when the customer is eligible (has at
@@ -1849,19 +1920,28 @@ Hiraya Spaces`
     const btn = $('nb-submit');
     btn.disabled = true; btn.textContent = 'Creating…';
     try {
-      const { data, error } = await sb().rpc('admin_create_booking', {
+      const params = {
         p_user_id: nbSelectedCustomer.user_id,
         p_service_slug: slug,
         p_address_id: addressId,
         p_preferred_date: date,
         p_preferred_time_slot: time,
         p_estimated_price_cents: priceCents,
+        p_travel_fee_cents: nbTravelCents(),
         p_customer_notes: $('nb-customer-notes').value.trim() || null,
         p_internal_notes: $('nb-internal-notes').value.trim() || null,
         p_status: 'confirmed',
         p_frequency: frequency,
         p_recurring_discount_pct: appliedDiscountPct,
-      });
+      };
+      let { data, error } = await sb().rpc('admin_create_booking', params);
+      // PGRST202 = no function takes p_travel_fee_cents yet (migration
+      // 20260927200000 not run). Save without it: the price still includes
+      // travel, it just isn't split out. Delete once the migration is live.
+      if (error && error.code === 'PGRST202') {
+        const { p_travel_fee_cents, ...legacyParams } = params;
+        ({ data, error } = await sb().rpc('admin_create_booking', legacyParams));
+      }
       if (error) throw error;
       const newBookingId = data; // admin_create_booking returns the new uuid
 
@@ -1952,6 +2032,9 @@ Hiraya Spaces`
   // The booking being edited's customer's most recent completed visit. Used
   // by recalcEditPrice to apply the cadence-based recurring discount.
   let editingCustomerLastCompleted = null;
+  // The booking's travel fee. Recomputing the price from the catalog must
+  // add it back, or editing an add-on silently drops it from the total.
+  let editingTravelCents = 0;
 
   async function askEdit(id) {
     // Source of truth is allBookings (which has joined service_name etc).
@@ -1964,6 +2047,13 @@ Hiraya Spaces`
     // the cadence discount when admin changes service / date / add-ons.
     const customer = aggregateCustomers().find(c => c.user_id === b.user_id);
     editingCustomerLastCompleted = customer?.last_completed || null;
+    editingTravelCents = b.travel_fee_cents || 0;
+    const editHint = $('edit-price-hint');
+    if (editHint) {
+      editHint.textContent = editingTravelCents
+        ? `Includes $${editingTravelCents / 100} travel${b.city ? ' (' + b.city + ')' : ''}, which is never discounted.`
+        : '';
+    }
 
     // Make sure caches are loaded — the modal may be opened before the
     // user has navigated to anything that triggered loadServicesCache.
@@ -2095,9 +2185,10 @@ Hiraya Spaces`
         else if (daysGap <= 30) discountPct = 10;
       }
     }
-    const totalCents = discountPct > 0
+    const cleaningCents = discountPct > 0
       ? Math.round(subtotalCents * (1 - discountPct / 100))
       : subtotalCents;
+    const totalCents = cleaningCents + editingTravelCents;
 
     const totalDollars = Math.round(totalCents / 100);
     const priceEl = $('edit-price');
@@ -4379,6 +4470,7 @@ Hiraya Spaces`
     resendInvoice,
     addNbExtra,
     recalcNbPrice,
+    onNbAddressPicked,
     askDeleteBooking,
     markBookingPaid,
     askRefundBooking,

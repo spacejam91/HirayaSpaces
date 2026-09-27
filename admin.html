@@ -1434,9 +1434,12 @@
     <!-- WHERE -->
     <div class="nb-section">
       <div class="nb-section-label">Address (from customer's saved addresses)</div>
-      <select id="nb-address" class="nb-select">
+      <select id="nb-address" class="nb-select" onchange="HirayaAdmin.onNbAddressPicked()">
         <option value="">Select a customer first…</option>
       </select>
+      <div class="nb-section-label" style="margin-top:12px">Travel fee</div>
+      <select id="nb-travel" class="nb-select" onchange="HirayaAdmin.recalcNbPrice()"></select>
+      <div style="margin-top:6px;font-size:12px;color:var(--muted)" id="nb-travel-hint"></div>
     </div>
 
     <!-- NOTES -->
@@ -1505,6 +1508,7 @@
     <div class="nb-section">
       <div class="nb-section-label">Estimated price (CAD)</div>
       <input type="number" id="edit-price" min="0" step="1" class="nb-input">
+      <div style="margin-top:6px;font-size:12px;color:var(--muted)" id="edit-price-hint"></div>
     </div>
 
     <div class="nb-section">
@@ -1743,7 +1747,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
 <script src="/js/supabase-client.js?v=202609212128"></script>
-<script src="/js/admin.js?v=202609212128"></script>
+<script src="/js/admin.js?v=202609271706"></script>
 
 </body>
 </html>

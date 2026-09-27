@@ -833,7 +833,10 @@ Deno.serve(async (req) => {
       const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
       const extrasTotalCents = extraServices.reduce((s: number, es: any) => s + ((es.price_cents || 0) * (es.quantity || 1)), 0);
       const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
-      const lineSubtotalCents = baseCatalogCents + extrasTotalCents + addonsTotalCents;
+      // Travel has its own line below, so it belongs in the subtotal too —
+      // otherwise the gap below re-lists it as "Additional services provided".
+      const travelCentsInv = booking.travel_fee_cents || 0;
+      const lineSubtotalCents = baseCatalogCents + extrasTotalCents + addonsTotalCents + travelCentsInv;
       const additionalCents = invoiceTotal - lineSubtotalCents;
       // Build line items as structured data first so we can render to both
       // HTML (for email body) and PDF (for attachment / admin download).
@@ -854,7 +857,6 @@ Deno.serve(async (req) => {
         const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
         lineItems.push({ name: baseName + qty, priceLabel: dollars(lineTotal) });
       }
-      const travelCentsInv = booking.travel_fee_cents || 0;
       if (travelCentsInv > 0) {
         lineItems.push({
           name: "Travel — " + (booking.addresses?.city || "out of region"),
@@ -1040,7 +1042,8 @@ Deno.serve(async (req) => {
       const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
       const extrasTotalCents = extraServices.reduce((s: number, es: any) => s + ((es.price_cents || 0) * (es.quantity || 1)), 0);
       const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
-      const lineSubtotalCents = baseCatalogCents + extrasTotalCents + addonsTotalCents;
+      const travelCentsInv = booking.travel_fee_cents || 0;
+      const lineSubtotalCents = baseCatalogCents + extrasTotalCents + addonsTotalCents + travelCentsInv;
       const additionalCents = paidTotal - lineSubtotalCents;
       const lineItems: { name: string; priceLabel: string }[] = [];
       lineItems.push({ name: serviceName, priceLabel: dollars(baseCatalogCents) });
@@ -1057,7 +1060,6 @@ Deno.serve(async (req) => {
         const lineTotal = (ba.price_cents || 0) * (ba.quantity || 1);
         lineItems.push({ name: baseName + qty, priceLabel: dollars(lineTotal) });
       }
-      const travelCentsInv = booking.travel_fee_cents || 0;
       if (travelCentsInv > 0) {
         lineItems.push({
           name: "Travel — " + (booking.addresses?.city || "out of region"),
