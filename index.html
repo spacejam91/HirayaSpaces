@@ -955,6 +955,7 @@
   .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
   .cal-nav button { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 16px; transition: border-color .2s; }
   .cal-nav button:hover { border-color: var(--sage); }
+  .cal-nav button:disabled, .cal-nav button:disabled:hover { opacity: .35; cursor: default; border-color: var(--border); }
   .cal-month { font-weight: 600; font-size: 15px; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 1.5rem; }
   .cal-head { text-align: center; font-size: 11px; color: var(--muted); font-weight: 500; padding: 4px 0; }
@@ -1539,9 +1540,9 @@
     </div>
     <div class="booking-right">
       <div class="cal-nav">
-        <button onclick="changeMonth(-1)">‹</button>
+        <button id="cal-prev" onclick="changeMonth(-1)" aria-label="Previous month">‹</button>
         <span class="cal-month" id="cal-title"></span>
-        <button onclick="changeMonth(1)">›</button>
+        <button id="cal-next" onclick="changeMonth(1)" aria-label="Next month">›</button>
       </div>
       <div class="cal-grid" id="cal-grid"></div>
       <div class="time-label">Select a time</div>
@@ -1944,7 +1945,9 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 // work without a full rewrite. Hourly stays mutually exclusive.
 let selSvcs = new Set();
 let selTiers = new Map();
-let selSvc=null, selTier=null, selAddons=[], selDay=null, selTime=null, calM=4, calY=2026;
+// Calendar opens on the current month (calM is 0-indexed).
+const _calNow = new Date();
+let selSvc=null, selTier=null, selAddons=[], selDay=null, selTime=null, calM=_calNow.getMonth(), calY=_calNow.getFullYear();
 
 function refreshPrimaryPointers() {
   if (selHourly) {
@@ -2524,6 +2527,8 @@ async function loadBlockedDates(){
 function renderCalendar(){
   document.getElementById('cal-title').textContent = MONTHS[calM] + ' ' + calY;
   const today=new Date(), tD=today.getDate(), tM=today.getMonth(), tY=today.getFullYear();
+  // No browsing back past the current month — every day there is in the past.
+  document.getElementById('cal-prev').disabled = calY*12+calM <= tY*12+tM;
   const first=new Date(calY,calM,1).getDay(), total=new Date(calY,calM+1,0).getDate();
   let html=['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-head">${d}</div>`).join('');
   for(let i=0;i<first;i++) html+=`<div></div>`;
@@ -2587,6 +2592,8 @@ function slotConflicts(slot, durMin){
   return bookedSlots.some(b => startMin >= b.startMin && startMin < b.endMin);
 }
 function changeMonth(dir){
+  const now=new Date();
+  if(dir<0 && calY*12+calM <= now.getFullYear()*12+now.getMonth()) return;
   calM+=dir;
   if(calM>11){calM=0;calY++;} if(calM<0){calM=11;calY--;}
   selDay=null; renderCalendar();
