@@ -1717,10 +1717,7 @@ Hiraya Spaces`
   function nbBaseCents() {
     const slug = $('nb-service').value;
     if (!slug) return 0;
-    if (slug === HOURLY_SLUG) {
-      const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
-      return hrs * HOURLY_RATE_CENTS;
-    }
+    if (slug === HOURLY_SLUG) return clampHours($('nb-hours').value) * HOURLY_RATE_CENTS;
     const svc = servicesCache.find(s => s.slug === slug);
     return svc?.starting_price_cents || 0;
   }
@@ -1953,6 +1950,9 @@ Hiraya Spaces`
         p_preferred_time_slot: time,
         p_estimated_price_cents: priceCents,
         p_travel_fee_cents: nbTravelCents(),
+        // Hourly cleans record their length so the calendar blocks all of it.
+        // Everything else takes its length from the catalog.
+        p_duration_minutes: slug === HOURLY_SLUG ? clampHours($('nb-hours').value) * 60 : null,
         p_customer_notes: $('nb-customer-notes').value.trim() || null,
         p_internal_notes: $('nb-internal-notes').value.trim() || null,
         p_status: 'confirmed',
@@ -2394,6 +2394,14 @@ Hiraya Spaces`
         showErr('edit-err', 'Booking is not editable (only pending/confirmed/in-progress can be edited).');
         return;
       }
+      // Hourly: record the hours so the calendar blocks the whole clean. Any
+      // other service clears it and falls back to the catalog length.
+      const { error: durErr } = await sb().rpc('admin_set_booking_duration', {
+        p_booking_id: id,
+        p_duration_minutes: editIsHourly() ? clampHours($('edit-hours').value) * 60 : null,
+      });
+      if (durErr) console.warn('admin_set_booking_duration failed:', durErr.message || durErr);
+
       // Sync addons in a second call. Booking_addons get fully replaced with
       // whatever was checked in the modal. If the function doesn't exist yet
       // (SQL migration not run), show a clear hint instead of just dying.
