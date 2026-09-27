@@ -1418,6 +1418,32 @@ Hiraya Spaces`
   // Flexible hourly rate. Same as HOURLY_RATE in index.html and the rate in
   // the database's create_booking().
   const HOURLY_RATE_CENTS = 4000;
+  const HOURLY_SLUG = 'hourly-flexible';
+
+  // Catalog price for a service dropdown. The hourly catalog row can't carry
+  // a real price (it doesn't know the hours), so it shows the rate.
+  function catalogPriceLabel(s) {
+    if (s.slug === HOURLY_SLUG) return `$${HOURLY_RATE_CENTS / 100}/hr`;
+    if (s.requires_quote) return 'Quote';
+    return '$' + Math.round((s.starting_price_cents || 0) / 100);
+  }
+
+  // A booking's cleaning price (service + add-ons) before any recurring
+  // discount. Fixed-price services are anchored on the catalog. Hourly can't
+  // be, so it's worked back from the stored price, which the database set as
+  // (hours x rate + add-ons) less the discount, plus travel.
+  function cleaningSubtotalCents(b, svc, addonsCents) {
+    if (svc?.slug === HOURLY_SLUG) {
+      const pct = b.recurring_discount_pct || 0;
+      if (b.estimated_price_cents == null || pct >= 100) return null;
+      return Math.round((b.estimated_price_cents - (b.travel_fee_cents || 0)) / (1 - pct / 100));
+    }
+    return svc?.starting_price_cents != null ? svc.starting_price_cents + addonsCents : null;
+  }
+
+  function clampHours(h) {
+    return Math.max(3, Math.min(8, Math.round(Number(h)) || 3));
+  }
 
   // Travel zones — same table as TRAVEL_ZONES in index.html and
   // travel_fee_cents_for_zone() in the database. Charged per visit, on top
@@ -1514,9 +1540,7 @@ Hiraya Spaces`
     const items = servicesCache.filter(s => !s.requires_quote);
     sel.innerHTML = '<option value="">Pick a service…</option>'
       + items.map(s => {
-          const price = s.slug === 'hourly-flexible'
-            ? '$40/hr'
-            : (s.starting_price_cents != null ? '$' + Math.round(s.starting_price_cents / 100) : '');
+          const price = s.starting_price_cents != null || s.slug === HOURLY_SLUG ? catalogPriceLabel(s) : '';
           return `<option value="${escapeHtml(s.slug)}" data-price="${s.starting_price_cents ?? ''}">${escapeHtml(s.name)}${price ? ' — ' + price : ''}</option>`;
         }).join('');
   }
@@ -1680,7 +1704,7 @@ Hiraya Spaces`
 
   function onServicePicked() {
     const slug = $('nb-service').value;
-    const isHourly = slug === 'hourly-flexible';
+    const isHourly = slug === HOURLY_SLUG;
     $('nb-hourly-wrap').style.display = isHourly ? 'block' : 'none';
     recalcNbPrice();
   }
@@ -1693,7 +1717,7 @@ Hiraya Spaces`
   function nbBaseCents() {
     const slug = $('nb-service').value;
     if (!slug) return 0;
-    if (slug === 'hourly-flexible') {
+    if (slug === HOURLY_SLUG) {
       const hrs = Math.max(3, Math.min(8, Number($('nb-hours').value) || 3));
       return hrs * HOURLY_RATE_CENTS;
     }
@@ -1831,8 +1855,9 @@ Hiraya Spaces`
     const svcSel = document.createElement('select');
     svcSel.className = 'nb-input nb-extra-svc';
     svcSel.innerHTML = '<option value="">Pick a service…</option>' + servicesCache.map(s => {
-      const price = s.requires_quote ? 'Quote' : '$' + Math.round((s.starting_price_cents || 0) / 100);
-      return `<option value="${s.id}" data-slug="${escapeHtml(s.slug)}" data-name="${escapeHtml(s.name)}" data-price="${s.starting_price_cents || 0}">${escapeHtml(s.name)} — ${price}</option>`;
+      const price = catalogPriceLabel(s);
+      const cents = s.slug === HOURLY_SLUG ? 3 * HOURLY_RATE_CENTS : (s.starting_price_cents || 0);
+      return `<option value="${s.id}" data-slug="${escapeHtml(s.slug)}" data-name="${escapeHtml(s.name)}" data-price="${cents}">${escapeHtml(s.name)} — ${price}</option>`;
     }).join('');
 
     const priceInput = document.createElement('input');
@@ -2058,8 +2083,7 @@ Hiraya Spaces`
     const svcSel = $('edit-service');
     if (svcSel) {
       svcSel.innerHTML = servicesCache.map(s => {
-        const price = s.requires_quote ? 'Quote' : '$' + Math.round((s.starting_price_cents || 0) / 100);
-        return `<option value="${s.id}" data-slug="${s.slug}">${s.name} — ${price}</option>`;
+        return `<option value="${s.id}" data-slug="${s.slug}">${s.name} — ${catalogPriceLabel(s)}</option>`;
       }).join('');
       // Pre-select the current service by matching name (we don't store
       // service_id in allBookings — only service_name).
@@ -2110,8 +2134,23 @@ Hiraya Spaces`
       }).join('') || '<div style="color:var(--muted);font-size:13px">No add-ons available.</div>';
     }
 
+    // Hourly bookings get an hours field. The catalog can't know how many
+    // hours were booked, so work them back from the stored price for the
+    // admin to confirm.
+    const editSvc = servicesCache.find(s => s.name === b.service_name);
+    let editHours = 3;
+    if (editSvc?.slug === HOURLY_SLUG) {
+      const cleaning = cleaningSubtotalCents(b, editSvc, 0);
+      const addonsCents = [...currentEditAddonQty].reduce((sum, [aid, qty]) =>
+        sum + (addonsCache.find(a => a.id === aid)?.price_cents || 0) * qty, 0);
+      const extrasCents = currentExtras.reduce((sum, e) => sum + (e.price_cents || 0) * (e.quantity || 1), 0);
+      if (cleaning != null) editHours = clampHours((cleaning - addonsCents - extrasCents) / HOURLY_RATE_CENTS);
+    }
+    $('edit-hours').value = editHours;
+    syncEditHourly();
+
     // Recalc price when service tier changes too.
-    if (svcSel) svcSel.onchange = recalcEditPrice;
+    if (svcSel) svcSel.onchange = () => { syncEditHourly(); recalcEditPrice(); };
 
     $('edit-date').value = b.preferred_date || '';
     $('edit-time').value = b.preferred_time_slot || '8:00 am';
@@ -2127,6 +2166,17 @@ Hiraya Spaces`
     // any tab. Just add the .open class to show it.
     const overlay = $('edit-overlay');
     if (overlay) overlay.classList.add('open');
+  }
+
+  function editIsHourly() {
+    const svcSel = $('edit-service');
+    const svc = svcSel && servicesCache.find(s => s.id === parseInt(svcSel.value, 10));
+    return svc?.slug === HOURLY_SLUG;
+  }
+
+  function syncEditHourly() {
+    const wrap = $('edit-hourly-wrap');
+    if (wrap) wrap.style.display = editIsHourly() ? 'block' : 'none';
   }
 
   function cancelEdit() {
@@ -2147,7 +2197,9 @@ Hiraya Spaces`
     if (!svcSel) return;
     const selectedId = parseInt(svcSel.value, 10);
     const svc = servicesCache.find(s => s.id === selectedId);
-    const baseCents = svc?.starting_price_cents || 0;
+    const baseCents = svc?.slug === HOURLY_SLUG
+      ? clampHours($('edit-hours')?.value) * HOURLY_RATE_CENTS
+      : (svc?.starting_price_cents || 0);
     const addonsCents = Array.from(document.querySelectorAll('.edit-addon-cb'))
       .filter(cb => cb.checked)
       .reduce((sum, cb) => {
@@ -2215,8 +2267,9 @@ Hiraya Spaces`
     const svcSel = document.createElement('select');
     svcSel.className = 'nb-input edit-extra-svc';
     svcSel.innerHTML = '<option value="">Pick a service…</option>' + servicesCache.map(s => {
-      const price = s.requires_quote ? 'Quote' : '$' + Math.round((s.starting_price_cents || 0) / 100);
-      return `<option value="${s.id}" data-slug="${escapeHtml(s.slug)}" data-name="${escapeHtml(s.name)}" data-price="${s.starting_price_cents || 0}">${escapeHtml(s.name)} — ${price}</option>`;
+      const price = catalogPriceLabel(s);
+      const cents = s.slug === HOURLY_SLUG ? 3 * HOURLY_RATE_CENTS : (s.starting_price_cents || 0);
+      return `<option value="${s.id}" data-slug="${escapeHtml(s.slug)}" data-name="${escapeHtml(s.name)}" data-price="${cents}">${escapeHtml(s.name)} — ${price}</option>`;
     }).join('');
     if (initial?.service_id) svcSel.value = String(initial.service_id);
 
@@ -4306,11 +4359,18 @@ Hiraya Spaces`
     // engineer from stored total + pct (gives a phantom number when the two
     // are out of sync, which they can be for historical / cloned bookings).
     const detailSvcMatch = servicesCache.find(s => s.name === b.service_name) || null;
-    const detailSvcCents = detailSvcMatch?.starting_price_cents ?? null;
-    const detailSubtotalCents = (detailSvcCents != null)
-      ? detailSvcCents + detailAddonsSumCents
-      : detailTotalCents;
-    const detailSvcPriceStr = (detailSvcCents != null && detailSvcCents > 0) ? ` — <strong>$${Math.round(detailSvcCents / 100)}</strong>` : '';
+    const detailTravelCents = b.travel_fee_cents || 0;
+    const detailIsHourly = detailSvcMatch?.slug === HOURLY_SLUG;
+    // Cleaning before discount; travel is separate and never discounted.
+    const detailSubtotalCents = cleaningSubtotalCents(b, detailSvcMatch, detailAddonsSumCents)
+      ?? (detailTotalCents != null ? detailTotalCents - detailTravelCents : null);
+    const detailSvcCents = detailIsHourly
+      ? (detailSubtotalCents != null ? detailSubtotalCents - detailAddonsSumCents : null)
+      : (detailSvcMatch?.starting_price_cents ?? null);
+    const detailHours = detailIsHourly && detailSvcCents != null ? detailSvcCents / HOURLY_RATE_CENTS : null;
+    const detailSvcPriceStr = (detailSvcCents != null && detailSvcCents > 0)
+      ? ` — <strong>$${Math.round(detailSvcCents / 100)}</strong>${detailHours && Number.isInteger(detailHours) ? ` (${detailHours} hrs × $${HOURLY_RATE_CENTS / 100})` : ''}`
+      : '';
     // Recurring badge — mirror the card so the modal shows the schedule too.
     const detailFreqLabels = { weekly: 'Weekly · 20% off', biweekly: 'Every 2 weeks · 15% off', monthly: 'Monthly · 10% off' };
     const detailFreqBadge = (b.frequency && b.frequency !== 'one_time' && detailFreqLabels[b.frequency])
@@ -4369,8 +4429,13 @@ Hiraya Spaces`
     // was actually applied to the price). Avoids the phantom "subtotal $259"
     // when stored data is inconsistent (price=full but discount_pct>0).
     const detailDiscountAmount = (detailSubtotalCents != null && detailTotalCents != null)
-      ? detailSubtotalCents - detailTotalCents
+      ? detailSubtotalCents - (detailTotalCents - detailTravelCents)
       : 0;
+    const detailTravelLine = detailTravelCents > 0
+      ? `<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:2px 0">
+          <span>Travel${b.city ? ' — ' + escapeHtml(b.city) : ''}</span><span>$${Math.round(detailTravelCents / 100)}</span>
+        </div>`
+      : '';
     if (detailDiscountPct > 0 && detailDiscountAmount > 0 && detailSubtotalCents != null && detailTotalCents != null) {
       $('detail-price').innerHTML = `
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:2px 0">
@@ -4379,6 +4444,7 @@ Hiraya Spaces`
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--sage);padding:2px 0">
           <span>↻ Recurring discount (${detailDiscountPct}% off)</span><span>-$${Math.round(detailDiscountAmount / 100)}</span>
         </div>
+        ${detailTravelLine}
         <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:8px 0 0;border-top:1px solid var(--border);margin-top:6px">
           <span>Total</span><span>$${Math.round(detailTotalCents / 100)}</span>
         </div>

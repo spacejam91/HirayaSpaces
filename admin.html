@@ -1474,6 +1474,10 @@
     <div class="nb-section">
       <div class="nb-section-label">Primary service</div>
       <select id="edit-service" class="nb-input"></select>
+      <div id="edit-hourly-wrap" style="display:none;margin-top:10px">
+        <div class="nb-section-label">Hours (3–8, $40/hr)</div>
+        <input type="number" id="edit-hours" class="nb-input" min="3" max="8" value="3" oninput="HirayaAdmin.recalcEditPrice()">
+      </div>
     </div>
 
     <div class="nb-section">
@@ -1747,7 +1751,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
 <script src="/js/supabase-client.js?v=202609212128"></script>
-<script src="/js/admin.js?v=202609271732"></script>
+<script src="/js/admin.js?v=202609271740"></script>
 
 </body>
 </html>

@@ -245,6 +245,32 @@ function escapeHtml(value: unknown): string {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+// Flexible hourly rate. Same as HOURLY_RATE in index.html and admin.js, and
+// the rate the database's create_booking() charges.
+const HOURLY_RATE_CENTS = 4000;
+
+// The primary service's line price, before any recurring discount. Fixed-price
+// services use the catalog. Flexible hourly can't: its catalog row doesn't know
+// how many hours were booked, so it's worked back from the booked price, which
+// the database set as (hours x rate + add-ons + extras) less the discount,
+// plus travel.
+function primaryLineCents(booking: any, addonsCents: number, extrasCents: number): number {
+  const catalog = booking.services?.starting_price_cents ?? 0;
+  const pct = booking.recurring_discount_pct || 0;
+  if (booking.services?.slug !== "hourly-flexible" || booking.estimated_price_cents == null || pct >= 100) {
+    return catalog;
+  }
+  const cleaning = Math.round((booking.estimated_price_cents - (booking.travel_fee_cents || 0)) / (1 - pct / 100));
+  return Math.max(0, cleaning - addonsCents - extrasCents);
+}
+
+// "Flexible Cleaning — Hourly (4 hours)" when the hours come out whole.
+function primaryLineName(booking: any, serviceName: string, lineCents: number): string {
+  if (booking.services?.slug !== "hourly-flexible") return serviceName;
+  const hours = lineCents / HOURLY_RATE_CENTS;
+  return Number.isInteger(hours) && hours >= 3 && hours <= 8 ? `${serviceName} (${hours} hours)` : serviceName;
+}
+
 function dollars(cents: number | null | undefined): string {
   if (cents == null) return "Quote on request";
   return "$" + (Number(cents) / 100).toFixed(0);
@@ -556,13 +582,14 @@ Deno.serve(async (req) => {
     // each addon priced (or "Included" for $0 like Eco Products). Cleaner
     // than the old separate Service line + Add-ons bullet list, and shows
     // the customer how the total was built.
-    const baseCents = booking.services?.starting_price_cents ?? 0;
     const addonsCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+    const extrasCents = extraServices.reduce((s: number, es: any) => s + ((es.price_cents || 0) * (es.quantity || 1)), 0);
+    const baseCents = primaryLineCents(booking, addonsCents, extrasCents);
     // Use the saved total when it's there, otherwise reconstruct from parts.
     const lineRows: string[] = [];
     // Primary service first.
     lineRows.push(
-      `<tr><td style="padding:6px 0;color:#1a2e1e">${escapeHtml(serviceName)}</td>` +
+      `<tr><td style="padding:6px 0;color:#1a2e1e">${escapeHtml(primaryLineName(booking, serviceName, baseCents))}</td>` +
       `<td style="padding:6px 0;text-align:right;color:#1a2e1e;font-weight:600">${baseCents ? dollars(baseCents) : "—"}</td></tr>`
     );
     // Any extra services the customer added (Regular + Carpet + Sofa case).
@@ -830,9 +857,9 @@ Deno.serve(async (req) => {
       // is higher than that subtotal (e.g. admin marked complete with extra
       // work), the gap shows as its own "Additional services provided" line so
       // the upcharge is transparent.
-      const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
       const extrasTotalCents = extraServices.reduce((s: number, es: any) => s + ((es.price_cents || 0) * (es.quantity || 1)), 0);
       const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+      const baseCatalogCents = primaryLineCents(booking, addonsTotalCents, extrasTotalCents);
       // Travel has its own line below, so it belongs in the subtotal too —
       // otherwise the gap below re-lists it as "Additional services provided".
       const travelCentsInv = booking.travel_fee_cents || 0;
@@ -841,7 +868,7 @@ Deno.serve(async (req) => {
       // Build line items as structured data first so we can render to both
       // HTML (for email body) and PDF (for attachment / admin download).
       const lineItems: { name: string; priceLabel: string }[] = [];
-      lineItems.push({ name: serviceName, priceLabel: dollars(baseCatalogCents) });
+      lineItems.push({ name: primaryLineName(booking, serviceName, baseCatalogCents), priceLabel: dollars(baseCatalogCents) });
       // Extra services come right after the primary so they read as part of
       // the cleaning scope, before discrete add-ons.
       for (const es of extraServices) {
@@ -1039,14 +1066,14 @@ Deno.serve(async (req) => {
 
       // Rebuild the same line items as the invoice mode so the attached PDF
       // matches the original invoice (just stamped PAID this time).
-      const baseCatalogCents = (booking.services?.starting_price_cents) ?? 0;
       const extrasTotalCents = extraServices.reduce((s: number, es: any) => s + ((es.price_cents || 0) * (es.quantity || 1)), 0);
       const addonsTotalCents = bookingAddons.reduce((s: number, ba: any) => s + ((ba.price_cents || 0) * (ba.quantity || 1)), 0);
+      const baseCatalogCents = primaryLineCents(booking, addonsTotalCents, extrasTotalCents);
       const travelCentsInv = booking.travel_fee_cents || 0;
       const lineSubtotalCents = baseCatalogCents + extrasTotalCents + addonsTotalCents + travelCentsInv;
       const additionalCents = paidTotal - lineSubtotalCents;
       const lineItems: { name: string; priceLabel: string }[] = [];
-      lineItems.push({ name: serviceName, priceLabel: dollars(baseCatalogCents) });
+      lineItems.push({ name: primaryLineName(booking, serviceName, baseCatalogCents), priceLabel: dollars(baseCatalogCents) });
       for (const es of extraServices) {
         const svcName = es.services?.name || "Service";
         const tierLabel = es.tier_name ? ` — ${es.tier_name}` : "";
