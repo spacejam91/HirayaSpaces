@@ -1934,14 +1934,7 @@ Hiraya Spaces`
         p_frequency: frequency,
         p_recurring_discount_pct: appliedDiscountPct,
       };
-      let { data, error } = await sb().rpc('admin_create_booking', params);
-      // PGRST202 = no function takes p_travel_fee_cents yet (migration
-      // 20260927200000 not run). Save without it: the price still includes
-      // travel, it just isn't split out. Delete once the migration is live.
-      if (error && error.code === 'PGRST202') {
-        const { p_travel_fee_cents, ...legacyParams } = params;
-        ({ data, error } = await sb().rpc('admin_create_booking', legacyParams));
-      }
+      const { data, error } = await sb().rpc('admin_create_booking', params);
       if (error) throw error;
       const newBookingId = data; // admin_create_booking returns the new uuid
 
