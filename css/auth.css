@@ -1,5 +1,9 @@
 /* Auth additions — reuses brand tokens defined in index.html (:root vars). */
 
+/* The one token these styles use that the pages' own :root blocks don't
+   define — cancelled/no-show badges and the delete-address button. */
+:root { --rose: #b85c5c; }
+
 /* Force Cormorant Garamond to render lining (modern) numerals instead of
    its default old-style figures. Without this, "1" renders as a thin
    vertical line that reads like a Roman numeral "I". Applies globally to
@@ -376,7 +380,8 @@
 
 /* Locked state — applied when a saved address is selected so the fields
    read as informational rather than editable. */
-.form-group input.locked {
+.form-group input.locked,
+.form-group select.locked {
   background: var(--sage-light);
   color: var(--muted);
   cursor: not-allowed;

@@ -534,7 +534,10 @@
     ['f-street', 'f-unit', 'f-city', 'f-postal'].forEach(function (id) {
       const el = $(id);
       if (!el) return;
-      el.readOnly = locked;
+      // A <select> ignores readOnly, so the city picker needs disabled —
+      // otherwise a saved Guelph address could be re-picked as Kitchener.
+      if (el.tagName === 'SELECT') el.disabled = locked;
+      else el.readOnly = locked;
       el.classList.toggle('locked', locked);
     });
   }
@@ -562,6 +565,12 @@
           if (window.onZoneChange) window.onZoneChange(savedZone ? savedZone.id : '');
         $('f-postal').value = addr.postal_code || '';
         setAddressFieldsLocked(true);
+        // A saved city we couldn't match to a zone stays pickable, so the
+        // customer can choose it (booking refuses without a zone).
+        if (!savedZone) {
+          $('f-city').disabled = false;
+          $('f-city').classList.remove('locked');
+        }
       }
     } else {
       // "Enter a different address" — unlock and clear so the user can type.
