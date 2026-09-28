@@ -3263,12 +3263,14 @@ Hiraya Spaces`
       const issued = fmtDate(inv.created_at);
       const paid = inv.paid_at ? fmtDate(inv.paid_at) : '<span class="inv-muted">—</span>';
       const amount = inv.total_cents != null ? '$' + Math.round(inv.total_cents / 100).toLocaleString() : '—';
+      // Hand-set totals are marked here too, not only in the invoice modal.
+      const adjusted = inv.manually_adjusted ? ' <span class="inv-muted" style="font-size:11px;font-weight:600;letter-spacing:.04em">· ADJUSTED</span>' : '';
       return `<tr onclick="HirayaAdmin.openInvoiceFromTable('${inv.booking_id}')">
         <td class="inv-num-cell">${escapeHtml(inv.invoice_number || '—')}</td>
         <td>${escapeHtml(inv.customer_name || 'Customer')}<div class="inv-muted" style="font-size:12px">${escapeHtml(inv.customer_email || '')}</div></td>
         <td>${escapeHtml(inv.service_name || 'Cleaning')}</td>
         <td>${escapeHtml(issued)}</td>
-        <td class="inv-num">${escapeHtml(amount)}</td>
+        <td class="inv-num">${escapeHtml(amount)}${adjusted}</td>
         <td><span class="inv-badge ${escapeHtml(inv.status || 'unpaid')}">${escapeHtml(invoiceStatusLabel(inv.status))}</span></td>
         <td>${paid}</td>
       </tr>`;
@@ -3328,6 +3330,14 @@ Hiraya Spaces`
     const msg = $('invoice-adjust-msg');
     const btn = $('invoice-adjust-reset');
     if (!viewingInvoice) return;
+    // Reset rewrites the total from the booking price. On a paid invoice
+    // that would change what the customer already paid, with paid_at intact.
+    if (viewingInvoice.status === 'paid') {
+      msg.style.color = 'var(--forest-soft)';
+      msg.textContent = 'This invoice is paid. Mark it unpaid first if the amount really has to change.';
+      return;
+    }
+    if (!window.confirm(`Reset ${viewingInvoice.invoice_number || 'this invoice'} to the booking price? This replaces the total you set by hand.`)) return;
     btn.disabled = true;
     msg.style.color = 'var(--muted)';
     msg.textContent = 'Resetting…';
@@ -3467,13 +3477,19 @@ Hiraya Spaces`
         const addonItems = b.addon_items || [];
         const addonsSum = addonItems.reduce((s, a) => s + (a.price_cents || 0), 0);
         const invoiceTotal = inv.total_cents || 0;
-        const svcPrice = Math.max(0, invoiceTotal - addonsSum);
+        // Travel is part of the total but not the cleaning, and gets its own
+        // line — same as the booking card and the emailed invoice.
+        const travelCents = b.travel_fee_cents || 0;
+        const svcPrice = Math.max(0, invoiceTotal - addonsSum - travelCents);
         const rows = [];
         rows.push(`<div style="display:flex;justify-content:space-between"><span>${escapeHtml(b.service_name || 'Cleaning service')}</span><strong>$${Math.round(svcPrice / 100)}</strong></div>`);
         addonItems.forEach(a => {
           const qtyLabel = a.quantity > 1 ? ` × ${a.quantity}` : '';
           rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}${qtyLabel}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
         });
+        if (travelCents > 0) {
+          rows.push(`<div style="display:flex;justify-content:space-between"><span>Travel${b.city ? ' — ' + escapeHtml(b.city) : ''}</span><strong>$${Math.round(travelCents / 100)}</strong></div>`);
+        }
         rows.push(`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--sage);font-size:16px"><span><strong>Total</strong></span><strong>$${Math.round(invoiceTotal / 100)}</strong></div>`);
         linesEl.innerHTML = rows.join('');
       }
@@ -3529,13 +3545,17 @@ Hiraya Spaces`
     if (linesEl) {
       const addonItems = b.addon_items || [];
       const addonsSum = addonItems.reduce((s, a) => s + (a.price_cents || 0), 0);
-      const svcPrice = Math.max(0, totalCents - addonsSum);
+      const travelCents = b.travel_fee_cents || 0;
+      const svcPrice = Math.max(0, totalCents - addonsSum - travelCents);
       const rows = [];
       rows.push(`<div style="display:flex;justify-content:space-between"><span>${escapeHtml(b.service_name || 'Cleaning service')}</span><strong>$${Math.round(svcPrice / 100)}</strong></div>`);
       addonItems.forEach(a => {
         const qtyLabel = a.quantity > 1 ? ` × ${a.quantity}` : '';
         rows.push(`<div style="display:flex;justify-content:space-between"><span>✨ ${escapeHtml(a.name)}${qtyLabel}</span><strong>$${Math.round((a.price_cents || 0) / 100)}</strong></div>`);
       });
+      if (travelCents > 0) {
+        rows.push(`<div style="display:flex;justify-content:space-between"><span>Travel${b.city ? ' — ' + escapeHtml(b.city) : ''}</span><strong>$${Math.round(travelCents / 100)}</strong></div>`);
+      }
       rows.push(`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--sage);font-size:16px"><span><strong>Total</strong></span><strong>$${Math.round(totalCents / 100)}</strong></div>`);
       linesEl.innerHTML = rows.join('');
     }

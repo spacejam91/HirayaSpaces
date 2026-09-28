@@ -75,7 +75,9 @@
     // not free text. Resolve it to the display name and the per-visit fee.
     const zoneId = $('f-city').value.trim();
     const zone = (window.zoneById ? window.zoneById(zoneId) : null);
-    const city = zone ? zone.label : '';
+    // "Elsewhere nearby" is a fee zone, not a place — the town goes in the address.
+    const town = ($('f-town')?.value || '').trim();
+    const city = zone ? (zone.id === 'other' ? town : zone.label) : '';
     const travelFee = zone ? zone.fee : 0;
     const postal = $('f-postal').value.trim().toUpperCase();
     const savedAddrSel = $('f-saved-addr');
@@ -91,6 +93,9 @@
       return { error: 'Please enter a valid email address.' };
     }
     if (!savedAddressId) {
+      if (zone && zone.id === 'other' && !town) {
+        return { error: 'Please tell us which town the clean is in.' };
+      }
       if (!street || !city || !postal) {
         return { error: 'Please fill in street, city, and postal code.' };
       }
@@ -564,7 +569,11 @@
           $('f-city').value = savedZone ? savedZone.id : '';
           if (window.onZoneChange) window.onZoneChange(savedZone ? savedZone.id : '');
         $('f-postal').value = addr.postal_code || '';
+        // If the customer re-picks "Elsewhere nearby", offer the saved town.
+        if ($('f-town')) $('f-town').value = savedZone ? '' : (addr.city || '');
         setAddressFieldsLocked(true);
+        // A saved address already names its town.
+        if (savedZone && $('f-town-group')) $('f-town-group').style.display = 'none';
         // A saved city we couldn't match to a zone stays pickable, so the
         // customer can choose it (booking refuses without a zone).
         if (!savedZone) {
@@ -579,6 +588,7 @@
       $('f-city').value = '';
       if (window.onZoneChange) window.onZoneChange('');
       $('f-postal').value = '';
+      if ($('f-town')) $('f-town').value = '';
       setAddressFieldsLocked(false);
       setTimeout(() => { const s = $('f-street'); if (s) s.focus(); }, 30);
     }

@@ -231,6 +231,8 @@
     $('addr-street').value = '';
     $('addr-unit').value = '';
     $('addr-city').value = '';
+    if ($('addr-town')) $('addr-town').value = '';
+    if (window.onAddrZoneChange) window.onAddrZoneChange('');
     $('addr-postal').value = '';
     $('addr-is-default').checked = cachedAddresses.length === 0; // first one defaults to default
     $('addr-form-err').style.display = 'none';
@@ -250,6 +252,10 @@
     // #addr-city is a zone picker; the saved city is free text ("Galt").
     const savedZone = window.zoneFromCityText ? window.zoneFromCityText(a.city) : null;
     $('addr-city').value = savedZone ? savedZone.id : '';
+    // A town we have no zone for ("Elmira") is offered back if they pick
+    // "Elsewhere nearby".
+    if ($('addr-town')) $('addr-town').value = savedZone ? '' : (a.city || '');
+    if (window.onAddrZoneChange) window.onAddrZoneChange(savedZone ? savedZone.id : '');
     $('addr-postal').value = a.postal_code || '';
     $('addr-is-default').checked = !!a.is_default;
     $('addr-form-err').style.display = 'none';
@@ -282,7 +288,12 @@
     // ("cambridge", or "other" for Elsewhere nearby) — it's an address.
     const zoneId = $('addr-city').value.trim();
     const zone = window.zoneById ? window.zoneById(zoneId) : null;
-    const city = zone ? zone.label : zoneId;
+    const town = ($('addr-town')?.value || '').trim();
+    if (zone && zone.id === 'other' && !town) {
+      showFormError('Please tell us which town this address is in.');
+      return;
+    }
+    const city = zone ? (zone.id === 'other' ? town : zone.label) : zoneId;
     const postalRaw = $('addr-postal').value.trim().toUpperCase();
     const setDefault = $('addr-is-default').checked;
 
@@ -520,7 +531,9 @@
         ? '$' + Math.round(b.estimated_price_cents / 100)
         : 'Quote on request';
       const addonItems = (b.booking_addons || [])
-        .map(ba => ba.addons ? { name: ba.addons.name, price_cents: ba.addons.price_cents } : null)
+        // The price booked (not today's catalog price), times the quantity —
+        // the same line total the admin dashboard uses.
+        .map(ba => ba.addons ? { name: ba.addons.name, price_cents: (ba.price_cents ?? ba.addons.price_cents ?? 0) * (ba.quantity || 1) } : null)
         .filter(Boolean);
       const addonsSumCents = addonItems.reduce((s, a) => s + (a.price_cents || 0), 0);
       // The stored total includes the per-visit travel fee, so it has to come
