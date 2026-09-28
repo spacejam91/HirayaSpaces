@@ -247,7 +247,9 @@
     $('addr-label').value = a.label || '';
     $('addr-street').value = a.street_address || '';
     $('addr-unit').value = a.unit || '';
-    $('addr-city').value = a.city || '';
+    // #addr-city is a zone picker; the saved city is free text ("Galt").
+    const savedZone = window.zoneFromCityText ? window.zoneFromCityText(a.city) : null;
+    $('addr-city').value = savedZone ? savedZone.id : '';
     $('addr-postal').value = a.postal_code || '';
     $('addr-is-default').checked = !!a.is_default;
     $('addr-form-err').style.display = 'none';
@@ -276,7 +278,11 @@
     const label = $('addr-label').value.trim();
     const street = $('addr-street').value.trim();
     const unit = $('addr-unit').value.trim();
-    const city = $('addr-city').value.trim();
+    // Store the city's name ("Cambridge"), not the picker's zone id
+    // ("cambridge", or "other" for Elsewhere nearby) — it's an address.
+    const zoneId = $('addr-city').value.trim();
+    const zone = window.zoneById ? window.zoneById(zoneId) : null;
+    const city = zone ? zone.label : zoneId;
     const postalRaw = $('addr-postal').value.trim().toUpperCase();
     const setDefault = $('addr-is-default').checked;
 

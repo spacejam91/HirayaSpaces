@@ -1462,7 +1462,7 @@ Hiraya Spaces`
     'kitchener-waterloo': 'kitchener', 'kitchener waterloo': 'kitchener',
     cambridge: 'cambridge', galt: 'cambridge', preston: 'cambridge',
     hespeler: 'cambridge', blair: 'cambridge',
-    guelph: 'guelph', 'elsewhere nearby': 'other',
+    guelph: 'guelph', 'elsewhere nearby': 'other', other: 'other',
   };
 
   function zoneFromCityText(text) {
